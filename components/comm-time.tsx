@@ -15,9 +15,9 @@ import {
   ArrowUp,
   ArrowDown,
 } from "lucide-react";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 
-// 型定義（変更なし）
+// 型定義
 type AlarmPoint = {
   id: string;
   minutes: number;
@@ -39,7 +39,7 @@ type TodoItem = {
   isCompleted: boolean;
 };
 
-// 初期値（変更なし）
+// 初期値の設定
 const initialMeetingAlarmPoints: AlarmPoint[] = [
   { id: "1", minutes: 30, isDone: false, remainingTime: 30 * 60 },
   { id: "2", minutes: 50, isDone: false, remainingTime: 50 * 60 },
@@ -67,57 +67,107 @@ const initialPomodoroSettings = {
 };
 
 export function CommTimeComponent() {
-  // 状態変数（既存の変数はそのまま）
+  // ローカルストレージから安全に値を取得するヘルパー関数
+  const getStorageValue = (key: string, defaultValue: unknown) => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {
+          return saved; // JSON以外の文字列の場合
+        }
+      }
+    }
+    return defaultValue;
+  };
+
+  // 状態変数の定義
   const [currentTime, setCurrentTime] = useState(new Date());
   const [activeTab, setActiveTab] = useState<TabType>("meeting");
+
+  // ミーティングタイマー関連の状態
   const [isMeetingRunning, setIsMeetingRunning] = useState(false);
   const [meetingStartTime, setMeetingStartTime] = useState<Date | null>(null);
   const [meetingElapsedTime, setMeetingElapsedTime] = useState(0);
-  const [alarmPoints, setAlarmPoints] = useState<AlarmPoint[]>(() => {
-    const saved = localStorage.getItem("alarmPoints");
-    return saved ? JSON.parse(saved) : initialMeetingAlarmPoints;
-  });
+  const [alarmPoints, setAlarmPoints] = useState<AlarmPoint[]>(
+    initialMeetingAlarmPoints
+  );
   const [meetingAlarmSettings, setMeetingAlarmSettings] =
-    useState<AlarmSettings>(() => {
-      const saved = localStorage.getItem("meetingAlarmSettings");
-      return saved ? JSON.parse(saved) : initialMeetingAlarmSettings;
-    });
-  const [meetingMemo, setMeetingMemo] = useState(() => {
-    const saved = localStorage.getItem("meetingMemo");
-    return saved || "";
-  });
-  const [meetingTodos, setMeetingTodos] = useState<TodoItem[]>(() => {
-    const saved = localStorage.getItem("meetingTodos");
-    return saved ? JSON.parse(saved) : [];
-  });
+    useState<AlarmSettings>(initialMeetingAlarmSettings);
+  const [meetingMemo, setMeetingMemo] = useState("");
+  const [meetingTodos, setMeetingTodos] = useState<TodoItem[]>([]);
+
+  // ポモドーロタイマー関連の状態
   const [isPomodoroRunning, setIsPomodoroRunning] = useState(false);
   const [pomodoroStartTime, setPomodoroStartTime] = useState<Date | null>(null);
   const [pomodoroElapsedTime, setPomodoroElapsedTime] = useState(0);
   const [pomodoroState, setPomodoroState] = useState<"work" | "break">("work");
-  const [pomodoroSettings, setPomodoroSettings] = useState(() => {
-    const saved = localStorage.getItem("pomodoroSettings");
-    return saved ? JSON.parse(saved) : initialPomodoroSettings;
-  });
-  const [pomodoroMemo, setPomodoroMemo] = useState(() => {
-    const saved = localStorage.getItem("pomodoroMemo");
-    return saved || "";
-  });
+  const [pomodoroSettings, setPomodoroSettings] = useState(
+    initialPomodoroSettings
+  );
+  const [pomodoroMemo, setPomodoroMemo] = useState("");
   const [pomodoroCycles, setPomodoroCycles] = useState(0);
-  const [pomodoroTodos, setPomodorTodos] = useState<TodoItem[]>(() => {
-    const saved = localStorage.getItem("pomodoroTodos");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [pomodoroTodos, setPomodorTodos] = useState<TodoItem[]>([]);
+
+  // TODO関連の状態
   const [newMeetingTodo, setNewMeetingTodo] = useState("");
   const [newPomodoroTodo, setNewPomodoroTodo] = useState("");
-  const [reservationDate, setReservationDate] = useState("");
-  const [reservationTime, setReservationTime] = useState("");
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
   const [editingTodoText, setEditingTodoText] = useState("");
+
+  // その他の状態
   const [forceFocus, setForceFocus] = useState(false);
+  const [reservationDate, setReservationDate] = useState("");
+  const [reservationTime, setReservationTime] = useState("");
 
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
 
+  // 初期データのロード
+  useEffect(() => {
+    // ローカルストレージからすべての保存データを読み込む
+    setAlarmPoints(getStorageValue("alarmPoints", initialMeetingAlarmPoints));
+    setMeetingAlarmSettings(
+      getStorageValue("meetingAlarmSettings", initialMeetingAlarmSettings)
+    );
+    setMeetingMemo(getStorageValue("meetingMemo", ""));
+    setMeetingTodos(getStorageValue("meetingTodos", []));
+    setPomodoroSettings(
+      getStorageValue("pomodoroSettings", initialPomodoroSettings)
+    );
+    setPomodoroMemo(getStorageValue("pomodoroMemo", ""));
+    setPomodorTodos(getStorageValue("pomodoroTodos", []));
+  }, []);
+
+  // データの自動保存
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("alarmPoints", JSON.stringify(alarmPoints));
+      localStorage.setItem(
+        "meetingAlarmSettings",
+        JSON.stringify(meetingAlarmSettings)
+      );
+      localStorage.setItem(
+        "pomodoroSettings",
+        JSON.stringify(pomodoroSettings)
+      );
+      localStorage.setItem("meetingMemo", meetingMemo);
+      localStorage.setItem("pomodoroMemo", pomodoroMemo);
+      localStorage.setItem("meetingTodos", JSON.stringify(meetingTodos));
+      localStorage.setItem("pomodoroTodos", JSON.stringify(pomodoroTodos));
+    }
+  }, [
+    alarmPoints,
+    meetingAlarmSettings,
+    pomodoroSettings,
+    meetingMemo,
+    pomodoroMemo,
+    meetingTodos,
+    pomodoroTodos,
+  ]);
+
+  // 時間のフォーマット関数
   const formatTime = useCallback((seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -127,12 +177,16 @@ export function CommTimeComponent() {
       .padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
   }, []);
 
-  // アラーム再生関数（変更なし）
+  // アラーム再生機能
   const playAlarm = useCallback(
     (settings: AlarmSettings) => {
-      const audioContext = new (window.AudioContext ||
-        (window as typeof window & { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext)();
+      if (typeof window === "undefined") return;
+
+      const audioContext = new ((window as typeof window & {
+        webkitAudioContext?: typeof AudioContext;
+      }).AudioContext || (window as typeof window & {
+        webkitAudioContext?: typeof AudioContext;
+      }).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
@@ -167,24 +221,23 @@ export function CommTimeComponent() {
     [forceFocus, meetingElapsedTime, formatTime]
   );
 
-  // 効果（既存の効果はそのまま）
+  // 現在時刻の更新
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // ミーティングタイマーの更新
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (isMeetingRunning) {
+    if (isMeetingRunning && meetingStartTime) {
       timer = setInterval(() => {
-        if (meetingStartTime) {
-          const now = new Date();
-          const newElapsedTime = Math.floor(
-            (now.getTime() - meetingStartTime.getTime()) / 1000
-          );
-          setMeetingElapsedTime(newElapsedTime);
-          document.title = `CommTime (${formatTime(newElapsedTime)})`;
-        }
+        const now = new Date();
+        const newElapsedTime = Math.floor(
+          (now.getTime() - meetingStartTime.getTime()) / 1000
+        );
+        setMeetingElapsedTime(newElapsedTime);
+        document.title = `CommTime (${formatTime(newElapsedTime)})`;
       }, 1000);
     }
     return () => {
@@ -195,24 +248,11 @@ export function CommTimeComponent() {
     };
   }, [isMeetingRunning, meetingStartTime, formatTime]);
 
+  // アラームポイントの更新
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (isPomodoroRunning) {
-      timer = setInterval(() => {
-        if (pomodoroStartTime) {
-          const now = new Date();
-          setPomodoroElapsedTime(
-            Math.floor((now.getTime() - pomodoroStartTime.getTime()) / 1000)
-          );
-        }
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [isPomodoroRunning, pomodoroStartTime]);
-
-  useEffect(() => {
     if (isMeetingRunning) {
-      const timer = setInterval(() => {
+      timer = setInterval(() => {
         setAlarmPoints((prevPoints) =>
           prevPoints.map((point) => {
             if (!point.isDone) {
@@ -231,16 +271,32 @@ export function CommTimeComponent() {
           })
         );
       }, 1000);
-      return () => clearInterval(timer);
     }
+    return () => clearInterval(timer);
   }, [isMeetingRunning, meetingAlarmSettings, playAlarm]);
 
+  // ポモドーロタイマーの更新
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isPomodoroRunning && pomodoroStartTime) {
+      timer = setInterval(() => {
+        const now = new Date();
+        setPomodoroElapsedTime(
+          Math.floor((now.getTime() - pomodoroStartTime.getTime()) / 1000)
+        );
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isPomodoroRunning, pomodoroStartTime]);
+
+  // ポモドーロの状態管理
   useEffect(() => {
     if (isPomodoroRunning) {
       const currentDuration =
         pomodoroState === "work"
           ? pomodoroSettings.workDuration
           : pomodoroSettings.breakDuration;
+
       if (pomodoroElapsedTime >= currentDuration * 60) {
         const newState = pomodoroState === "work" ? "break" : "work";
         setPomodoroState(newState);
@@ -251,9 +307,11 @@ export function CommTimeComponent() {
             ? pomodoroSettings.workAlarm
             : pomodoroSettings.breakAlarm
         );
+
         if (newState === "work") {
           setPomodoroCycles((prev) => prev + 1);
         }
+
         if (
           !pomodoroSettings.infiniteMode &&
           pomodoroCycles >= pomodoroSettings.cycles
@@ -271,57 +329,7 @@ export function CommTimeComponent() {
     playAlarm,
   ]);
 
-  useEffect(() => {
-    localStorage.setItem("alarmPoints", JSON.stringify(alarmPoints));
-    localStorage.setItem(
-      "meetingAlarmSettings",
-      JSON.stringify(meetingAlarmSettings)
-    );
-    localStorage.setItem("pomodoroSettings", JSON.stringify(pomodoroSettings));
-    localStorage.setItem("meetingMemo", meetingMemo);
-    localStorage.setItem("pomodoroMemo", pomodoroMemo);
-    localStorage.setItem("meetingTodos", JSON.stringify(meetingTodos));
-    localStorage.setItem("pomodoroTodos", JSON.stringify(pomodoroTodos));
-  }, [
-    alarmPoints,
-    meetingAlarmSettings,
-    pomodoroSettings,
-    meetingMemo,
-    pomodoroMemo,
-    meetingTodos,
-    pomodoroTodos,
-  ]);
-
-  // タイマーを開始する関数（新規追加）
-  const startTimer = useCallback(() => {
-    setIsMeetingRunning(true);
-    setMeetingStartTime(new Date());
-    setAlarmPoints((prevPoints) =>
-      prevPoints.map((p) => ({
-        ...p,
-        isDone: false,
-        remainingTime: p.minutes * 60,
-      }))
-    );
-  }, []);
-
-  // タイマー予約の効果を追加
-  useEffect(() => {
-    const reservationDateTime = new Date(
-      `${reservationDate}T${reservationTime}`
-    );
-    const now = new Date();
-    if (reservationDateTime > now) {
-      const timeUntilReservation =
-        reservationDateTime.getTime() - now.getTime();
-      const timerId = setTimeout(() => {
-        startTimer();
-      }, timeUntilReservation);
-      return () => clearTimeout(timerId);
-    }
-  }, [reservationDate, reservationTime, startTimer]);
-
-  // 関数（既存の関数はそのまま）
+  // タイマーの制御機能
   const toggleMeetingTimer = useCallback(() => {
     if (isMeetingRunning) {
       setIsMeetingRunning(false);
@@ -329,7 +337,6 @@ export function CommTimeComponent() {
       if (meetingStartTime === null) {
         setMeetingStartTime(new Date());
       } else {
-        // Adjust the start time when resuming
         const now = new Date();
         const pausedDuration =
           now.getTime() -
@@ -355,7 +362,6 @@ export function CommTimeComponent() {
         setPomodoroStartTime(new Date());
         setPomodoroElapsedTime(0);
       } else {
-        // Adjust the start time when resuming
         const now = new Date();
         const adjustedStartTime = new Date(
           now.getTime() - pomodoroElapsedTime * 1000
@@ -375,6 +381,7 @@ export function CommTimeComponent() {
     setPomodoroSettings(initialPomodoroSettings);
   }, []);
 
+  // アラームポイントの管理機能
   const addAlarmPoint = useCallback(() => {
     const newId = Date.now().toString();
     const newMinutes = Math.max(1, Math.floor(meetingElapsedTime / 60) + 1);
@@ -411,6 +418,7 @@ export function CommTimeComponent() {
     );
   }, []);
 
+  // 終了時刻の計算機能
   const getEndTime = useCallback(
     (startTime: Date | null, durationInSeconds: number) => {
       if (!startTime) return "--:--:--";
@@ -420,6 +428,7 @@ export function CommTimeComponent() {
     []
   );
 
+  // カウントダウン時間の計算
   const getCountdown = useCallback(
     (totalSeconds: number, elapsedSeconds: number) => {
       const remainingSeconds = totalSeconds - elapsedSeconds;
@@ -428,8 +437,16 @@ export function CommTimeComponent() {
     [formatTime]
   );
 
+  // TODO管理機能
   const addTodo = useCallback((text: string, isPomodoro: boolean) => {
-    const newTodo = { id: Date.now().toString(), text, isCompleted: false };
+    if (!text.trim()) return; // 空のTODOは追加しない
+
+    const newTodo = {
+      id: Date.now().toString(),
+      text: text.trim(),
+      isCompleted: false,
+    };
+
     if (isPomodoro) {
       setPomodorTodos((prev) => [...prev, newTodo]);
     } else {
@@ -438,18 +455,15 @@ export function CommTimeComponent() {
   }, []);
 
   const toggleTodo = useCallback((id: string, isPomodoro: boolean) => {
+    const updateTodos = (prev: TodoItem[]) =>
+      prev.map((todo) =>
+        todo.id === id ? { ...todo, isCompleted: !todo.isCompleted } : todo
+      );
+
     if (isPomodoro) {
-      setPomodorTodos((prev) =>
-        prev.map((todo) =>
-          todo.id === id ? { ...todo, isCompleted: !todo.isCompleted } : todo
-        )
-      );
+      setPomodorTodos(updateTodos);
     } else {
-      setMeetingTodos((prev) =>
-        prev.map((todo) =>
-          todo.id === id ? { ...todo, isCompleted: !todo.isCompleted } : todo
-        )
-      );
+      setMeetingTodos(updateTodos);
     }
   }, []);
 
@@ -463,9 +477,11 @@ export function CommTimeComponent() {
 
   const updateTodo = useCallback(
     (id: string, newText: string, isPomodoro: boolean) => {
+      if (!newText.trim()) return; // 空のテキストの場合は更新しない
+
       const updateFunc = (prev: TodoItem[]) =>
         prev.map((todo) =>
-          todo.id === id ? { ...todo, text: newText } : todo
+          todo.id === id ? { ...todo, text: newText.trim() } : todo
         );
 
       if (isPomodoro) {
@@ -474,6 +490,7 @@ export function CommTimeComponent() {
         setMeetingTodos(updateFunc);
       }
       setEditingTodoId(null);
+      setEditingTodoText("");
     },
     []
   );
@@ -488,6 +505,7 @@ export function CommTimeComponent() {
     setEditingTodoText("");
   }, []);
 
+  // TODOとアラームポイントのリンク機能
   const linkTodoToAlarmPoint = useCallback(
     (todoId: string, alarmPointId: string) => {
       setAlarmPoints((prev) =>
@@ -499,25 +517,29 @@ export function CommTimeComponent() {
     []
   );
 
+  // ドラッグ&ドロップの処理
   const onDragEnd = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (result: any) => {
+    (result: DropResult) => {
       if (!result.destination) return;
 
       const sourceId = result.source.droppableId;
       const destId = result.destination.droppableId;
 
       if (sourceId === destId) {
+        // 同じリスト内での並び替え
         const items =
           sourceId === "meetingTodos" ? meetingTodos : pomodoroTodos;
-        const [reorderedItem] = items.splice(result.source.index, 1);
-        items.splice(result.destination.index, 0, reorderedItem);
+        const reorderedItems = Array.from(items);
+        const [removed] = reorderedItems.splice(result.source.index, 1);
+        reorderedItems.splice(result.destination.index, 0, removed);
+
         if (sourceId === "meetingTodos") {
-          setMeetingTodos([...items]);
+          setMeetingTodos(reorderedItems);
         } else {
-          setPomodorTodos([...items]);
+          setPomodorTodos(reorderedItems);
         }
       } else if (destId.startsWith("alarmPoint")) {
+        // TODOをアラームポイントにリンク
         const todoId = result.draggableId;
         const alarmPointId = destId.split("-")[1];
         linkTodoToAlarmPoint(todoId, alarmPointId);
@@ -526,14 +548,18 @@ export function CommTimeComponent() {
     [meetingTodos, pomodoroTodos, linkTodoToAlarmPoint]
   );
 
+  // TODOの順序変更機能
   const moveTodoUp = useCallback(
     (index: number, isPomodoro: boolean) => {
       if (index === 0) return;
+
       const todos = isPomodoro ? pomodoroTodos : meetingTodos;
       const newTodos = [...todos];
-      const temp = newTodos[index];
-      newTodos[index] = newTodos[index - 1];
-      newTodos[index - 1] = temp;
+      [newTodos[index - 1], newTodos[index]] = [
+        newTodos[index],
+        newTodos[index - 1],
+      ];
+
       if (isPomodoro) {
         setPomodorTodos(newTodos);
       } else {
@@ -547,10 +573,13 @@ export function CommTimeComponent() {
     (index: number, isPomodoro: boolean) => {
       const todos = isPomodoro ? pomodoroTodos : meetingTodos;
       if (index === todos.length - 1) return;
+
       const newTodos = [...todos];
-      const temp = newTodos[index];
-      newTodos[index] = newTodos[index + 1];
-      newTodos[index + 1] = temp;
+      [newTodos[index], newTodos[index + 1]] = [
+        newTodos[index + 1],
+        newTodos[index],
+      ];
+
       if (isPomodoro) {
         setPomodorTodos(newTodos);
       } else {
