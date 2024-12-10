@@ -123,8 +123,6 @@ export function CommTimeComponent() {
 
   // その他の状態
   const [forceFocus, setForceFocus] = useState(false);
-  const [reservationDate, setReservationDate] = useState("");
-  const [reservationTime, setReservationTime] = useState("");
 
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
@@ -701,39 +699,7 @@ export function CommTimeComponent() {
                   </div>
                 )}
 
-                {/* タイマー予約セクション */}
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold mb-2">タイマー予約</h3>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="date"
-                      value={reservationDate}
-                      onChange={(e) => setReservationDate(e.target.value)}
-                      className="border rounded px-2 py-1"
-                    />
-                    <input
-                      type="time"
-                      value={reservationTime}
-                      onChange={(e) => setReservationTime(e.target.value)}
-                      className="border rounded px-2 py-1"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        console.log(
-                          "Timer reserved for:",
-                          reservationDate,
-                          reservationTime
-                        );
-                      }}
-                      className="bg-blue-500 text-white px-4 py-1 rounded hover:bg-blue-600"
-                    >
-                      予約
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mb-4">
+                <div className="mb-8">
                   <h3 className="text-lg font-semibold mb-2">
                     アラームポイント
                   </h3>
