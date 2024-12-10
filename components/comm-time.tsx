@@ -15,7 +15,12 @@ import {
   ArrowUp,
   ArrowDown,
 } from "lucide-react";
-import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  type DropResult,
+} from "react-beautiful-dnd";
 
 // 型定義
 type AlarmPoint = {
@@ -182,11 +187,16 @@ export function CommTimeComponent() {
     (settings: AlarmSettings) => {
       if (typeof window === "undefined") return;
 
-      const audioContext = new ((window as typeof window & {
-        webkitAudioContext?: typeof AudioContext;
-      }).AudioContext || (window as typeof window & {
-        webkitAudioContext?: typeof AudioContext;
-      }).webkitAudioContext)();
+      const audioContext = new ((
+        window as typeof window & {
+          webkitAudioContext?: typeof AudioContext;
+        }
+      ).AudioContext ||
+        (
+          window as typeof window & {
+            webkitAudioContext?: typeof AudioContext;
+          }
+        ).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
@@ -214,7 +224,7 @@ export function CommTimeComponent() {
         window.focus();
         document.title = "アラーム!";
         setTimeout(() => {
-          document.title = `CommTime (${formatTime(meetingElapsedTime)})`;
+          document.title = `CT (${formatTime(meetingElapsedTime)})`;
         }, 5000);
       }
     },
@@ -237,13 +247,13 @@ export function CommTimeComponent() {
           (now.getTime() - meetingStartTime.getTime()) / 1000
         );
         setMeetingElapsedTime(newElapsedTime);
-        document.title = `CommTime (${formatTime(newElapsedTime)})`;
+        document.title = `CT (${formatTime(newElapsedTime)})`;
       }, 1000);
     }
     return () => {
       clearInterval(timer);
       if (!isMeetingRunning) {
-        document.title = "CommTime";
+        document.title = "CT";
       }
     };
   }, [isMeetingRunning, meetingStartTime, formatTime]);
@@ -593,7 +603,7 @@ export function CommTimeComponent() {
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-lg p-6">
         <h1 className="text-3xl font-bold mb-6 text-center text-blue-600">
-          CommTime
+          Comm Time
         </h1>
 
         <div className="text-xl font-semibold mb-4 text-center">
@@ -602,6 +612,7 @@ export function CommTimeComponent() {
 
         <div className="flex mb-4">
           <button
+            type="button"
             onClick={() => setActiveTab("meeting")}
             className={`flex-1 py-2 ${
               activeTab === "meeting" ? "bg-blue-500 text-white" : "bg-gray-200"
@@ -610,6 +621,7 @@ export function CommTimeComponent() {
             <Clock className="inline mr-2" /> ミーティングタイマー
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab("pomodoro")}
             className={`flex-1 py-2 ${
               activeTab === "pomodoro"
@@ -640,6 +652,7 @@ export function CommTimeComponent() {
                 </div>
                 <div className="flex justify-center space-x-4 mb-4">
                   <button
+                    type="button"
                     onClick={toggleMeetingTimer}
                     className={`px-6 py-2 rounded-full ${
                       isMeetingRunning
@@ -655,12 +668,14 @@ export function CommTimeComponent() {
                     {isMeetingRunning ? "一時停止" : "開始"}
                   </button>
                   <button
+                    type="button"
                     onClick={resetMeetingTimer}
                     className="px-6 py-2 rounded-full bg-gray-500 hover:bg-gray-600 text-white"
                   >
                     リセット
                   </button>
                   <button
+                    type="button"
                     onClick={() =>
                       localStorage.setItem(
                         "meetingAlarmPoints",
@@ -703,6 +718,7 @@ export function CommTimeComponent() {
                       className="border rounded px-2 py-1"
                     />
                     <button
+                      type="button"
                       onClick={() => {
                         console.log(
                           "Timer reserved for:",
@@ -755,6 +771,7 @@ export function CommTimeComponent() {
                         </span>
                       )}
                       <button
+                        type="button"
                         onClick={() => removeAlarmPoint(point.id)}
                         className="text-red-500"
                       >
@@ -763,6 +780,7 @@ export function CommTimeComponent() {
                     </div>
                   ))}
                   <button
+                    type="button"
                     onClick={addAlarmPoint}
                     className="mt-2 text-blue-500 hover:text-blue-600"
                   >
@@ -811,6 +829,7 @@ export function CommTimeComponent() {
                       Hz
                     </label>
                     <button
+                      type="button"
                       onClick={() =>
                         setMeetingAlarmSettings(initialMeetingAlarmSettings)
                       }
@@ -819,6 +838,7 @@ export function CommTimeComponent() {
                       リセット
                     </button>
                     <button
+                      type="button"
                       onClick={() =>
                         localStorage.setItem(
                           "meetingAlarmSettings",
@@ -831,6 +851,7 @@ export function CommTimeComponent() {
                     </button>
                   </div>
                   <button
+                    type="button"
                     onClick={() => playAlarm(meetingAlarmSettings)}
                     className="mt-2 px-4 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded"
                   >
@@ -874,6 +895,7 @@ export function CommTimeComponent() {
                 </div>
                 <div className="flex justify-center space-x-4 mb-4">
                   <button
+                    type="button"
                     onClick={togglePomodoroTimer}
                     className={`px-6 py-2 rounded-full ${
                       isPomodoroRunning
@@ -889,12 +911,14 @@ export function CommTimeComponent() {
                     {isPomodoroRunning ? "一時停止" : "開始"}
                   </button>
                   <button
+                    type="button"
                     onClick={resetPomodoroTimer}
                     className="px-6 py-2 rounded-full bg-gray-500 hover:bg-gray-600 text-white"
                   >
                     リセット
                   </button>
                   <button
+                    type="button"
                     onClick={() =>
                       localStorage.setItem(
                         "pomodoroSettings",
@@ -1050,6 +1074,7 @@ export function CommTimeComponent() {
                       Hz
                     </label>
                     <button
+                      type="button"
                       onClick={() => playAlarm(pomodoroSettings.workAlarm)}
                       className="px-4 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded"
                     >
@@ -1105,6 +1130,7 @@ export function CommTimeComponent() {
                       Hz
                     </label>
                     <button
+                      type="button"
                       onClick={() => playAlarm(pomodoroSettings.breakAlarm)}
                       className="px-4 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded"
                     >
@@ -1130,6 +1156,7 @@ export function CommTimeComponent() {
                 placeholder="メモを入力..."
               />
               <button
+                type="button"
                 onClick={() =>
                   localStorage.setItem(
                     activeTab === "meeting" ? "meetingMemo" : "pomodoroMemo",
@@ -1194,6 +1221,7 @@ export function CommTimeComponent() {
                                 {editingTodoId === todo.id ? (
                                   <>
                                     <button
+                                      type="button"
                                       onClick={() =>
                                         updateTodo(
                                           todo.id,
@@ -1206,6 +1234,7 @@ export function CommTimeComponent() {
                                       <Save className="w-4 h-4" />
                                     </button>
                                     <button
+                                      type="button"
                                       onClick={cancelEditingTodo}
                                       className="text-red-500 mr-2"
                                     >
@@ -1215,6 +1244,7 @@ export function CommTimeComponent() {
                                 ) : (
                                   <>
                                     <button
+                                      type="button"
                                       onClick={() =>
                                         toggleTodo(
                                           todo.id,
@@ -1226,6 +1256,7 @@ export function CommTimeComponent() {
                                       <Check className="w-4 h-4" />
                                     </button>
                                     <button
+                                      type="button"
                                       onClick={() =>
                                         startEditingTodo(todo.id, todo.text)
                                       }
@@ -1234,6 +1265,7 @@ export function CommTimeComponent() {
                                       <Edit className="w-4 h-4" />
                                     </button>
                                     <button
+                                      type="button"
                                       onClick={() =>
                                         removeTodo(
                                           todo.id,
@@ -1245,6 +1277,7 @@ export function CommTimeComponent() {
                                       <X className="w-4 h-4" />
                                     </button>
                                     <button
+                                      type="button"
                                       onClick={() =>
                                         moveTodoUp(
                                           index,
@@ -1256,6 +1289,7 @@ export function CommTimeComponent() {
                                       <ArrowUp className="w-4 h-4" />
                                     </button>
                                     <button
+                                      type="button"
                                       onClick={() =>
                                         moveTodoDown(
                                           index,
@@ -1294,6 +1328,7 @@ export function CommTimeComponent() {
                   ref={todoInputRef}
                 />
                 <button
+                  type="button"
                   onClick={() => {
                     if (activeTab === "meeting") {
                       addTodo(newMeetingTodo, false);
