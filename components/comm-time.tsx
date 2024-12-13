@@ -52,8 +52,8 @@ const initialMeetingAlarmPoints: AlarmPoint[] = [
 ];
 
 const initialMeetingAlarmSettings: AlarmSettings = {
-  volume: 45,
-  frequency: 400,
+  volume: 44,
+  frequency: 340,
 };
 
 const initialPomodoroSettings = {
@@ -62,12 +62,12 @@ const initialPomodoroSettings = {
   cycles: 4,
   infiniteMode: false,
   workAlarm: {
-    volume: 35,
-    frequency: 360,
+    volume: 65,
+    frequency: 240,
   },
   breakAlarm: {
-    volume: 30,
-    frequency: 300,
+    volume: 36,
+    frequency: 740,
   },
 };
 
