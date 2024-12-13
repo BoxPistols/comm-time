@@ -1112,7 +1112,7 @@ export function CommTimeComponent() {
                       }
                       className="px-4 py-1 bg-gray-500 hover:bg-yellow-600 text-white rounded"
                     >
-                      アラームリセット
+                      リセット
                     </button>
               </div>
             )}
