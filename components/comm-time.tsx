@@ -881,7 +881,7 @@ export function CommTimeComponent() {
                     onClick={resetPomodoroTimer}
                     className="px-6 py-2 rounded-full bg-gray-500 hover:bg-gray-600 text-white"
                   >
-                    ALLリセット
+                    リセット
                   </button>
                   <button
                     type="button"
@@ -1104,20 +1104,10 @@ export function CommTimeComponent() {
                     </button>
                   </div>
                 </div>
-
-                <button
-                      type="button"
-                      onClick={() =>
-                        setPomodoroSettings(initialPomodoroSettings)
-                      }
-                      className="px-4 py-1 bg-gray-500 hover:bg-yellow-600 text-white rounded"
-                    >
-                      リセット
-                    </button>
               </div>
             )}
           </div>
-
+          
           <div className="w-full md:w-1/4">
             <div className="bg-gray-50 p-4 rounded-lg mb-4">
               <h3 className="text-lg font-semibold mb-2">メモ</h3>
