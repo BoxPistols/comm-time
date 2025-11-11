@@ -14,6 +14,9 @@ import {
   List,
   ArrowUp,
   ArrowDown,
+  Bell,
+  BellOff,
+  Vibrate,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -123,6 +126,9 @@ export function CommTimeComponent() {
 
   // その他の状態
   const [forceFocus, setForceFocus] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [vibrationEnabled, setVibrationEnabled] = useState(true);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
 
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
@@ -141,6 +147,13 @@ export function CommTimeComponent() {
     );
     setPomodoroMemo(getStorageValue("pomodoroMemo", ""));
     setPomodorTodos(getStorageValue("pomodoroTodos", []));
+    setNotificationsEnabled(getStorageValue("notificationsEnabled", false));
+    setVibrationEnabled(getStorageValue("vibrationEnabled", true));
+
+    // 通知権限の確認
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setNotificationPermission(Notification.permission);
+    }
   }, []);
 
   // データの自動保存
@@ -159,6 +172,8 @@ export function CommTimeComponent() {
       localStorage.setItem("pomodoroMemo", pomodoroMemo);
       localStorage.setItem("meetingTodos", JSON.stringify(meetingTodos));
       localStorage.setItem("pomodoroTodos", JSON.stringify(pomodoroTodos));
+      localStorage.setItem("notificationsEnabled", JSON.stringify(notificationsEnabled));
+      localStorage.setItem("vibrationEnabled", JSON.stringify(vibrationEnabled));
     }
   }, [
     alarmPoints,
@@ -168,6 +183,8 @@ export function CommTimeComponent() {
     pomodoroMemo,
     meetingTodos,
     pomodoroTodos,
+    notificationsEnabled,
+    vibrationEnabled,
   ]);
 
   // 時間のフォーマット関数
@@ -182,9 +199,10 @@ export function CommTimeComponent() {
 
   // アラーム再生機能
   const playAlarm = useCallback(
-    (settings: AlarmSettings) => {
+    (settings: AlarmSettings, message: string = "アラーム!") => {
       if (typeof window === "undefined") return;
 
+      // 音声アラーム
       const audioContext = new ((
         window as typeof window & {
           webkitAudioContext?: typeof AudioContext;
@@ -218,15 +236,32 @@ export function CommTimeComponent() {
       );
       oscillator.stop(audioContext.currentTime + 1);
 
+      // バイブレーション
+      if (vibrationEnabled && "vibrate" in navigator) {
+        // 200ms振動, 100ms休止, 200ms振動のパターン
+        navigator.vibrate([200, 100, 200]);
+      }
+
+      // 通知
+      if (notificationsEnabled && notificationPermission === "granted") {
+        new Notification("Comm Time", {
+          body: message,
+          icon: "/icon.png",
+          badge: "/badge.png",
+          tag: "comm-time-alarm",
+          requireInteraction: true,
+        });
+      }
+
       if (forceFocus) {
         window.focus();
-        document.title = "アラーム!";
+        document.title = "🔔 " + message;
         setTimeout(() => {
           document.title = `CT (${formatTime(meetingElapsedTime)})`;
         }, 5000);
       }
     },
-    [forceFocus, meetingElapsedTime, formatTime]
+    [forceFocus, meetingElapsedTime, formatTime, vibrationEnabled, notificationsEnabled, notificationPermission]
   );
 
   // 現在時刻の更新
@@ -266,7 +301,7 @@ export function CommTimeComponent() {
             if (!point.isDone) {
               const newRemainingTime = Math.max(0, point.remainingTime - 1);
               if (newRemainingTime === 0) {
-                playAlarm(meetingAlarmSettings);
+                playAlarm(meetingAlarmSettings, `${point.minutes}分経過しました`);
                 return {
                   ...point,
                   isDone: true,
@@ -313,7 +348,8 @@ export function CommTimeComponent() {
         playAlarm(
           newState === "work"
             ? pomodoroSettings.workAlarm
-            : pomodoroSettings.breakAlarm
+            : pomodoroSettings.breakAlarm,
+          newState === "work" ? "休憩終了！作業を開始してください" : "お疲れ様です！休憩時間です"
         );
 
         if (newState === "work") {
@@ -444,6 +480,24 @@ export function CommTimeComponent() {
     },
     [formatTime]
   );
+
+  // 通知権限のリクエスト
+  const requestNotificationPermission = useCallback(async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      alert("このブラウザは通知をサポートしていません");
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission === "granted") {
+        setNotificationsEnabled(true);
+      }
+    } catch (error) {
+      console.error("通知権限のリクエストに失敗しました:", error);
+    }
+  }, []);
 
   // TODO管理機能
   const addTodo = useCallback((text: string, isPomodoro: boolean) => {
@@ -598,385 +652,502 @@ export function CommTimeComponent() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-lg p-6">
-        <h1 className="text-3xl font-bold mb-6 text-center text-blue-600">
-          Comm Time
-        </h1>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-4 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        {/* ヘッダー */}
+        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 mb-4 sm:mb-6 border border-white/20">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Clock className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                  Comm Time
+                </h1>
+                <p className="text-xs sm:text-sm text-gray-500 font-medium">
+                  現在時刻: {currentTime.toLocaleTimeString()}
+                </p>
+              </div>
+            </div>
 
-        <div className="text-xl font-semibold mb-4 text-center">
-          現在時刻: {currentTime.toLocaleTimeString()}
+            {/* 設定ボタン群 */}
+            <div className="flex gap-2 items-center">
+              {/* バイブレーション設定 */}
+              <button
+                type="button"
+                onClick={() => setVibrationEnabled(!vibrationEnabled)}
+                className={`p-2 sm:p-2.5 rounded-xl transition-all duration-200 ${
+                  vibrationEnabled
+                    ? "bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg"
+                    : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                }`}
+                title={vibrationEnabled ? "バイブレーション ON" : "バイブレーション OFF"}
+              >
+                <Vibrate className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+
+              {/* 通知設定 */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (notificationPermission !== "granted") {
+                    requestNotificationPermission();
+                  } else {
+                    setNotificationsEnabled(!notificationsEnabled);
+                  }
+                }}
+                className={`p-2 sm:p-2.5 rounded-xl transition-all duration-200 ${
+                  notificationsEnabled
+                    ? "bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg"
+                    : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                }`}
+                title={notificationsEnabled ? "通知 ON" : "通知 OFF"}
+              >
+                {notificationsEnabled ? (
+                  <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+                ) : (
+                  <BellOff className="w-4 h-4 sm:w-5 sm:h-5" />
+                )}
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="flex mb-4">
+        {/* タブ切り替え */}
+        <div className="flex gap-2 sm:gap-3 mb-4 sm:mb-6">
           <button
             type="button"
             onClick={() => setActiveTab("meeting")}
-            className={`flex-1 py-2 ${
-              activeTab === "meeting" ? "bg-blue-500 text-white" : "bg-gray-200"
+            className={`flex-1 py-3 sm:py-4 px-4 sm:px-6 rounded-xl sm:rounded-2xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-2 ${
+              activeTab === "meeting"
+                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xl scale-105"
+                : "bg-white/80 backdrop-blur-lg text-gray-700 hover:bg-white shadow-md hover:shadow-lg"
             }`}
           >
-            <Clock className="inline mr-2" /> ミーティングタイマー
+            <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">ミーティングタイマー</span>
+            <span className="sm:hidden">ミーティング</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("pomodoro")}
-            className={`flex-1 py-2 ${
+            className={`flex-1 py-3 sm:py-4 px-4 sm:px-6 rounded-xl sm:rounded-2xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === "pomodoro"
-                ? "bg-blue-500 text-white"
-                : "bg-gray-200"
+                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xl scale-105"
+                : "bg-white/80 backdrop-blur-lg text-gray-700 hover:bg-white shadow-md hover:shadow-lg"
             }`}
           >
-            <List className="inline mr-2" /> ポモドーロタイマー
+            <List className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">ポモドーロタイマー</span>
+            <span className="sm:hidden">ポモドーロ</span>
           </button>
         </div>
 
-        <div className="flex flex-col md:flex-row">
-          <div className="w-full md:w-3/4 pr-0 md:pr-4 mb-4 md:mb-0">
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+          <div className="w-full lg:w-2/3">
             {activeTab === "meeting" && (
-              <div className="p-6 bg-gray-50 rounded-lg">
-                <h2 className="text-2xl font-semibold mb-4">
+              <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 border border-white/20">
+                <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                   ミーティングタイマー
                 </h2>
-                <div className="text-6xl font-bold text-center mb-4">
-                  {formatTime(meetingElapsedTime)}
+
+                {/* タイマー表示 */}
+                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 sm:p-8 mb-4 sm:mb-6 shadow-2xl">
+                  <div className="text-4xl sm:text-5xl lg:text-6xl font-bold text-center mb-3 sm:mb-4 text-white tabular-nums tracking-tight">
+                    {formatTime(meetingElapsedTime)}
+                  </div>
+                  <div className="text-xl sm:text-2xl lg:text-3xl font-semibold text-center text-white/90 tabular-nums">
+                    残り:{" "}
+                    {formatTime(
+                      Math.max(0, alarmPoints[alarmPoints.length - 1]?.minutes * 60 -
+                        meetingElapsedTime)
+                    )}
+                  </div>
                 </div>
-                <div className="text-4xl font-bold text-center mb-4">
-                  残り時間:{" "}
-                  {formatTime(
-                    alarmPoints[alarmPoints.length - 1]?.minutes * 60 -
-                      meetingElapsedTime
-                  )}
-                </div>
-                <div className="flex justify-center space-x-4 mb-4">
+
+                {/* コントロールボタン */}
+                <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-4 sm:mb-6">
                   <button
                     type="button"
                     onClick={toggleMeetingTimer}
-                    className={`px-6 py-2 rounded-full ${
+                    className={`px-6 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105 ${
                       isMeetingRunning
-                        ? "bg-red-500 hover:bg-red-600"
-                        : "bg-green-500 hover:bg-green-600"
-                    } text-white`}
+                        ? "bg-gradient-to-r from-red-500 to-pink-500 text-white"
+                        : "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
+                    }`}
                   >
                     {isMeetingRunning ? (
-                      <Pause className="inline mr-2" />
+                      <Pause className="w-4 h-4 sm:w-5 sm:h-5" />
                     ) : (
-                      <Play className="inline mr-2" />
+                      <Play className="w-4 h-4 sm:w-5 sm:h-5" />
                     )}
-                    {isMeetingRunning ? "一時停止" : "開始"}
+                    <span className="hidden sm:inline">
+                      {isMeetingRunning ? "一時停止" : "開始"}
+                    </span>
+                    <span className="sm:hidden">
+                      {isMeetingRunning ? "停止" : "開始"}
+                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={resetMeetingTimer}
-                    className="px-6 py-2 rounded-full bg-gray-500 hover:bg-gray-600 text-white"
+                    className="px-6 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-semibold text-sm sm:text-base transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                   >
-                    リセット
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      localStorage.setItem(
-                        "meetingAlarmPoints",
-                        JSON.stringify(alarmPoints)
-                      )
-                    }
-                    className="px-6 py-2 rounded-full bg-blue-500 hover:bg-blue-600 text-white"
-                  >
-                    保存
+                    <span className="hidden sm:inline">リセット</span>
+                    <span className="sm:inline">Reset</span>
                   </button>
                 </div>
 
+                {/* 時間情報 */}
                 {meetingStartTime && (
-                  <div className="text-center mb-4">
-                    <p>開始時間: {meetingStartTime.toLocaleTimeString()}</p>
-                    <p>
-                      推定終了時間:{" "}
-                      {getEndTime(
-                        meetingStartTime,
-                        alarmPoints[alarmPoints.length - 1].minutes * 60
-                      )}
-                    </p>
+                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 border border-blue-100">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-sm sm:text-base">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-600 font-medium">開始:</span>
+                        <span className="text-gray-900 font-semibold">
+                          {meetingStartTime.toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-600 font-medium">終了予定:</span>
+                        <span className="text-gray-900 font-semibold">
+                          {getEndTime(
+                            meetingStartTime,
+                            alarmPoints[alarmPoints.length - 1]?.minutes * 60 || 0
+                          )}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                <div className="mb-8">
-                  <h3 className="text-lg font-semibold mb-2">
+                {/* アラームポイント */}
+                <div className="mb-6 sm:mb-8">
+                  <h3 className="text-base sm:text-lg font-bold mb-3 sm:mb-4 text-gray-800">
                     アラームポイント
                   </h3>
-                  {alarmPoints.map((point) => (
-                    <div
-                      key={point.id}
-                      className="flex items-center space-x-2 mb-2"
-                    >
-                      <input
-                        type="number"
-                        value={point.minutes}
-                        onChange={(e) =>
-                          updateAlarmPoint(point.id, parseInt(e.target.value))
-                        }
-                        min="1"
-                        className="w-16 px-2 py-1 border rounded"
-                      />
-                      <span>分</span>
-                      <span>{formatTime(point.remainingTime)}</span>
-                      {point.isDone ? (
-                        <span className="text-green-500">完了!</span>
-                      ) : (
-                        <span className="text-gray-500">
-                          保留中 (終了予定:{" "}
-                          {getEndTime(meetingStartTime, point.minutes * 60)})
-                        </span>
-                      )}
-                      {point.linkedTodo && (
-                        <span className="text-blue-500">
-                          {
-                            meetingTodos.find(
-                              (todo) => todo.id === point.linkedTodo
-                            )?.text
-                          }
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => removeAlarmPoint(point.id)}
-                        className="text-red-500"
+                  <div className="space-y-2 sm:space-y-3">
+                    {alarmPoints.map((point) => (
+                      <div
+                        key={point.id}
+                        className={`flex flex-wrap items-center gap-2 p-3 rounded-xl transition-all duration-200 ${
+                          point.isDone
+                            ? "bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200"
+                            : "bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200"
+                        }`}
                       >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={addAlarmPoint}
-                    className="mt-2 text-blue-500 hover:text-blue-600"
-                  >
-                    <Plus className="inline mr-1" /> アラームポイントを追加
-                  </button>
-                </div>
-
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold mb-2">
-                    ミーティングアラーム設定
-                  </h3>
-                  <div className="flex items-center space-x-4">
-                    <label className="flex items-center">
-                      <Volume2 className="mr-2" />
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        step="1"
-                        value={meetingAlarmSettings.volume}
-                        onChange={(e) =>
-                          setMeetingAlarmSettings({
-                            ...meetingAlarmSettings,
-                            volume: parseInt(e.target.value),
-                          })
-                        }
-                        className="w-32"
-                      />
-                      <span className="ml-2">
-                        {meetingAlarmSettings.volume}
-                      </span>
-                    </label>
-                    <label className="flex items-center">
-                      周波数:
-                      <input
-                        type="number"
-                        value={meetingAlarmSettings.frequency}
-                        onChange={(e) =>
-                          setMeetingAlarmSettings({
-                            ...meetingAlarmSettings,
-                            frequency: parseInt(e.target.value),
-                          })
-                        }
-                        className="w-16 ml-2 px-2 py-1 border rounded"
-                      />
-                      Hz
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMeetingAlarmSettings(initialMeetingAlarmSettings)
-                      }
-                      className="px-4 py-1 bg-gray-500 hover:bg-yellow-600 text-white rounded"
-                    >
-                      リセット
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        localStorage.setItem(
-                          "meetingAlarmSettings",
-                          JSON.stringify(meetingAlarmSettings)
-                        )
-                      }
-                      className="px-4 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded"
-                    >
-                      保存
-                    </button>
+                        <input
+                          type="number"
+                          value={point.minutes}
+                          onChange={(e) =>
+                            updateAlarmPoint(point.id, parseInt(e.target.value))
+                          }
+                          min="1"
+                          className="w-16 sm:w-20 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        />
+                        <span className="text-sm sm:text-base font-medium text-gray-700">分</span>
+                        <span className="text-sm sm:text-base font-mono font-semibold text-gray-900 bg-white px-2 sm:px-3 py-1 rounded-lg">
+                          {formatTime(point.remainingTime)}
+                        </span>
+                        {point.isDone ? (
+                          <span className="text-xs sm:text-sm font-semibold text-green-600 bg-green-100 px-2 sm:px-3 py-1 rounded-full">
+                            ✓ 完了
+                          </span>
+                        ) : (
+                          <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">
+                            終了予定: {getEndTime(meetingStartTime, point.minutes * 60)}
+                          </span>
+                        )}
+                        {point.linkedTodo && (
+                          <span className="text-xs sm:text-sm text-blue-600 bg-blue-100 px-2 sm:px-3 py-1 rounded-full">
+                            {meetingTodos.find((todo) => todo.id === point.linkedTodo)?.text}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeAlarmPoint(point.id)}
+                          className="ml-auto p-1.5 sm:p-2 text-red-500 hover:text-red-600 hover:bg-red-100 rounded-lg transition-colors duration-200"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                   <button
                     type="button"
-                    onClick={() => playAlarm(meetingAlarmSettings)}
-                    className="mt-2 px-4 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded"
+                    onClick={addAlarmPoint}
+                    className="mt-3 sm:mt-4 w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                   >
-                    ミーティングアラームをテスト
+                    <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span className="text-sm sm:text-base">アラームポイントを追加</span>
                   </button>
                 </div>
-                <div className="mb-4">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={forceFocus}
-                      onChange={(e) => setForceFocus(e.target.checked)}
-                      className="mr-2"
-                    />
-                    アラーム時に強制的にこのタブにフォーカスする
-                  </label>
+
+                {/* アラーム設定 */}
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 sm:p-6 border border-purple-100">
+                  <h3 className="text-base sm:text-lg font-bold mb-4 text-gray-800">
+                    ミーティングアラーム設定
+                  </h3>
+
+                  <div className="space-y-4">
+                    {/* 音量設定 */}
+                    <div className="bg-white rounded-lg p-3 sm:p-4">
+                      <label className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
+                            <span className="text-sm sm:text-base font-semibold text-gray-700">音量</span>
+                          </div>
+                          <span className="text-sm sm:text-base font-bold text-indigo-600">
+                            {meetingAlarmSettings.volume}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value={meetingAlarmSettings.volume}
+                          onChange={(e) =>
+                            setMeetingAlarmSettings({
+                              ...meetingAlarmSettings,
+                              volume: parseInt(e.target.value),
+                            })
+                          }
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                        />
+                      </label>
+                    </div>
+
+                    {/* 周波数設定 */}
+                    <div className="bg-white rounded-lg p-3 sm:p-4">
+                      <label className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <span className="text-sm sm:text-base font-semibold text-gray-700">周波数:</span>
+                        <input
+                          type="number"
+                          value={meetingAlarmSettings.frequency}
+                          onChange={(e) =>
+                            setMeetingAlarmSettings({
+                              ...meetingAlarmSettings,
+                              frequency: parseInt(e.target.value),
+                            })
+                          }
+                          className="w-full sm:w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        />
+                        <span className="text-sm sm:text-base text-gray-600">Hz</span>
+                      </label>
+                    </div>
+
+                    {/* ボタン群 */}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => playAlarm(meetingAlarmSettings, "アラームテスト")}
+                        className="flex-1 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg text-sm sm:text-base"
+                      >
+                        テスト
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMeetingAlarmSettings(initialMeetingAlarmSettings)}
+                        className="px-4 py-2.5 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg text-sm sm:text-base"
+                      >
+                        リセット
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* その他オプション */}
+                  <div className="mt-4 pt-4 border-t border-purple-200">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={forceFocus}
+                        onChange={(e) => setForceFocus(e.target.checked)}
+                        className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <span className="text-xs sm:text-sm text-gray-700">
+                        アラーム時に強制的にこのタブにフォーカスする
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </div>
             )}
 
             {activeTab === "pomodoro" && (
-              <div
-                className={`p-6 rounded-lg ${
-                  pomodoroState === "work" ? "bg-blue-100" : "bg-yellow-100"
-                }`}
-              >
-                <h2 className="text-2xl font-semibold mb-4">
+              <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 border border-white/20">
+                <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                   ポモドーロタイマー
                 </h2>
-                <div className="text-6xl font-bold text-center mb-4">
-                  {formatTime(pomodoroElapsedTime)}
+
+                {/* タイマー表示 */}
+                <div
+                  className={`rounded-2xl p-6 sm:p-8 mb-4 sm:mb-6 shadow-2xl transition-all duration-500 ${
+                    pomodoroState === "work"
+                      ? "bg-gradient-to-br from-blue-500 to-indigo-600"
+                      : "bg-gradient-to-br from-yellow-500 to-orange-600"
+                  }`}
+                >
+                  <div className="text-4xl sm:text-5xl lg:text-6xl font-bold text-center mb-3 sm:mb-4 text-white tabular-nums tracking-tight">
+                    {formatTime(pomodoroElapsedTime)}
+                  </div>
+                  <div className="text-xl sm:text-2xl font-semibold text-center text-white/90 mb-2">
+                    {pomodoroState === "work" ? "🎯 作業時間" : "☕ 休憩時間"}
+                  </div>
+                  <div className="text-base sm:text-lg text-center text-white/80 font-medium">
+                    サイクル: {pomodoroCycles} /{" "}
+                    {pomodoroSettings.infiniteMode ? "∞" : pomodoroSettings.cycles}
+                  </div>
                 </div>
-                <div className="text-center mb-4">
-                  {pomodoroState === "work" ? "作業時間" : "休憩時間"}
-                </div>
-                <div className="text-center mb-4">
-                  サイクル: {pomodoroCycles} /{" "}
-                  {pomodoroSettings.infiniteMode
-                    ? "∞"
-                    : pomodoroSettings.cycles}
-                </div>
-                <div className="flex justify-center space-x-4 mb-4">
+
+                {/* コントロールボタン */}
+                <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-4 sm:mb-6">
                   <button
                     type="button"
                     onClick={togglePomodoroTimer}
-                    className={`px-6 py-2 rounded-full ${
+                    className={`px-6 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105 ${
                       isPomodoroRunning
-                        ? "bg-red-500 hover:bg-red-600"
-                        : "bg-green-500 hover:bg-green-600"
-                    } text-white`}
+                        ? "bg-gradient-to-r from-red-500 to-pink-500 text-white"
+                        : "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
+                    }`}
                   >
                     {isPomodoroRunning ? (
-                      <Pause className="inline mr-2" />
+                      <Pause className="w-4 h-4 sm:w-5 sm:h-5" />
                     ) : (
-                      <Play className="inline mr-2" />
+                      <Play className="w-4 h-4 sm:w-5 sm:h-5" />
                     )}
-                    {isPomodoroRunning ? "一時停止" : "開始"}
+                    <span className="hidden sm:inline">
+                      {isPomodoroRunning ? "一時停止" : "開始"}
+                    </span>
+                    <span className="sm:hidden">
+                      {isPomodoroRunning ? "停止" : "開始"}
+                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={resetPomodoroTimer}
-                    className="px-6 py-2 rounded-full bg-gray-500 hover:bg-gray-600 text-white"
+                    className="px-6 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-semibold text-sm sm:text-base transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                   >
-                    リセット
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      localStorage.setItem(
-                        "pomodoroSettings",
-                        JSON.stringify(pomodoroSettings)
-                      )
-                    }
-                    className="px-6 py-2 rounded-full bg-blue-500 hover:bg-blue-600 text-white"
-                  >
-                    保存
+                    <span className="hidden sm:inline">リセット</span>
+                    <span className="sm:inline">Reset</span>
                   </button>
                 </div>
 
+                {/* 時間情報 */}
                 {pomodoroStartTime && (
-                  <div className="text-center mb-4">
-                    <p>開始時間: {pomodoroStartTime.toLocaleTimeString()}</p>
-                    <p>
-                      推定終了時間:{" "}
-                      {getEndTime(
-                        pomodoroStartTime,
-                        (pomodoroState === "work"
-                          ? pomodoroSettings.workDuration
-                          : pomodoroSettings.breakDuration) * 60
-                      )}
-                    </p>
-                    <p>
-                      カウントダウン:{" "}
-                      {getCountdown(
-                        (pomodoroState === "work"
-                          ? pomodoroSettings.workDuration
-                          : pomodoroSettings.breakDuration) * 60,
-                        pomodoroElapsedTime
-                      )}
-                    </p>
+                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 border border-blue-100">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-xs sm:text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-600 font-medium">開始:</span>
+                        <span className="text-gray-900 font-semibold">
+                          {pomodoroStartTime.toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-600 font-medium">終了予定:</span>
+                        <span className="text-gray-900 font-semibold">
+                          {getEndTime(
+                            pomodoroStartTime,
+                            (pomodoroState === "work"
+                              ? pomodoroSettings.workDuration
+                              : pomodoroSettings.breakDuration) * 60
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-600 font-medium">残り:</span>
+                        <span className="text-gray-900 font-semibold">
+                          {getCountdown(
+                            (pomodoroState === "work"
+                              ? pomodoroSettings.workDuration
+                              : pomodoroSettings.breakDuration) * 60,
+                            pomodoroElapsedTime
+                          )}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold mb-2">ポモドーロ設定</h3>
-                  <div className="flex items-center space-x-4 mb-2">
-                    <label className="flex items-center">
-                      作業時間:
-                      <input
-                        type="number"
-                        value={pomodoroSettings.workDuration}
-                        onChange={(e) =>
-                          setPomodoroSettings({
-                            ...pomodoroSettings,
-                            workDuration: Math.max(1, parseInt(e.target.value)),
-                          })
-                        }
-                        min="1"
-                        className="w-16 ml-2 px-2 py-1 border rounded"
-                      />
-                      分
-                    </label>
-                    <label className="flex items-center">
-                      休憩時間:
-                      <input
-                        type="number"
-                        value={pomodoroSettings.breakDuration}
-                        onChange={(e) =>
-                          setPomodoroSettings({
-                            ...pomodoroSettings,
-                            breakDuration: Math.max(
-                              1,
-                              parseInt(e.target.value)
-                            ),
-                          })
-                        }
-                        min="1"
-                        className="w-16 ml-2 px-2 py-1 border rounded"
-                      />
-                      分
-                    </label>
-                    <label className="flex items-center">
-                      サイクル数:
-                      <input
-                        type="number"
-                        value={pomodoroSettings.cycles}
-                        onChange={(e) =>
-                          setPomodoroSettings({
-                            ...pomodoroSettings,
-                            cycles: Math.max(1, parseInt(e.target.value)),
-                          })
-                        }
-                        min="1"
-                        className="w-16 ml-2 px-2 py-1 border rounded"
-                      />
-                    </label>
+                {/* ポモドーロ設定 */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 sm:p-6 mb-6 border border-blue-100">
+                  <h3 className="text-base sm:text-lg font-bold mb-4 text-gray-800">
+                    ポモドーロ設定
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4">
+                    <div className="bg-white rounded-lg p-3">
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs sm:text-sm font-semibold text-gray-700">
+                          作業時間
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            value={pomodoroSettings.workDuration}
+                            onChange={(e) =>
+                              setPomodoroSettings({
+                                ...pomodoroSettings,
+                                workDuration: Math.max(1, parseInt(e.target.value) || 1),
+                              })
+                            }
+                            min="1"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          />
+                          <span className="text-sm text-gray-600 whitespace-nowrap">分</span>
+                        </div>
+                      </label>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-3">
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs sm:text-sm font-semibold text-gray-700">
+                          休憩時間
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            value={pomodoroSettings.breakDuration}
+                            onChange={(e) =>
+                              setPomodoroSettings({
+                                ...pomodoroSettings,
+                                breakDuration: Math.max(1, parseInt(e.target.value) || 1),
+                              })
+                            }
+                            min="1"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          />
+                          <span className="text-sm text-gray-600 whitespace-nowrap">分</span>
+                        </div>
+                      </label>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-3">
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs sm:text-sm font-semibold text-gray-700">
+                          サイクル数
+                        </span>
+                        <input
+                          type="number"
+                          value={pomodoroSettings.cycles}
+                          onChange={(e) =>
+                            setPomodoroSettings({
+                              ...pomodoroSettings,
+                              cycles: Math.max(1, parseInt(e.target.value) || 1),
+                            })
+                          }
+                          min="1"
+                          disabled={pomodoroSettings.infiniteMode}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400"
+                        />
+                      </label>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-4">
-                    <label className="flex items-center">
+
+                  <div className="bg-white rounded-lg p-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={pomodoroSettings.infiniteMode}
@@ -986,131 +1157,164 @@ export function CommTimeComponent() {
                             infiniteMode: e.target.checked,
                           })
                         }
-                        className="mr-2"
+                        className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500"
                       />
-                      無限モード
+                      <span className="text-xs sm:text-sm font-semibold text-gray-700">
+                        無限モード（サイクル数無制限）
+                      </span>
                     </label>
                   </div>
                 </div>
 
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold mb-2">
-                    作業時間アラーム設定
+                {/* 作業時間アラーム設定 */}
+                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-4 sm:p-6 mb-4 border border-blue-100">
+                  <h3 className="text-base sm:text-lg font-bold mb-4 text-gray-800">
+                    🎯 作業時間アラーム設定
                   </h3>
-                  <div className="flex items-center space-x-4">
-                    <label className="flex items-center">
-                      <Volume2 className="mr-2" />
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        step="1"
-                        value={pomodoroSettings.workAlarm.volume}
-                        onChange={(e) =>
-                          setPomodoroSettings({
-                            ...pomodoroSettings,
-                            workAlarm: {
-                              ...pomodoroSettings.workAlarm,
-                              volume: parseInt(e.target.value),
-                            },
-                          })
-                        }
-                        className="w-32"
-                      />
-                      <span className="ml-2">
-                        {pomodoroSettings.workAlarm.volume}
-                      </span>
-                    </label>
-                    <label className="flex items-center">
-                      周波数:
-                      <input
-                        type="number"
-                        value={pomodoroSettings.workAlarm.frequency}
-                        onChange={(e) =>
-                          setPomodoroSettings({
-                            ...pomodoroSettings,
-                            workAlarm: {
-                              ...pomodoroSettings.workAlarm,
-                              frequency: parseInt(e.target.value),
-                            },
-                          })
-                        }
-                        className="w-16 ml-2 px-2 py-1 border rounded"
-                      />
-                      Hz
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => playAlarm(pomodoroSettings.workAlarm)}
-                      className="px-4 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded"
-                    >
-                      テスト
-                    </button>
+
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-lg p-3 sm:p-4">
+                      <label className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                            <span className="text-sm sm:text-base font-semibold text-gray-700">音量</span>
+                          </div>
+                          <span className="text-sm sm:text-base font-bold text-blue-600">
+                            {pomodoroSettings.workAlarm.volume}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value={pomodoroSettings.workAlarm.volume}
+                          onChange={(e) =>
+                            setPomodoroSettings({
+                              ...pomodoroSettings,
+                              workAlarm: {
+                                ...pomodoroSettings.workAlarm,
+                                volume: parseInt(e.target.value),
+                              },
+                            })
+                          }
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <div className="bg-white rounded-lg p-3 sm:p-4 flex-1">
+                        <label className="flex flex-col sm:flex-row sm:items-center gap-2">
+                          <span className="text-sm sm:text-base font-semibold text-gray-700">周波数:</span>
+                          <input
+                            type="number"
+                            value={pomodoroSettings.workAlarm.frequency}
+                            onChange={(e) =>
+                              setPomodoroSettings({
+                                ...pomodoroSettings,
+                                workAlarm: {
+                                  ...pomodoroSettings.workAlarm,
+                                  frequency: parseInt(e.target.value),
+                                },
+                              })
+                            }
+                            className="w-full sm:w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                          <span className="text-sm sm:text-base text-gray-600">Hz</span>
+                        </label>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => playAlarm(pomodoroSettings.workAlarm, "作業時間アラームテスト")}
+                        className="px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg text-sm sm:text-base whitespace-nowrap"
+                      >
+                        テスト
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold mb-2">
-                    休憩時間アラーム設定
+                {/* 休憩時間アラーム設定 */}
+                <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-4 sm:p-6 border border-orange-100">
+                  <h3 className="text-base sm:text-lg font-bold mb-4 text-gray-800">
+                    ☕ 休憩時間アラーム設定
                   </h3>
-                  <div className="flex items-center space-x-4">
-                    <label className="flex items-center">
-                      <Volume2 className="mr-2" />
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        step="1"
-                        value={pomodoroSettings.breakAlarm.volume}
-                        onChange={(e) =>
-                          setPomodoroSettings({
-                            ...pomodoroSettings,
-                            breakAlarm: {
-                              ...pomodoroSettings.breakAlarm,
-                              volume: parseInt(e.target.value),
-                            },
-                          })
-                        }
-                        className="w-32"
-                      />
-                      <span className="ml-2">
-                        {pomodoroSettings.breakAlarm.volume}
-                      </span>
-                    </label>
-                    <label className="flex items-center">
-                      周波数:
-                      <input
-                        type="number"
-                        value={pomodoroSettings.breakAlarm.frequency}
-                        onChange={(e) =>
-                          setPomodoroSettings({
-                            ...pomodoroSettings,
-                            breakAlarm: {
-                              ...pomodoroSettings.breakAlarm,
-                              frequency: parseInt(e.target.value),
-                            },
-                          })
-                        }
-                        className="w-16 ml-2 px-2 py-1 border rounded"
-                      />
-                      Hz
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => playAlarm(pomodoroSettings.breakAlarm)}
-                      className="px-4 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded"
-                    >
-                      テスト
-                    </button>
+
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-lg p-3 sm:p-4">
+                      <label className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" />
+                            <span className="text-sm sm:text-base font-semibold text-gray-700">音量</span>
+                          </div>
+                          <span className="text-sm sm:text-base font-bold text-orange-600">
+                            {pomodoroSettings.breakAlarm.volume}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value={pomodoroSettings.breakAlarm.volume}
+                          onChange={(e) =>
+                            setPomodoroSettings({
+                              ...pomodoroSettings,
+                              breakAlarm: {
+                                ...pomodoroSettings.breakAlarm,
+                                volume: parseInt(e.target.value),
+                              },
+                            })
+                          }
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-600"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <div className="bg-white rounded-lg p-3 sm:p-4 flex-1">
+                        <label className="flex flex-col sm:flex-row sm:items-center gap-2">
+                          <span className="text-sm sm:text-base font-semibold text-gray-700">周波数:</span>
+                          <input
+                            type="number"
+                            value={pomodoroSettings.breakAlarm.frequency}
+                            onChange={(e) =>
+                              setPomodoroSettings({
+                                ...pomodoroSettings,
+                                breakAlarm: {
+                                  ...pomodoroSettings.breakAlarm,
+                                  frequency: parseInt(e.target.value),
+                                },
+                              })
+                            }
+                            className="w-full sm:w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          />
+                          <span className="text-sm sm:text-base text-gray-600">Hz</span>
+                        </label>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => playAlarm(pomodoroSettings.breakAlarm, "休憩時間アラームテスト")}
+                        className="px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg text-sm sm:text-base whitespace-nowrap"
+                      >
+                        テスト
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
           </div>
-          
-          <div className="w-full md:w-1/4">
-            <div className="bg-gray-50 p-4 rounded-lg mb-4">
-              <h3 className="text-lg font-semibold mb-2">メモ</h3>
+
+          <div className="w-full lg:w-1/3">
+            {/* メモセクション */}
+            <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 mb-4 border border-white/20">
+              <h3 className="text-base sm:text-lg font-bold mb-3 sm:mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                📝 メモ
+              </h3>
               <textarea
                 value={activeTab === "meeting" ? meetingMemo : pomodoroMemo}
                 onChange={(e) =>
@@ -1118,25 +1322,17 @@ export function CommTimeComponent() {
                     ? setMeetingMemo(e.target.value)
                     : setPomodoroMemo(e.target.value)
                 }
-                className="w-full h-32 p-2 border rounded"
-                placeholder="メモを入力..."
+                className="w-full h-32 sm:h-40 p-3 sm:p-4 border border-gray-300 rounded-xl text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                placeholder="メモを入力してください..."
               />
-              <button
-                type="button"
-                onClick={() =>
-                  localStorage.setItem(
-                    activeTab === "meeting" ? "meetingMemo" : "pomodoroMemo",
-                    activeTab === "meeting" ? meetingMemo : pomodoroMemo
-                  )
-                }
-                className="mt-2 px-4 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded"
-              >
-                保存
-              </button>
             </div>
 
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-semibold mb-2">TODOリスト</h3>
+            {/* TODOリストセクション */}
+            <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 border border-white/20">
+              <h3 className="text-base sm:text-lg font-bold mb-3 sm:mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                ✅ TODOリスト
+              </h3>
+
               <DragDropContext onDragEnd={onDragEnd}>
                 <Droppable
                   droppableId={
@@ -1147,7 +1343,7 @@ export function CommTimeComponent() {
                     <ul
                       {...provided.droppableProps}
                       ref={provided.innerRef}
-                      className="space-y-2"
+                      className="space-y-2 mb-3 sm:mb-4 max-h-[400px] overflow-y-auto"
                     >
                       {(activeTab === "meeting"
                         ? meetingTodos
@@ -1158,34 +1354,32 @@ export function CommTimeComponent() {
                           draggableId={todo.id}
                           index={index}
                         >
-                          {(provided) => (
+                          {(provided, snapshot) => (
                             <li
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
-                              className="flex items-center justify-between p-2 bg-white rounded shadow"
+                              className={`flex items-start gap-2 p-2 sm:p-3 rounded-xl transition-all duration-200 ${
+                                todo.isCompleted
+                                  ? "bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200"
+                                  : "bg-white border border-gray-200"
+                              } ${
+                                snapshot.isDragging
+                                  ? "shadow-2xl scale-105"
+                                  : "shadow-sm hover:shadow-md"
+                              }`}
                             >
                               {editingTodoId === todo.id ? (
-                                <input
-                                  type="text"
-                                  value={editingTodoText}
-                                  onChange={(e) =>
-                                    setEditingTodoText(e.target.value)
-                                  }
-                                  className="flex-grow mr-2 px-2 py-1 border rounded"
-                                />
-                              ) : (
-                                <span
-                                  className={
-                                    todo.isCompleted ? "line-through" : ""
-                                  }
-                                >
-                                  {todo.text}
-                                </span>
-                              )}
-                              <div>
-                                {editingTodoId === todo.id ? (
-                                  <>
+                                <>
+                                  <input
+                                    type="text"
+                                    value={editingTodoText}
+                                    onChange={(e) =>
+                                      setEditingTodoText(e.target.value)
+                                    }
+                                    className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                  />
+                                  <div className="flex gap-1">
                                     <button
                                       type="button"
                                       onClick={() =>
@@ -1195,20 +1389,31 @@ export function CommTimeComponent() {
                                           activeTab === "pomodoro"
                                         )
                                       }
-                                      className="text-green-500 mr-2"
+                                      className="p-1.5 text-green-600 hover:bg-green-100 rounded-lg transition-colors duration-200"
                                     >
-                                      <Save className="w-4 h-4" />
+                                      <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     </button>
                                     <button
                                       type="button"
                                       onClick={cancelEditingTodo}
-                                      className="text-red-500 mr-2"
+                                      className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors duration-200"
                                     >
-                                      <X className="w-4 h-4" />
+                                      <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     </button>
-                                  </>
-                                ) : (
-                                  <>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <span
+                                    className={`flex-1 text-xs sm:text-sm ${
+                                      todo.isCompleted
+                                        ? "line-through text-gray-500"
+                                        : "text-gray-800"
+                                    }`}
+                                  >
+                                    {todo.text}
+                                  </span>
+                                  <div className="flex gap-1 flex-shrink-0">
                                     <button
                                       type="button"
                                       onClick={() =>
@@ -1217,18 +1422,22 @@ export function CommTimeComponent() {
                                           activeTab === "pomodoro"
                                         )
                                       }
-                                      className="text-green-500 mr-2"
+                                      className={`p-1.5 rounded-lg transition-colors duration-200 ${
+                                        todo.isCompleted
+                                          ? "text-green-600 bg-green-100"
+                                          : "text-gray-400 hover:text-green-600 hover:bg-green-100"
+                                      }`}
                                     >
-                                      <Check className="w-4 h-4" />
+                                      <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() =>
                                         startEditingTodo(todo.id, todo.text)
                                       }
-                                      className="text-blue-500 mr-2"
+                                      className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors duration-200"
                                     >
-                                      <Edit className="w-4 h-4" />
+                                      <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     </button>
                                     <button
                                       type="button"
@@ -1238,9 +1447,9 @@ export function CommTimeComponent() {
                                           activeTab === "pomodoro"
                                         )
                                       }
-                                      className="text-red-500 mr-2"
+                                      className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors duration-200"
                                     >
-                                      <X className="w-4 h-4" />
+                                      <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     </button>
                                     <button
                                       type="button"
@@ -1250,9 +1459,10 @@ export function CommTimeComponent() {
                                           activeTab === "pomodoro"
                                         )
                                       }
-                                      className="text-blue-500 mr-2"
+                                      disabled={index === 0}
+                                      className="p-1.5 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
                                     >
-                                      <ArrowUp className="w-4 h-4" />
+                                      <ArrowUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     </button>
                                     <button
                                       type="button"
@@ -1262,13 +1472,21 @@ export function CommTimeComponent() {
                                           activeTab === "pomodoro"
                                         )
                                       }
-                                      className="text-blue-500"
+                                      disabled={
+                                        index ===
+                                        (activeTab === "meeting"
+                                          ? meetingTodos
+                                          : pomodoroTodos
+                                        ).length -
+                                          1
+                                      }
+                                      className="p-1.5 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
                                     >
-                                      <ArrowDown className="w-4 h-4" />
+                                      <ArrowDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     </button>
-                                  </>
-                                )}
-                              </div>
+                                  </div>
+                                </>
+                              )}
                             </li>
                           )}
                         </Draggable>
@@ -1278,7 +1496,9 @@ export function CommTimeComponent() {
                   )}
                 </Droppable>
               </DragDropContext>
-              <div className="mt-2 flex">
+
+              {/* TODO追加フォーム */}
+              <div className="flex gap-2">
                 <input
                   type="text"
                   value={
@@ -1289,7 +1509,21 @@ export function CommTimeComponent() {
                       ? setNewMeetingTodo(e.target.value)
                       : setNewPomodoroTodo(e.target.value)
                   }
-                  className="flex-grow mr-2 px-2 py-1 border rounded"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      if (activeTab === "meeting") {
+                        addTodo(newMeetingTodo, false);
+                        setNewMeetingTodo("");
+                      } else {
+                        addTodo(newPomodoroTodo, true);
+                        setNewPomodoroTodo("");
+                      }
+                      if (todoInputRef.current) {
+                        todoInputRef.current.focus();
+                      }
+                    }
+                  }}
+                  className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-xl text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   placeholder="新しいTODOを入力..."
                   ref={todoInputRef}
                 />
@@ -1307,9 +1541,10 @@ export function CommTimeComponent() {
                       todoInputRef.current.focus();
                     }
                   }}
-                  className="px-4 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded whitespace-nowrap"
+                  className="px-4 sm:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg text-sm sm:text-base whitespace-nowrap flex items-center gap-2"
                 >
-                  追加
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">追加</span>
                 </button>
               </div>
             </div>
