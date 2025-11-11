@@ -841,7 +841,7 @@ export function CommTimeComponent() {
                           type="number"
                           value={point.minutes}
                           onChange={(e) =>
-                            updateAlarmPoint(point.id, parseInt(e.target.value))
+                            updateAlarmPoint(point.id, parseInt(e.target.value) || 1)
                           }
                           min="1"
                           className="w-16 sm:w-20 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
