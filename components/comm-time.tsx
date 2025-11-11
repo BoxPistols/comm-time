@@ -794,8 +794,7 @@ export function CommTimeComponent() {
                     onClick={resetMeetingTimer}
                     className="px-6 sm:px-8 py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-semibold text-sm sm:text-base transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                   >
-                    <span className="hidden sm:inline">リセット</span>
-                    <span className="sm:inline">Reset</span>
+                    <span>リセット</span>
                   </button>
                 </div>
 
