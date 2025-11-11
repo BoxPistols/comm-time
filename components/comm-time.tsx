@@ -349,15 +349,17 @@ export function CommTimeComponent() {
 
           const remainingMs = targetDate.getTime() - now.getTime();
           const remainingSec = Math.max(0, Math.floor(remainingMs / 1000));
-          setCountdownSeconds(remainingSec);
+
+          setCountdownSeconds((prevSeconds) => {
+            // カウントダウンが0になったらアラーム（前回の値が0より大きく、今回0になった場合）
+            if (prevSeconds > 0 && remainingSec === 0) {
+              playAlarm(meetingAlarmSettings, "時間になりました！");
+              setIsMeetingRunning(false);
+            }
+            return remainingSec;
+          });
 
           document.title = `CT (${formatTime(remainingSec)})`;
-
-          // カウントダウンが0になったらアラーム
-          if (remainingSec === 0 && countdownSeconds > 0) {
-            playAlarm(meetingAlarmSettings, "時間になりました！");
-            setIsMeetingRunning(false);
-          }
         } else {
           // 通常モード: 経過時間を計算
           const newElapsedTime = Math.floor(
@@ -377,7 +379,7 @@ export function CommTimeComponent() {
         document.title = "CT";
       }
     };
-  }, [isMeetingRunning, meetingStartTime, formatTime, countdownMode, targetEndTime, countdownSeconds, playAlarm, meetingAlarmSettings, playTickSound]);
+  }, [isMeetingRunning, meetingStartTime, formatTime, countdownMode, targetEndTime, playAlarm, meetingAlarmSettings, playTickSound]);
 
   // アラームポイントの更新
   useEffect(() => {
