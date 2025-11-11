@@ -17,6 +17,7 @@ import {
   Bell,
   BellOff,
   Vibrate,
+  Timer,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -130,6 +131,15 @@ export function CommTimeComponent() {
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
 
+  // カウントダウンモードの状態
+  const [countdownMode, setCountdownMode] = useState(false);
+  const [targetEndTime, setTargetEndTime] = useState("");
+  const [countdownSeconds, setCountdownSeconds] = useState(0);
+
+  // チクタク音の状態
+  const [tickSoundEnabled, setTickSoundEnabled] = useState(false);
+  const tickAudioContextRef = useRef<AudioContext | null>(null);
+
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
 
@@ -149,6 +159,9 @@ export function CommTimeComponent() {
     setPomodorTodos(getStorageValue("pomodoroTodos", []));
     setNotificationsEnabled(getStorageValue("notificationsEnabled", false));
     setVibrationEnabled(getStorageValue("vibrationEnabled", true));
+    setCountdownMode(getStorageValue("countdownMode", false));
+    setTargetEndTime(getStorageValue("targetEndTime", ""));
+    setTickSoundEnabled(getStorageValue("tickSoundEnabled", false));
 
     // 通知権限の確認
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -174,6 +187,9 @@ export function CommTimeComponent() {
       localStorage.setItem("pomodoroTodos", JSON.stringify(pomodoroTodos));
       localStorage.setItem("notificationsEnabled", JSON.stringify(notificationsEnabled));
       localStorage.setItem("vibrationEnabled", JSON.stringify(vibrationEnabled));
+      localStorage.setItem("countdownMode", JSON.stringify(countdownMode));
+      localStorage.setItem("targetEndTime", targetEndTime);
+      localStorage.setItem("tickSoundEnabled", JSON.stringify(tickSoundEnabled));
     }
   }, [
     alarmPoints,
@@ -185,6 +201,9 @@ export function CommTimeComponent() {
     pomodoroTodos,
     notificationsEnabled,
     vibrationEnabled,
+    countdownMode,
+    targetEndTime,
+    tickSoundEnabled,
   ]);
 
   // 時間のフォーマット関数
@@ -270,17 +289,86 @@ export function CommTimeComponent() {
     return () => clearInterval(timer);
   }, []);
 
+  // チクタク音を再生する関数
+  const playTickSound = useCallback(() => {
+    if (typeof window === "undefined" || !tickSoundEnabled) return;
+
+    try {
+      if (!tickAudioContextRef.current) {
+        tickAudioContextRef.current = new ((
+          window as typeof window & {
+            webkitAudioContext?: typeof AudioContext;
+          }
+        ).AudioContext ||
+          (
+            window as typeof window & {
+              webkitAudioContext?: typeof AudioContext;
+            }
+          ).webkitAudioContext)();
+      }
+
+      const audioContext = tickAudioContextRef.current;
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+      gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
+
+      oscillator.start();
+      gainNode.gain.exponentialRampToValueAtTime(
+        0.00001,
+        audioContext.currentTime + 0.05
+      );
+      oscillator.stop(audioContext.currentTime + 0.05);
+    } catch (error) {
+      console.error("チクタク音の再生に失敗しました:", error);
+    }
+  }, [tickSoundEnabled]);
+
   // ミーティングタイマーの更新
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isMeetingRunning && meetingStartTime) {
       timer = setInterval(() => {
         const now = new Date();
-        const newElapsedTime = Math.floor(
-          (now.getTime() - meetingStartTime.getTime()) / 1000
-        );
-        setMeetingElapsedTime(newElapsedTime);
-        document.title = `CT (${formatTime(newElapsedTime)})`;
+
+        if (countdownMode && targetEndTime) {
+          // カウントダウンモード: 終了時刻までの残り時間を計算
+          const [hours, minutes] = targetEndTime.split(":").map(Number);
+          const targetDate = new Date();
+          targetDate.setHours(hours, minutes, 0, 0);
+
+          // 終了時刻が過去の場合は明日として扱う
+          if (targetDate < meetingStartTime) {
+            targetDate.setDate(targetDate.getDate() + 1);
+          }
+
+          const remainingMs = targetDate.getTime() - now.getTime();
+          const remainingSec = Math.max(0, Math.floor(remainingMs / 1000));
+          setCountdownSeconds(remainingSec);
+
+          document.title = `CT (${formatTime(remainingSec)})`;
+
+          // カウントダウンが0になったらアラーム
+          if (remainingSec === 0 && countdownSeconds > 0) {
+            playAlarm(meetingAlarmSettings, "時間になりました！");
+            setIsMeetingRunning(false);
+          }
+        } else {
+          // 通常モード: 経過時間を計算
+          const newElapsedTime = Math.floor(
+            (now.getTime() - meetingStartTime.getTime()) / 1000
+          );
+          setMeetingElapsedTime(newElapsedTime);
+          document.title = `CT (${formatTime(newElapsedTime)})`;
+        }
+
+        // チクタク音を再生
+        playTickSound();
       }, 1000);
     }
     return () => {
@@ -289,7 +377,7 @@ export function CommTimeComponent() {
         document.title = "CT";
       }
     };
-  }, [isMeetingRunning, meetingStartTime, formatTime]);
+  }, [isMeetingRunning, meetingStartTime, formatTime, countdownMode, targetEndTime, countdownSeconds, playAlarm, meetingAlarmSettings, playTickSound]);
 
   // アラームポイントの更新
   useEffect(() => {
@@ -327,10 +415,12 @@ export function CommTimeComponent() {
         setPomodoroElapsedTime(
           Math.floor((now.getTime() - pomodoroStartTime.getTime()) / 1000)
         );
+        // チクタク音を再生
+        playTickSound();
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [isPomodoroRunning, pomodoroStartTime]);
+  }, [isPomodoroRunning, pomodoroStartTime, playTickSound]);
 
   // ポモドーロの状態管理
   useEffect(() => {
@@ -673,6 +763,20 @@ export function CommTimeComponent() {
 
             {/* 設定ボタン群 */}
             <div className="flex gap-2 items-center">
+              {/* チクタク音設定 */}
+              <button
+                type="button"
+                onClick={() => setTickSoundEnabled(!tickSoundEnabled)}
+                className={`p-2 sm:p-2.5 rounded-xl transition-all duration-200 ${
+                  tickSoundEnabled
+                    ? "bg-gradient-to-br from-green-500 to-teal-500 text-white shadow-lg"
+                    : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                }`}
+                title={tickSoundEnabled ? "チクタク音 ON" : "チクタク音 OFF"}
+              >
+                <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+
               {/* バイブレーション設定 */}
               <button
                 type="button"
@@ -752,16 +856,58 @@ export function CommTimeComponent() {
                   ミーティングタイマー
                 </h2>
 
+                {/* カウントダウンモード切り替え */}
+                <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-xl p-4 mb-4 border border-cyan-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Timer className="w-5 h-5 text-cyan-600" />
+                      <span className="text-sm sm:text-base font-semibold text-gray-800">
+                        カウントダウンモード
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCountdownMode(!countdownMode)}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                        countdownMode
+                          ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md"
+                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                      }`}
+                    >
+                      {countdownMode ? "ON" : "OFF"}
+                    </button>
+                  </div>
+                  {countdownMode && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        終了時刻:
+                      </label>
+                      <input
+                        type="time"
+                        value={targetEndTime}
+                        onChange={(e) => setTargetEndTime(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 {/* タイマー表示 */}
                 <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 sm:p-8 mb-4 sm:mb-6 shadow-2xl">
                   <div className="text-4xl sm:text-5xl lg:text-6xl font-bold text-center mb-3 sm:mb-4 text-white tabular-nums tracking-tight">
-                    {formatTime(meetingElapsedTime)}
+                    {countdownMode
+                      ? formatTime(countdownSeconds)
+                      : formatTime(meetingElapsedTime)}
                   </div>
                   <div className="text-xl sm:text-2xl lg:text-3xl font-semibold text-center text-white/90 tabular-nums">
-                    残り:{" "}
-                    {formatTime(
-                      Math.max(0, alarmPoints[alarmPoints.length - 1]?.minutes * 60 -
-                        meetingElapsedTime)
+                    {countdownMode ? "残り時間" : (
+                      <>
+                        残り:{" "}
+                        {formatTime(
+                          Math.max(0, alarmPoints[alarmPoints.length - 1]?.minutes * 60 -
+                            meetingElapsedTime)
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
