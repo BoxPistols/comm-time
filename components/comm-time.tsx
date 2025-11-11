@@ -484,7 +484,7 @@ export function CommTimeComponent() {
   // 通知権限のリクエスト
   const requestNotificationPermission = useCallback(async () => {
     if (typeof window === "undefined" || !("Notification" in window)) {
-      alert("このブラウザは通知をサポートしていません");
+      console.warn("このブラウザは通知をサポートしていません");
       return;
     }
 
