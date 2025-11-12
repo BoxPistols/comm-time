@@ -1,37 +1,522 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Comm Time ⏰
 
-## Getting Started
+ミーティングタイマーとポモドーロタイマーを備えた時間管理アプリケーションです。
 
-First, run the development server:
+## 📋 目次
+
+- [機能一覧](#機能一覧)
+- [使い方マニュアル](#使い方マニュアル)
+  - [ミーティングタイマー](#1-ミーティングタイマー)
+  - [ポモドーロタイマー](#2-ポモドーロタイマー)
+  - [共通機能](#3-共通機能)
+- [開発・運用更新マニュアル](#開発運用更新マニュアル)
+  - [開発環境のセットアップ](#開発環境のセットアップ)
+  - [ビルド・デプロイ](#ビルドデプロイ)
+  - [メンテナンス](#メンテナンス)
+
+---
+
+## 🎯 機能一覧
+
+### ミーティングタイマー
+- ⏱️ **経過時間モード**: 開始からの経過時間を計測
+- ⏰ **カウントダウンモード**: 終了時刻を設定してカウントダウン
+- 🔔 **アラームポイント**: 複数の時間でアラームを設定可能
+- 📝 **メモ機能**: ミーティング中のメモを記録
+- ✅ **TODOリスト**: タスクを管理
+
+### ポモドーロタイマー
+- 🎯 **作業時間と休憩時間**: 自動で切り替え
+- 🔄 **サイクル管理**: 設定したサイクル数で自動停止
+- ♾️ **無限モード**: サイクル数無制限で継続
+- 🔔 **作業/休憩別アラーム**: それぞれ異なる音で通知
+- 📝 **メモ・TODO**: 作業内容の記録とタスク管理
+
+### 共通機能
+- 🔊 **チクタク音**: タイマー動作中の秒針音（ON/OFF可能）
+- 📳 **バイブレーション**: アラーム時の振動通知
+- ⚡ **フラッシュ効果**: 画面全体が点滅してアラームを通知
+- 🔔 **通知**: ブラウザ通知でバックグラウンドでも通知
+- 💾 **自動保存**: すべての設定とデータをローカルストレージに保存
+
+---
+
+## 📖 使い方マニュアル
+
+### 1. ミーティングタイマー
+
+#### 基本的な使い方
+
+1. **タイマーの開始**
+   - 「開始」ボタンをクリックしてタイマーをスタート
+   - 画面には経過時間が表示されます
+
+2. **タイマーの一時停止**
+   - 「一時停止」ボタンをクリック
+   - 再度「開始」ボタンで再開できます
+
+3. **タイマーのリセット**
+   - 「リセット」ボタンですべてをリセット
+   - アラームポイントは初期値に戻ります
+
+#### カウントダウンモード
+
+1. **カウントダウンモードをON**
+   - 「カウントダウンモード」のトグルをONにする
+
+2. **終了時刻を設定**
+   - 時刻入力フィールドで終了時刻を設定（例: 15:30）
+
+3. **タイマー開始**
+   - 「開始」ボタンをクリック
+   - 設定時刻までの残り時間が表示されます
+   - 0になったらアラームが鳴ります
+
+#### アラームポイントの設定
+
+1. **デフォルトのアラームポイント**
+   - 30分、50分、60分が設定済み
+
+2. **アラームポイントの追加**
+   - 「アラームポイントを追加」ボタンをクリック
+   - 現在の経過時間+1分の位置に新しいポイントが追加されます
+
+3. **時間の変更**
+   - アラームポイントの数値を直接編集
+   - 1分から任意の時間に設定可能
+
+4. **アラームポイントの削除**
+   - 各ポイントの右側にある「×」ボタンをクリック
+
+#### アラーム設定のカスタマイズ
+
+1. **音量の調整**
+   - スライダーで0〜100の範囲で調整
+   - 大きな数字ほど音量が大きくなります
+
+2. **周波数の変更**
+   - 数値を入力してアラーム音の高さを変更
+   - 低い数値: 低い音（例: 240Hz）
+   - 高い数値: 高い音（例: 740Hz）
+
+3. **テスト再生**
+   - 「テスト」ボタンで設定したアラームを試聴
+   - 30秒間、5秒ごとにアラームが鳴ります
+   - タップまたは「アラーム停止」ボタンで停止
+
+4. **設定のリセット**
+   - 「リセット」ボタンで初期設定に戻す
+
+### 2. ポモドーロタイマー
+
+#### 基本的な使い方
+
+1. **タイマーの開始**
+   - 「開始」ボタンで作業時間がスタート
+   - デフォルト: 25分作業 → 5分休憩
+
+2. **自動切り替え**
+   - 作業時間が終了すると自動的に休憩時間に切り替わり、アラームが鳴ります
+   - 休憩時間が終了すると作業時間に戻ります
+
+3. **サイクル管理**
+   - サイクルカウンターで進捗を確認
+   - 設定したサイクル数に達すると自動停止
+
+#### ポモドーロ設定のカスタマイズ
+
+1. **作業時間の設定**
+   - デフォルト: 25分
+   - 1分から任意の時間に変更可能
+
+2. **休憩時間の設定**
+   - デフォルト: 5分
+   - 1分から任意の時間に変更可能
+
+3. **サイクル数の設定**
+   - デフォルト: 4サイクル
+   - 完了すると自動停止します
+
+4. **無限モード**
+   - チェックボックスをONにすると、サイクル数無制限で継続
+   - 手動で停止するまで作業と休憩を繰り返します
+
+#### アラーム設定（作業時間・休憩時間）
+
+- **作業時間アラーム**: 休憩終了時に鳴る（作業開始のお知らせ）
+- **休憩時間アラーム**: 作業終了時に鳴る（休憩開始のお知らせ）
+
+各アラームで以下を個別に設定できます：
+
+1. **音量**: スライダーで0〜100
+2. **周波数**: 音の高さを調整
+3. **テスト**: 設定を試聴
+
+### 3. 共通機能
+
+#### メモ機能
+
+- テキストエリアに自由にメモを記入
+- ミーティングタイマーとポモドーロタイマーで別々に保存
+- 自動保存されるので、ブラウザを閉じても内容が残ります
+
+#### TODOリスト
+
+1. **TODOの追加**
+   - 入力欄にタスクを入力してEnterキーまたは「追加」ボタン
+
+2. **TODOの完了**
+   - チェックマークボタンをクリックで完了/未完了を切り替え
+   - 完了したTODOは取り消し線が表示されます
+
+3. **TODOの編集**
+   - 鉛筆アイコンをクリックして編集モードに
+   - 内容を変更して保存ボタンまたは×ボタン
+
+4. **TODOの削除**
+   - ×ボタンでTODOを削除
+
+5. **順序の変更**
+   - ↑↓ボタンで順序を変更
+   - ドラッグ&ドロップでも並び替え可能
+
+#### ヘッダーの設定ボタン
+
+1. **🔊 チクタク音**
+   - タイマー動作中の秒針音のON/OFF
+   - 緑色: ON / グレー: OFF
+
+2. **📳 バイブレーション**
+   - アラーム時の振動通知のON/OFF
+   - 紫色: ON / グレー: OFF
+   - スマートフォンで効果的
+
+3. **⚡ フラッシュ**
+   - アラーム時の画面点滅のON/OFF
+   - 黄色: ON / グレー: OFF
+   - 点滅画面をタップして停止
+
+4. **🔔 通知**
+   - ブラウザ通知のON/OFF
+   - 青色: ON / グレー: OFF
+   - 初回クリック時に通知許可を求められます
+   - バックグラウンドでもアラームを通知
+
+#### アラームの停止方法
+
+アラームが鳴っている時は、以下の方法で停止できます：
+
+1. **フラッシュ画面をタップ**（フラッシュがONの場合）
+2. **ヘッダーの「アラーム停止」ボタン**をクリック
+3. **画面の任意の場所をクリック**（フラッシュがOFFの場合）
+4. **30秒経過で自動停止**
+
+---
+
+## 🛠️ 開発・運用更新マニュアル
+
+### 開発環境のセットアップ
+
+#### 必要な環境
+
+- Node.js 18.x以上
+- npm, yarn, pnpm, bunのいずれか
+
+#### セットアップ手順
+
+1. **リポジトリのクローン**
+
+```bash
+git clone https://github.com/BoxPistols/comm-time.git
+cd comm-time
+```
+
+2. **依存関係のインストール**
+
+```bash
+npm install
+# または
+yarn install
+# または
+pnpm install
+# または
+bun install
+```
+
+3. **開発サーバーの起動**
 
 ```bash
 npm run dev
-# or
+# または
 yarn dev
-# or
+# または
 pnpm dev
-# or
+# または
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. **ブラウザでアクセス**
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+[http://localhost:3000](http://localhost:3000) を開く
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### ビルド・デプロイ
 
-## Learn More
+#### ローカルビルド
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run build
+npm run start
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+#### Vercelへのデプロイ
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+このプロジェクトはVercelで自動デプロイされています。
 
-## Deploy on Vercel
+1. **自動デプロイ**
+   - `main`ブランチへのプッシュで本番環境に自動デプロイ
+   - プルリクエストでプレビュー環境が自動生成
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+2. **手動デプロイ**
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# comm-time
+```bash
+# Vercel CLIのインストール
+npm i -g vercel
+
+# デプロイ
+vercel
+
+# 本番環境へのデプロイ
+vercel --prod
+```
+
+### メンテナンス
+
+#### ファイル構成
+
+```
+comm-time/
+├── app/
+│   ├── layout.tsx          # レイアウト・メタデータ設定
+│   ├── page.tsx            # メインページ
+│   ├── globals.css         # グローバルスタイル
+│   └── fonts/              # フォントファイル
+├── components/
+│   └── comm-time.tsx       # メインコンポーネント
+├── public/
+│   └── favicon.svg         # ファビコン（タイマーアイコン）
+├── lib/                    # ユーティリティ関数
+└── README.md               # このファイル
+```
+
+#### 主要な更新作業
+
+##### 1. デザインの変更
+
+**ファビコンの変更**
+
+```bash
+# public/favicon.svgを編集
+# app/layout.tsxでアイコン設定を確認
+```
+
+**カラーテーマの変更**
+
+`components/comm-time.tsx`のTailwindクラスを編集：
+- グラデーション: `from-indigo-500 to-purple-600`など
+- ボタン色: `bg-gradient-to-r from-green-500 to-emerald-500`など
+
+##### 2. 機能の追加・修正
+
+**新しいアラームポイントの追加**
+
+`components/comm-time.tsx`の`initialMeetingAlarmPoints`を編集：
+
+```typescript
+const initialMeetingAlarmPoints: AlarmPoint[] = [
+  { id: "1", minutes: 30, isDone: false, remainingTime: 30 * 60 },
+  { id: "2", minutes: 50, isDone: false, remainingTime: 50 * 60 },
+  { id: "3", minutes: 60, isDone: false, remainingTime: 60 * 60 },
+  // 新しいポイントを追加
+  { id: "4", minutes: 90, isDone: false, remainingTime: 90 * 60 },
+];
+```
+
+**デフォルト設定の変更**
+
+`components/comm-time.tsx`の各初期設定を編集：
+
+```typescript
+// ミーティングアラーム設定
+const initialMeetingAlarmSettings: AlarmSettings = {
+  volume: 44,      // 音量（0-100）
+  frequency: 340,  // 周波数（Hz）
+};
+
+// ポモドーロ設定
+const initialPomodoroSettings = {
+  workDuration: 25,    // 作業時間（分）
+  breakDuration: 5,    // 休憩時間（分）
+  cycles: 4,           // サイクル数
+  infiniteMode: false, // 無限モード
+  workAlarm: {
+    volume: 65,
+    frequency: 240,
+  },
+  breakAlarm: {
+    volume: 36,
+    frequency: 740,
+  },
+};
+```
+
+##### 3. バグ修正の手順
+
+1. **問題の特定**
+   - ブラウザのコンソールでエラーを確認
+   - `components/comm-time.tsx`の該当箇所を確認
+
+2. **修正**
+   - コードを編集
+   - 開発サーバーで動作確認
+
+3. **テスト**
+   - アラーム機能のテスト
+   - タイマーの動作確認
+   - データの保存・読み込みを確認
+
+4. **コミット**
+
+```bash
+git add .
+git commit -m "Fix: 問題の説明"
+git push
+```
+
+##### 4. 依存関係の更新
+
+```bash
+# パッケージの更新確認
+npm outdated
+
+# パッケージの更新
+npm update
+
+# または特定のパッケージを更新
+npm install package-name@latest
+
+# セキュリティの脆弱性を修正
+npm audit fix
+```
+
+##### 5. 既知の問題と対処法
+
+**モバイルブラウザでチクタク音が再生されない**
+
+- 一部のモバイルブラウザではユーザーインタラクション後にAudioContextが有効化されます
+- タイマー開始時に`AudioContext.resume()`を呼び出して対処済み
+
+**iOS Safariで通知が表示されない**
+
+- iOS Safariはデスクトップ通知をサポートしていません
+- フラッシュとバイブレーションを活用してください
+
+**アラームが30秒で自動停止する**
+
+- これは仕様です。`components/comm-time.tsx`の`playAlarm`関数で変更可能：
+
+```typescript
+// 繰り返しアラーム（5秒ごとに30秒間）
+playSound();
+let alarmCount = 0;
+alarmIntervalRef.current = setInterval(() => {
+  alarmCount++;
+  if (alarmCount >= 6) {  // この数値を変更（6回 × 5秒 = 30秒）
+    stopAlarm();
+  } else {
+    playSound();
+    // ...
+  }
+}, 5000);  // この間隔も変更可能
+```
+
+### Git開発フロー
+
+#### ブランチ戦略
+
+- `main`: 本番環境
+- `claude/xxx`: 機能追加・修正用ブランチ（Claudeが使用）
+
+#### コミットメッセージの規約
+
+```
+<種類>: <簡潔な説明>
+
+<詳細な説明（任意）>
+```
+
+種類:
+- `Fix`: バグ修正
+- `Add`: 新機能追加
+- `Update`: 機能の更新・改善
+- `Remove`: 機能の削除
+- `Refactor`: リファクタリング
+- `Docs`: ドキュメント更新
+
+例:
+```bash
+git commit -m "Fix: アラームフラッシュがタップで消えない問題を修正"
+git commit -m "Add: カウントダウンモード機能を追加"
+git commit -m "Update: ポモドーロのデフォルト設定を変更"
+```
+
+### データ管理
+
+#### ローカルストレージのキー
+
+以下のキーでデータが保存されています：
+
+- `alarmPoints`: アラームポイント
+- `meetingAlarmSettings`: ミーティングアラーム設定
+- `pomodoroSettings`: ポモドーロ設定
+- `meetingMemo`: ミーティングメモ
+- `pomodoroMemo`: ポモドーロメモ
+- `meetingTodos`: ミーティングTODO
+- `pomodoroTodos`: ポモドーロTODO
+- `notificationsEnabled`: 通知設定
+- `vibrationEnabled`: バイブレーション設定
+- `countdownMode`: カウントダウンモード
+- `targetEndTime`: 目標終了時刻
+- `tickSoundEnabled`: チクタク音設定
+- `flashEnabled`: フラッシュ設定
+
+#### データのリセット
+
+ユーザーがデータをリセットしたい場合：
+
+1. **ブラウザの開発者ツールを開く**
+2. **Application（またはStorage）タブ**
+3. **Local Storage → ドメイン**
+4. **すべてのキーを削除**
+5. **ページをリロード**
+
+---
+
+## 🔗 リンク
+
+- **本番環境**: [https://comm-time.vercel.app](https://comm-time.vercel.app)
+- **リポジトリ**: [https://github.com/BoxPistols/comm-time](https://github.com/BoxPistols/comm-time)
+
+---
+
+## 📄 ライセンス
+
+このプロジェクトはMITライセンスの下で公開されています。
+
+---
+
+## 🙏 謝辞
+
+- [Next.js](https://nextjs.org)
+- [Tailwind CSS](https://tailwindcss.com)
+- [Lucide Icons](https://lucide.dev)
+- [react-beautiful-dnd](https://github.com/atlassian/react-beautiful-dnd)
