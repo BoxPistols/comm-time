@@ -419,19 +419,19 @@ export function CommTimeComponent() {
     };
   }, []);
 
-  // 画面クリックでアラーム停止（オプション）
+  // 画面クリックでアラーム停止（フラッシュがない場合）
   useEffect(() => {
     const handleClick = () => {
-      if (isAlarmRinging) {
+      if (isAlarmRinging && !isFlashing) {
         stopAlarm();
       }
     };
 
-    if (isAlarmRinging) {
+    if (isAlarmRinging && !isFlashing) {
       window.addEventListener('click', handleClick);
       return () => window.removeEventListener('click', handleClick);
     }
-  }, [isAlarmRinging, stopAlarm]);
+  }, [isAlarmRinging, isFlashing, stopAlarm]);
 
   // チクタク音を再生する関数
   const playTickSound = useCallback(() => {
@@ -716,8 +716,12 @@ export function CommTimeComponent() {
 
   // 通知権限のリクエスト
   const requestNotificationPermission = useCallback(async () => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
-      alert("このブラウザは通知をサポートしていません");
+    if (typeof window === "undefined") return;
+
+    // iOS Safariなど、一部のブラウザでは通知がサポートされていない
+    if (!("Notification" in window) || !window.Notification) {
+      // 通知が使えない場合は、何もせずに戻る（エラーメッセージを出さない）
+      console.log("このブラウザでは通知機能が利用できません");
       return;
     }
 
@@ -727,16 +731,19 @@ export function CommTimeComponent() {
       if (permission === "granted") {
         setNotificationsEnabled(true);
         // テスト通知を送信
-        new Notification("Comm Time", {
-          body: "通知が有効になりました！",
-          icon: "/favicon.svg",
-        });
+        try {
+          new Notification("Comm Time", {
+            body: "通知が有効になりました！",
+            icon: "/favicon.svg",
+          });
+        } catch (e) {
+          console.log("通知の送信に失敗しました:", e);
+        }
       } else if (permission === "denied") {
-        alert("通知が拒否されました。ブラウザの設定から通知を許可してください。");
+        console.log("通知が拒否されました");
       }
     } catch (error) {
       console.error("通知権限のリクエストに失敗しました:", error);
-      alert("通知権限のリクエストに失敗しました");
     }
   }, []);
 
@@ -903,9 +910,21 @@ export function CommTimeComponent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-4 px-4 sm:px-6 lg:px-8 relative">
-      {/* フラッシュオーバーレイ */}
+      {/* フラッシュオーバーレイ - タップでアラーム停止 */}
       {isFlashing && (
-        <div className="fixed inset-0 bg-white z-50 animate-pulse pointer-events-none" />
+        <div
+          className="fixed inset-0 bg-white z-50 animate-pulse cursor-pointer flex items-center justify-center"
+          onClick={stopAlarm}
+        >
+          <div className="text-center">
+            <p className="text-4xl sm:text-5xl lg:text-6xl font-bold text-red-600 mb-4 animate-bounce">
+              ⏰ TIME UP! ⏰
+            </p>
+            <p className="text-lg sm:text-xl lg:text-2xl text-gray-700 font-semibold">
+              タップして停止
+            </p>
+          </div>
+        </div>
       )}
 
       <div className="max-w-7xl mx-auto">
