@@ -433,8 +433,8 @@ export function CommTimeComponent() {
     }
   }, [isAlarmRinging, isFlashing, stopAlarm]);
 
-  // チクタク音を再生する関数
-  const playTickSound = useCallback(() => {
+  // チクタク音を再生する関数（モバイル対応）
+  const playTickSound = useCallback(async () => {
     if (typeof window === "undefined" || !tickSoundEnabled) return;
 
     try {
@@ -449,22 +449,30 @@ export function CommTimeComponent() {
       const audioContext = tickAudioContextRef.current;
       if (!audioContext) return;
 
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
+      // モバイルブラウザ対応: AudioContextがsuspendedの場合はresume
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
 
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
+      // AudioContextがrunning状態の時のみ音を再生
+      if (audioContext.state === 'running') {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
 
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-      gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
 
-      oscillator.start();
-      gainNode.gain.exponentialRampToValueAtTime(
-        0.00001,
-        audioContext.currentTime + 0.05
-      );
-      oscillator.stop(audioContext.currentTime + 0.05);
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
+
+        oscillator.start();
+        gainNode.gain.exponentialRampToValueAtTime(
+          0.00001,
+          audioContext.currentTime + 0.05
+        );
+        oscillator.stop(audioContext.currentTime + 0.05);
+      }
     } catch (error) {
       console.error("チクタク音の再生に失敗しました:", error);
     }
@@ -607,10 +615,21 @@ export function CommTimeComponent() {
   ]);
 
   // タイマーの制御機能
-  const toggleMeetingTimer = useCallback(() => {
+  const toggleMeetingTimer = useCallback(async () => {
     if (isMeetingRunning) {
       setIsMeetingRunning(false);
     } else {
+      // タイマー開始時にAudioContextをresumeする（モバイル対応）
+      if (tickSoundEnabled && tickAudioContextRef.current) {
+        try {
+          if (tickAudioContextRef.current.state === 'suspended') {
+            await tickAudioContextRef.current.resume();
+          }
+        } catch (error) {
+          console.error("AudioContextのresume失敗:", error);
+        }
+      }
+
       if (meetingStartTime === null) {
         setMeetingStartTime(new Date());
       } else {
@@ -622,7 +641,7 @@ export function CommTimeComponent() {
       }
       setIsMeetingRunning(true);
     }
-  }, [isMeetingRunning, meetingStartTime, meetingElapsedTime]);
+  }, [isMeetingRunning, meetingStartTime, meetingElapsedTime, tickSoundEnabled]);
 
   const resetMeetingTimer = useCallback(() => {
     setIsMeetingRunning(false);
@@ -631,10 +650,21 @@ export function CommTimeComponent() {
     setAlarmPoints(initialMeetingAlarmPoints);
   }, []);
 
-  const togglePomodoroTimer = useCallback(() => {
+  const togglePomodoroTimer = useCallback(async () => {
     if (isPomodoroRunning) {
       setIsPomodoroRunning(false);
     } else {
+      // タイマー開始時にAudioContextをresumeする（モバイル対応）
+      if (tickSoundEnabled && tickAudioContextRef.current) {
+        try {
+          if (tickAudioContextRef.current.state === 'suspended') {
+            await tickAudioContextRef.current.resume();
+          }
+        } catch (error) {
+          console.error("AudioContextのresume失敗:", error);
+        }
+      }
+
       if (pomodoroStartTime === null) {
         setPomodoroStartTime(new Date());
         setPomodoroElapsedTime(0);
@@ -647,7 +677,7 @@ export function CommTimeComponent() {
       }
       setIsPomodoroRunning(true);
     }
-  }, [isPomodoroRunning, pomodoroStartTime, pomodoroElapsedTime]);
+  }, [isPomodoroRunning, pomodoroStartTime, pomodoroElapsedTime, tickSoundEnabled]);
 
   const resetPomodoroTimer = useCallback(() => {
     setIsPomodoroRunning(false);
