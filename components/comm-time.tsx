@@ -145,6 +145,11 @@ export function CommTimeComponent() {
   const [isFlashing, setIsFlashing] = useState(false);
   const [flashEnabled, setFlashEnabled] = useState(true);
 
+  // アラーム状態（繰り返し用）
+  const [isAlarmRinging, setIsAlarmRinging] = useState(false);
+  const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const titleBlinkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
 
@@ -224,61 +229,150 @@ export function CommTimeComponent() {
       .padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
   }, []);
 
-  // アラーム再生機能
+  // Safari対応のアラーム音生成（HTMLAudioElement使用）
+  const createAlarmAudio = useCallback((settings: AlarmSettings) => {
+    try {
+      // Web Audio APIで音を生成してBlobを作成
+      const win = window as typeof window & { webkitAudioContext?: typeof AudioContext };
+      const AudioContextClass = win.AudioContext || win.webkitAudioContext;
+      if (!AudioContextClass) return null;
+
+      const audioContext = new AudioContextClass();
+      const sampleRate = audioContext.sampleRate;
+      const duration = 0.5; // 0.5秒
+      const numSamples = sampleRate * duration;
+      const buffer = audioContext.createBuffer(1, numSamples, sampleRate);
+      const channelData = buffer.getChannelData(0);
+
+      // サイン波を生成
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        channelData[i] = Math.sin(2 * Math.PI * settings.frequency * t) * (settings.volume / 100);
+      }
+
+      // WAVファイルとしてエンコード
+      const wavBlob = bufferToWave(buffer, numSamples);
+      const audioUrl = URL.createObjectURL(wavBlob);
+      const audio = new Audio(audioUrl);
+      audio.volume = settings.volume / 100;
+
+      return audio;
+    } catch (error) {
+      console.error("アラーム音の生成に失敗:", error);
+      return null;
+    }
+  }, []);
+
+  // バッファをWAVに変換
+  const bufferToWave = (buffer: AudioBuffer, len: number) => {
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const format = 1; // PCM
+    const bitDepth = 16;
+
+    const bytesPerSample = bitDepth / 8;
+    const blockAlign = numChannels * bytesPerSample;
+
+    const data = new Float32Array(len);
+    buffer.copyFromChannel(data, 0, 0);
+
+    const dataLength = len * numChannels * bytesPerSample;
+    const arrayBuffer = new ArrayBuffer(44 + dataLength);
+    const view = new DataView(arrayBuffer);
+
+    // WAVヘッダーを書き込み
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + dataLength, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, format, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitDepth, true);
+    writeString(36, 'data');
+    view.setUint32(40, dataLength, true);
+
+    // PCMデータを書き込み
+    let offset = 44;
+    for (let i = 0; i < len; i++) {
+      const sample = Math.max(-1, Math.min(1, data[i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+
+    return new Blob([arrayBuffer], { type: 'audio/wav' });
+  };
+
+  // アラーム停止機能
+  const stopAlarm = useCallback(() => {
+    setIsAlarmRinging(false);
+    if (alarmIntervalRef.current) {
+      clearInterval(alarmIntervalRef.current);
+      alarmIntervalRef.current = null;
+    }
+    if (titleBlinkIntervalRef.current) {
+      clearInterval(titleBlinkIntervalRef.current);
+      titleBlinkIntervalRef.current = null;
+    }
+    document.title = "Comm Time";
+  }, []);
+
+  // アラーム再生機能（Safari対応・繰り返し対応）
   const playAlarm = useCallback(
     (settings: AlarmSettings, message: string = "アラーム!") => {
       if (typeof window === "undefined") return;
 
-      // 音声アラーム（バックグラウンドでも動作）
-      try {
-        const win = window as typeof window & { webkitAudioContext?: typeof AudioContext };
-        const AudioContextClass = win.AudioContext || win.webkitAudioContext;
-        if (AudioContextClass) {
-          const audioContext = new AudioContextClass();
-          const oscillator = audioContext.createOscillator();
-          const gainNode = audioContext.createGain();
+      // 既存のアラームを停止
+      stopAlarm();
+      setIsAlarmRinging(true);
 
-          oscillator.connect(gainNode);
-          gainNode.connect(audioContext.destination);
-
-          oscillator.type = "sine";
-          oscillator.frequency.setValueAtTime(
-            settings.frequency,
-            audioContext.currentTime
-          );
-          gainNode.gain.setValueAtTime(
-            settings.volume / 100,
-            audioContext.currentTime
-          );
-
-          oscillator.start();
-          gainNode.gain.exponentialRampToValueAtTime(
-            0.00001,
-            audioContext.currentTime + 1
-          );
-          oscillator.stop(audioContext.currentTime + 1);
+      // Safari対応の音声再生
+      const playSound = () => {
+        try {
+          const audio = createAlarmAudio(settings);
+          if (audio) {
+            audio.play().catch((e) => console.error("音声再生エラー:", e));
+          }
+        } catch (error) {
+          console.error("音声再生に失敗:", error);
         }
-      } catch (error) {
-        console.error("アラーム音の再生に失敗しました:", error);
-      }
+      };
+
+      // 繰り返しアラーム（5秒ごとに30秒間）
+      playSound(); // 最初の再生
+      let alarmCount = 0;
+      alarmIntervalRef.current = setInterval(() => {
+        alarmCount++;
+        if (alarmCount >= 6) {
+          stopAlarm();
+        } else {
+          playSound();
+
+          // バイブレーション（毎回）
+          if (vibrationEnabled && "vibrate" in navigator) {
+            navigator.vibrate([500, 200, 500, 200, 500]);
+          }
+        }
+      }, 5000);
 
       // 強力なバイブレーション（iPhone対応）
       if (vibrationEnabled && "vibrate" in navigator) {
-        // より長く強力なパターン: 500ms振動, 200ms休止, 500ms振動, 200ms休止, 500ms振動
         navigator.vibrate([500, 200, 500, 200, 500]);
       }
 
-      // フラッシュエフェクト
+      // フラッシュエフェクト（長めに）
       if (flashEnabled) {
         setIsFlashing(true);
-        let flashCount = 0;
-        const flashInterval = setInterval(() => {
-          flashCount++;
-          if (flashCount >= 6) {
-            clearInterval(flashInterval);
-            setIsFlashing(false);
-          }
-        }, 300);
+        setTimeout(() => setIsFlashing(false), 30000); // 30秒間点滅
       }
 
       // 通知（バックグラウンドでユーザーに知らせる）
@@ -292,17 +386,19 @@ export function CommTimeComponent() {
         });
       }
 
-      // フォーカスとタイトル更新
+      // タイトル点滅（目立つように）
+      let titleBlink = false;
+      titleBlinkIntervalRef.current = setInterval(() => {
+        titleBlink = !titleBlink;
+        document.title = titleBlink ? "🔔🔔🔔 " + message + " 🔔🔔🔔" : "⚠️⚠️⚠️ TIME UP! ⚠️⚠️⚠️";
+      }, 500);
+
+      // フォーカス
       if (forceFocus) {
         window.focus();
       }
-
-      document.title = "🔔 " + message;
-      setTimeout(() => {
-        document.title = "Comm Time";
-      }, 5000);
     },
-    [forceFocus, vibrationEnabled, notificationsEnabled, notificationPermission, flashEnabled]
+    [forceFocus, vibrationEnabled, notificationsEnabled, notificationPermission, flashEnabled, createAlarmAudio, stopAlarm]
   );
 
   // 現在時刻の更新
@@ -310,6 +406,32 @@ export function CommTimeComponent() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // クリーンアップ: コンポーネントアンマウント時にアラーム停止
+  useEffect(() => {
+    return () => {
+      if (alarmIntervalRef.current) {
+        clearInterval(alarmIntervalRef.current);
+      }
+      if (titleBlinkIntervalRef.current) {
+        clearInterval(titleBlinkIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // 画面クリックでアラーム停止（オプション）
+  useEffect(() => {
+    const handleClick = () => {
+      if (isAlarmRinging) {
+        stopAlarm();
+      }
+    };
+
+    if (isAlarmRinging) {
+      window.addEventListener('click', handleClick);
+      return () => window.removeEventListener('click', handleClick);
+    }
+  }, [isAlarmRinging, stopAlarm]);
 
   // チクタク音を再生する関数
   const playTickSound = useCallback(() => {
@@ -595,7 +717,7 @@ export function CommTimeComponent() {
   // 通知権限のリクエスト
   const requestNotificationPermission = useCallback(async () => {
     if (typeof window === "undefined" || !("Notification" in window)) {
-      console.warn("このブラウザは通知をサポートしていません");
+      alert("このブラウザは通知をサポートしていません");
       return;
     }
 
@@ -604,11 +726,28 @@ export function CommTimeComponent() {
       setNotificationPermission(permission);
       if (permission === "granted") {
         setNotificationsEnabled(true);
+        // テスト通知を送信
+        new Notification("Comm Time", {
+          body: "通知が有効になりました！",
+          icon: "/favicon.svg",
+        });
+      } else if (permission === "denied") {
+        alert("通知が拒否されました。ブラウザの設定から通知を許可してください。");
       }
     } catch (error) {
       console.error("通知権限のリクエストに失敗しました:", error);
+      alert("通知権限のリクエストに失敗しました");
     }
   }, []);
+
+  // 通知トグル
+  const toggleNotifications = useCallback(() => {
+    if (notificationPermission !== "granted") {
+      requestNotificationPermission();
+    } else {
+      setNotificationsEnabled(!notificationsEnabled);
+    }
+  }, [notificationPermission, notificationsEnabled, requestNotificationPermission]);
 
   // TODO管理機能
   const addTodo = useCallback((text: string, isPomodoro: boolean) => {
@@ -781,7 +920,7 @@ export function CommTimeComponent() {
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                   Comm Time
                 </h1>
-                <p className="text-xs sm:text-sm text-gray-500 font-medium">
+                <p className="text-sm sm:text-base lg:text-lg text-gray-700 font-semibold tabular-nums">
                   現在時刻: {currentTime.toLocaleTimeString()}
                 </p>
               </div>
@@ -789,6 +928,17 @@ export function CommTimeComponent() {
 
             {/* 設定ボタン群 */}
             <div className="flex gap-2 items-center">
+              {/* アラーム停止ボタン（鳴っている時のみ表示） */}
+              {isAlarmRinging && (
+                <button
+                  type="button"
+                  onClick={stopAlarm}
+                  className="px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold shadow-lg hover:shadow-xl animate-pulse"
+                >
+                  <span className="text-sm sm:text-base">アラーム停止</span>
+                </button>
+              )}
+
               {/* チクタク音設定 */}
               <button
                 type="button"
@@ -834,13 +984,7 @@ export function CommTimeComponent() {
               {/* 通知設定 */}
               <button
                 type="button"
-                onClick={() => {
-                  if (notificationPermission !== "granted") {
-                    requestNotificationPermission();
-                  } else {
-                    setNotificationsEnabled(!notificationsEnabled);
-                  }
-                }}
+                onClick={toggleNotifications}
                 className={`p-2 sm:p-2.5 rounded-xl transition-all duration-200 ${
                   notificationsEnabled
                     ? "bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg"
