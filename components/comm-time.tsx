@@ -18,6 +18,7 @@ import {
   BellOff,
   Vibrate,
   Timer,
+  Zap,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -140,6 +141,10 @@ export function CommTimeComponent() {
   const [tickSoundEnabled, setTickSoundEnabled] = useState(false);
   const tickAudioContextRef = useRef<AudioContext | null>(null);
 
+  // フラッシュの状態
+  const [isFlashing, setIsFlashing] = useState(false);
+  const [flashEnabled, setFlashEnabled] = useState(true);
+
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
 
@@ -162,6 +167,7 @@ export function CommTimeComponent() {
     setCountdownMode(getStorageValue("countdownMode", false));
     setTargetEndTime(getStorageValue("targetEndTime", ""));
     setTickSoundEnabled(getStorageValue("tickSoundEnabled", false));
+    setFlashEnabled(getStorageValue("flashEnabled", true));
 
     // 通知権限の確認
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -190,6 +196,7 @@ export function CommTimeComponent() {
       localStorage.setItem("countdownMode", JSON.stringify(countdownMode));
       localStorage.setItem("targetEndTime", targetEndTime);
       localStorage.setItem("tickSoundEnabled", JSON.stringify(tickSoundEnabled));
+      localStorage.setItem("flashEnabled", JSON.stringify(flashEnabled));
     }
   }, [
     alarmPoints,
@@ -204,6 +211,7 @@ export function CommTimeComponent() {
     countdownMode,
     targetEndTime,
     tickSoundEnabled,
+    flashEnabled,
   ]);
 
   // 時間のフォーマット関数
@@ -221,66 +229,80 @@ export function CommTimeComponent() {
     (settings: AlarmSettings, message: string = "アラーム!") => {
       if (typeof window === "undefined") return;
 
-      // 音声アラーム
-      const audioContext = new ((
-        window as typeof window & {
-          webkitAudioContext?: typeof AudioContext;
+      // 音声アラーム（バックグラウンドでも動作）
+      try {
+        const win = window as typeof window & { webkitAudioContext?: typeof AudioContext };
+        const AudioContextClass = win.AudioContext || win.webkitAudioContext;
+        if (AudioContextClass) {
+          const audioContext = new AudioContextClass();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+
+          oscillator.type = "sine";
+          oscillator.frequency.setValueAtTime(
+            settings.frequency,
+            audioContext.currentTime
+          );
+          gainNode.gain.setValueAtTime(
+            settings.volume / 100,
+            audioContext.currentTime
+          );
+
+          oscillator.start();
+          gainNode.gain.exponentialRampToValueAtTime(
+            0.00001,
+            audioContext.currentTime + 1
+          );
+          oscillator.stop(audioContext.currentTime + 1);
         }
-      ).AudioContext ||
-        (
-          window as typeof window & {
-            webkitAudioContext?: typeof AudioContext;
-          }
-        ).webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(
-        settings.frequency,
-        audioContext.currentTime
-      );
-      gainNode.gain.setValueAtTime(
-        settings.volume / 100,
-        audioContext.currentTime
-      );
-
-      oscillator.start();
-      gainNode.gain.exponentialRampToValueAtTime(
-        0.00001,
-        audioContext.currentTime + 1
-      );
-      oscillator.stop(audioContext.currentTime + 1);
-
-      // バイブレーション
-      if (vibrationEnabled && "vibrate" in navigator) {
-        // 200ms振動, 100ms休止, 200ms振動のパターン
-        navigator.vibrate([200, 100, 200]);
+      } catch (error) {
+        console.error("アラーム音の再生に失敗しました:", error);
       }
 
-      // 通知
+      // 強力なバイブレーション（iPhone対応）
+      if (vibrationEnabled && "vibrate" in navigator) {
+        // より長く強力なパターン: 500ms振動, 200ms休止, 500ms振動, 200ms休止, 500ms振動
+        navigator.vibrate([500, 200, 500, 200, 500]);
+      }
+
+      // フラッシュエフェクト
+      if (flashEnabled) {
+        setIsFlashing(true);
+        let flashCount = 0;
+        const flashInterval = setInterval(() => {
+          flashCount++;
+          if (flashCount >= 6) {
+            clearInterval(flashInterval);
+            setIsFlashing(false);
+          }
+        }, 300);
+      }
+
+      // 通知（バックグラウンドでユーザーに知らせる）
       if (notificationsEnabled && notificationPermission === "granted") {
         new Notification("Comm Time", {
           body: message,
-          icon: "/icon.png",
-          badge: "/badge.png",
+          icon: "/favicon.svg",
+          badge: "/favicon.svg",
           tag: "comm-time-alarm",
           requireInteraction: true,
         });
       }
 
+      // フォーカスとタイトル更新
       if (forceFocus) {
         window.focus();
-        document.title = "🔔 " + message;
-        setTimeout(() => {
-          document.title = `CT (${formatTime(meetingElapsedTime)})`;
-        }, 5000);
       }
+
+      document.title = "🔔 " + message;
+      setTimeout(() => {
+        document.title = "Comm Time";
+      }, 5000);
     },
-    [forceFocus, meetingElapsedTime, formatTime, vibrationEnabled, notificationsEnabled, notificationPermission]
+    [forceFocus, vibrationEnabled, notificationsEnabled, notificationPermission, flashEnabled]
   );
 
   // 現在時刻の更新
@@ -295,19 +317,16 @@ export function CommTimeComponent() {
 
     try {
       if (!tickAudioContextRef.current) {
-        tickAudioContextRef.current = new ((
-          window as typeof window & {
-            webkitAudioContext?: typeof AudioContext;
-          }
-        ).AudioContext ||
-          (
-            window as typeof window & {
-              webkitAudioContext?: typeof AudioContext;
-            }
-          ).webkitAudioContext)();
+        const win = window as typeof window & { webkitAudioContext?: typeof AudioContext };
+        const AudioContextClass = win.AudioContext || win.webkitAudioContext;
+        if (AudioContextClass) {
+          tickAudioContextRef.current = new AudioContextClass();
+        }
       }
 
       const audioContext = tickAudioContextRef.current;
+      if (!audioContext) return;
+
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
@@ -744,7 +763,12 @@ export function CommTimeComponent() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-4 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-4 px-4 sm:px-6 lg:px-8 relative">
+      {/* フラッシュオーバーレイ */}
+      {isFlashing && (
+        <div className="fixed inset-0 bg-white z-50 animate-pulse pointer-events-none" />
+      )}
+
       <div className="max-w-7xl mx-auto">
         {/* ヘッダー */}
         <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 mb-4 sm:mb-6 border border-white/20">
@@ -791,6 +815,20 @@ export function CommTimeComponent() {
                 title={vibrationEnabled ? "バイブレーション ON" : "バイブレーション OFF"}
               >
                 <Vibrate className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+
+              {/* フラッシュ設定 */}
+              <button
+                type="button"
+                onClick={() => setFlashEnabled(!flashEnabled)}
+                className={`p-2 sm:p-2.5 rounded-xl transition-all duration-200 ${
+                  flashEnabled
+                    ? "bg-gradient-to-br from-yellow-500 to-orange-500 text-white shadow-lg"
+                    : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                }`}
+                title={flashEnabled ? "フラッシュ ON" : "フラッシュ OFF"}
+              >
+                <Zap className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
 
               {/* 通知設定 */}
