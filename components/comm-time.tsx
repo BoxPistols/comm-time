@@ -315,6 +315,7 @@ export function CommTimeComponent() {
   // アラーム停止機能
   const stopAlarm = useCallback(() => {
     setIsAlarmRinging(false);
+    setIsFlashing(false);
     if (alarmIntervalRef.current) {
       clearInterval(alarmIntervalRef.current);
       alarmIntervalRef.current = null;
