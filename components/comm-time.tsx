@@ -1052,13 +1052,13 @@ export function CommTimeComponent() {
         </div>
 
         {/* タブ切り替え */}
-        <div className="flex gap-2 sm:gap-3 mb-4 sm:mb-6">
+        <div className="flex gap-3 sm:gap-4 mb-4 sm:mb-6">
           <button
             type="button"
             onClick={() => setActiveTab("meeting")}
             className={`flex-1 py-3 sm:py-4 px-4 sm:px-6 rounded-xl sm:rounded-2xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === "meeting"
-                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xl scale-105"
+                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xl"
                 : "bg-white/80 backdrop-blur-lg text-gray-700 hover:bg-white shadow-md hover:shadow-lg"
             }`}
           >
@@ -1071,7 +1071,7 @@ export function CommTimeComponent() {
             onClick={() => setActiveTab("pomodoro")}
             className={`flex-1 py-3 sm:py-4 px-4 sm:px-6 rounded-xl sm:rounded-2xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === "pomodoro"
-                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xl scale-105"
+                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xl"
                 : "bg-white/80 backdrop-blur-lg text-gray-700 hover:bg-white shadow-md hover:shadow-lg"
             }`}
           >
