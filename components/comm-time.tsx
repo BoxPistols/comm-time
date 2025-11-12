@@ -17,6 +17,8 @@ import {
   Bell,
   BellOff,
   Vibrate,
+  Timer,
+  Zap,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -130,6 +132,24 @@ export function CommTimeComponent() {
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
 
+  // カウントダウンモードの状態
+  const [countdownMode, setCountdownMode] = useState(false);
+  const [targetEndTime, setTargetEndTime] = useState("");
+  const [countdownSeconds, setCountdownSeconds] = useState(0);
+
+  // チクタク音の状態
+  const [tickSoundEnabled, setTickSoundEnabled] = useState(false);
+  const tickAudioContextRef = useRef<AudioContext | null>(null);
+
+  // フラッシュの状態
+  const [isFlashing, setIsFlashing] = useState(false);
+  const [flashEnabled, setFlashEnabled] = useState(true);
+
+  // アラーム状態（繰り返し用）
+  const [isAlarmRinging, setIsAlarmRinging] = useState(false);
+  const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const titleBlinkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
 
@@ -149,6 +169,10 @@ export function CommTimeComponent() {
     setPomodorTodos(getStorageValue("pomodoroTodos", []));
     setNotificationsEnabled(getStorageValue("notificationsEnabled", false));
     setVibrationEnabled(getStorageValue("vibrationEnabled", true));
+    setCountdownMode(getStorageValue("countdownMode", false));
+    setTargetEndTime(getStorageValue("targetEndTime", ""));
+    setTickSoundEnabled(getStorageValue("tickSoundEnabled", false));
+    setFlashEnabled(getStorageValue("flashEnabled", true));
 
     // 通知権限の確認
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -174,6 +198,10 @@ export function CommTimeComponent() {
       localStorage.setItem("pomodoroTodos", JSON.stringify(pomodoroTodos));
       localStorage.setItem("notificationsEnabled", JSON.stringify(notificationsEnabled));
       localStorage.setItem("vibrationEnabled", JSON.stringify(vibrationEnabled));
+      localStorage.setItem("countdownMode", JSON.stringify(countdownMode));
+      localStorage.setItem("targetEndTime", targetEndTime);
+      localStorage.setItem("tickSoundEnabled", JSON.stringify(tickSoundEnabled));
+      localStorage.setItem("flashEnabled", JSON.stringify(flashEnabled));
     }
   }, [
     alarmPoints,
@@ -185,6 +213,10 @@ export function CommTimeComponent() {
     pomodoroTodos,
     notificationsEnabled,
     vibrationEnabled,
+    countdownMode,
+    targetEndTime,
+    tickSoundEnabled,
+    flashEnabled,
   ]);
 
   // 時間のフォーマット関数
@@ -197,71 +229,176 @@ export function CommTimeComponent() {
       .padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
   }, []);
 
-  // アラーム再生機能
+  // Safari対応のアラーム音生成（HTMLAudioElement使用）
+  const createAlarmAudio = useCallback((settings: AlarmSettings) => {
+    try {
+      // Web Audio APIで音を生成してBlobを作成
+      const win = window as typeof window & { webkitAudioContext?: typeof AudioContext };
+      const AudioContextClass = win.AudioContext || win.webkitAudioContext;
+      if (!AudioContextClass) return null;
+
+      const audioContext = new AudioContextClass();
+      const sampleRate = audioContext.sampleRate;
+      const duration = 0.5; // 0.5秒
+      const numSamples = sampleRate * duration;
+      const buffer = audioContext.createBuffer(1, numSamples, sampleRate);
+      const channelData = buffer.getChannelData(0);
+
+      // サイン波を生成
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        channelData[i] = Math.sin(2 * Math.PI * settings.frequency * t) * (settings.volume / 100);
+      }
+
+      // WAVファイルとしてエンコード
+      const wavBlob = bufferToWave(buffer, numSamples);
+      const audioUrl = URL.createObjectURL(wavBlob);
+      const audio = new Audio(audioUrl);
+      audio.volume = settings.volume / 100;
+
+      return audio;
+    } catch (error) {
+      console.error("アラーム音の生成に失敗:", error);
+      return null;
+    }
+  }, []);
+
+  // バッファをWAVに変換
+  const bufferToWave = (buffer: AudioBuffer, len: number) => {
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const format = 1; // PCM
+    const bitDepth = 16;
+
+    const bytesPerSample = bitDepth / 8;
+    const blockAlign = numChannels * bytesPerSample;
+
+    const data = new Float32Array(len);
+    buffer.copyFromChannel(data, 0, 0);
+
+    const dataLength = len * numChannels * bytesPerSample;
+    const arrayBuffer = new ArrayBuffer(44 + dataLength);
+    const view = new DataView(arrayBuffer);
+
+    // WAVヘッダーを書き込み
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + dataLength, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, format, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitDepth, true);
+    writeString(36, 'data');
+    view.setUint32(40, dataLength, true);
+
+    // PCMデータを書き込み
+    let offset = 44;
+    for (let i = 0; i < len; i++) {
+      const sample = Math.max(-1, Math.min(1, data[i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+
+    return new Blob([arrayBuffer], { type: 'audio/wav' });
+  };
+
+  // アラーム停止機能
+  const stopAlarm = useCallback(() => {
+    setIsAlarmRinging(false);
+    if (alarmIntervalRef.current) {
+      clearInterval(alarmIntervalRef.current);
+      alarmIntervalRef.current = null;
+    }
+    if (titleBlinkIntervalRef.current) {
+      clearInterval(titleBlinkIntervalRef.current);
+      titleBlinkIntervalRef.current = null;
+    }
+    document.title = "Comm Time";
+  }, []);
+
+  // アラーム再生機能（Safari対応・繰り返し対応）
   const playAlarm = useCallback(
     (settings: AlarmSettings, message: string = "アラーム!") => {
       if (typeof window === "undefined") return;
 
-      // 音声アラーム
-      const audioContext = new ((
-        window as typeof window & {
-          webkitAudioContext?: typeof AudioContext;
-        }
-      ).AudioContext ||
-        (
-          window as typeof window & {
-            webkitAudioContext?: typeof AudioContext;
+      // 既存のアラームを停止
+      stopAlarm();
+      setIsAlarmRinging(true);
+
+      // Safari対応の音声再生
+      const playSound = () => {
+        try {
+          const audio = createAlarmAudio(settings);
+          if (audio) {
+            audio.play().catch((e) => console.error("音声再生エラー:", e));
           }
-        ).webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
+        } catch (error) {
+          console.error("音声再生に失敗:", error);
+        }
+      };
 
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
+      // 繰り返しアラーム（5秒ごとに30秒間）
+      playSound(); // 最初の再生
+      let alarmCount = 0;
+      alarmIntervalRef.current = setInterval(() => {
+        alarmCount++;
+        if (alarmCount >= 6) {
+          stopAlarm();
+        } else {
+          playSound();
 
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(
-        settings.frequency,
-        audioContext.currentTime
-      );
-      gainNode.gain.setValueAtTime(
-        settings.volume / 100,
-        audioContext.currentTime
-      );
+          // バイブレーション（毎回）
+          if (vibrationEnabled && "vibrate" in navigator) {
+            navigator.vibrate([500, 200, 500, 200, 500]);
+          }
+        }
+      }, 5000);
 
-      oscillator.start();
-      gainNode.gain.exponentialRampToValueAtTime(
-        0.00001,
-        audioContext.currentTime + 1
-      );
-      oscillator.stop(audioContext.currentTime + 1);
-
-      // バイブレーション
+      // 強力なバイブレーション（iPhone対応）
       if (vibrationEnabled && "vibrate" in navigator) {
-        // 200ms振動, 100ms休止, 200ms振動のパターン
-        navigator.vibrate([200, 100, 200]);
+        navigator.vibrate([500, 200, 500, 200, 500]);
       }
 
-      // 通知
+      // フラッシュエフェクト（長めに）
+      if (flashEnabled) {
+        setIsFlashing(true);
+        setTimeout(() => setIsFlashing(false), 30000); // 30秒間点滅
+      }
+
+      // 通知（バックグラウンドでユーザーに知らせる）
       if (notificationsEnabled && notificationPermission === "granted") {
         new Notification("Comm Time", {
           body: message,
-          icon: "/icon.png",
-          badge: "/badge.png",
+          icon: "/favicon.svg",
+          badge: "/favicon.svg",
           tag: "comm-time-alarm",
           requireInteraction: true,
         });
       }
 
+      // タイトル点滅（目立つように）
+      let titleBlink = false;
+      titleBlinkIntervalRef.current = setInterval(() => {
+        titleBlink = !titleBlink;
+        document.title = titleBlink ? "🔔🔔🔔 " + message + " 🔔🔔🔔" : "⚠️⚠️⚠️ TIME UP! ⚠️⚠️⚠️";
+      }, 500);
+
+      // フォーカス
       if (forceFocus) {
         window.focus();
-        document.title = "🔔 " + message;
-        setTimeout(() => {
-          document.title = `CT (${formatTime(meetingElapsedTime)})`;
-        }, 5000);
       }
     },
-    [forceFocus, meetingElapsedTime, formatTime, vibrationEnabled, notificationsEnabled, notificationPermission]
+    [forceFocus, vibrationEnabled, notificationsEnabled, notificationPermission, flashEnabled, createAlarmAudio, stopAlarm]
   );
 
   // 現在時刻の更新
@@ -270,17 +407,119 @@ export function CommTimeComponent() {
     return () => clearInterval(timer);
   }, []);
 
+  // クリーンアップ: コンポーネントアンマウント時にアラーム停止
+  useEffect(() => {
+    return () => {
+      if (alarmIntervalRef.current) {
+        clearInterval(alarmIntervalRef.current);
+      }
+      if (titleBlinkIntervalRef.current) {
+        clearInterval(titleBlinkIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // 画面クリックでアラーム停止（フラッシュがない場合）
+  useEffect(() => {
+    const handleClick = () => {
+      if (isAlarmRinging && !isFlashing) {
+        stopAlarm();
+      }
+    };
+
+    if (isAlarmRinging && !isFlashing) {
+      window.addEventListener('click', handleClick);
+      return () => window.removeEventListener('click', handleClick);
+    }
+  }, [isAlarmRinging, isFlashing, stopAlarm]);
+
+  // チクタク音を再生する関数（モバイル対応）
+  const playTickSound = useCallback(async () => {
+    if (typeof window === "undefined" || !tickSoundEnabled) return;
+
+    try {
+      if (!tickAudioContextRef.current) {
+        const win = window as typeof window & { webkitAudioContext?: typeof AudioContext };
+        const AudioContextClass = win.AudioContext || win.webkitAudioContext;
+        if (AudioContextClass) {
+          tickAudioContextRef.current = new AudioContextClass();
+        }
+      }
+
+      const audioContext = tickAudioContextRef.current;
+      if (!audioContext) return;
+
+      // モバイルブラウザ対応: AudioContextがsuspendedの場合はresume
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
+      // AudioContextがrunning状態の時のみ音を再生
+      if (audioContext.state === 'running') {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
+
+        oscillator.start();
+        gainNode.gain.exponentialRampToValueAtTime(
+          0.00001,
+          audioContext.currentTime + 0.05
+        );
+        oscillator.stop(audioContext.currentTime + 0.05);
+      }
+    } catch (error) {
+      console.error("チクタク音の再生に失敗しました:", error);
+    }
+  }, [tickSoundEnabled]);
+
   // ミーティングタイマーの更新
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isMeetingRunning && meetingStartTime) {
       timer = setInterval(() => {
         const now = new Date();
-        const newElapsedTime = Math.floor(
-          (now.getTime() - meetingStartTime.getTime()) / 1000
-        );
-        setMeetingElapsedTime(newElapsedTime);
-        document.title = `CT (${formatTime(newElapsedTime)})`;
+
+        if (countdownMode && targetEndTime) {
+          // カウントダウンモード: 終了時刻までの残り時間を計算
+          const [hours, minutes] = targetEndTime.split(":").map(Number);
+          const targetDate = new Date();
+          targetDate.setHours(hours, minutes, 0, 0);
+
+          // 終了時刻が過去の場合は明日として扱う
+          if (targetDate < meetingStartTime) {
+            targetDate.setDate(targetDate.getDate() + 1);
+          }
+
+          const remainingMs = targetDate.getTime() - now.getTime();
+          const remainingSec = Math.max(0, Math.floor(remainingMs / 1000));
+
+          setCountdownSeconds((prevSeconds) => {
+            // カウントダウンが0になったらアラーム（前回の値が0より大きく、今回0になった場合）
+            if (prevSeconds > 0 && remainingSec === 0) {
+              playAlarm(meetingAlarmSettings, "時間になりました！");
+              setIsMeetingRunning(false);
+            }
+            return remainingSec;
+          });
+
+          document.title = `CT (${formatTime(remainingSec)})`;
+        } else {
+          // 通常モード: 経過時間を計算
+          const newElapsedTime = Math.floor(
+            (now.getTime() - meetingStartTime.getTime()) / 1000
+          );
+          setMeetingElapsedTime(newElapsedTime);
+          document.title = `CT (${formatTime(newElapsedTime)})`;
+        }
+
+        // チクタク音を再生
+        playTickSound();
       }, 1000);
     }
     return () => {
@@ -289,7 +528,7 @@ export function CommTimeComponent() {
         document.title = "CT";
       }
     };
-  }, [isMeetingRunning, meetingStartTime, formatTime]);
+  }, [isMeetingRunning, meetingStartTime, formatTime, countdownMode, targetEndTime, playAlarm, meetingAlarmSettings, playTickSound]);
 
   // アラームポイントの更新
   useEffect(() => {
@@ -327,10 +566,12 @@ export function CommTimeComponent() {
         setPomodoroElapsedTime(
           Math.floor((now.getTime() - pomodoroStartTime.getTime()) / 1000)
         );
+        // チクタク音を再生
+        playTickSound();
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [isPomodoroRunning, pomodoroStartTime]);
+  }, [isPomodoroRunning, pomodoroStartTime, playTickSound]);
 
   // ポモドーロの状態管理
   useEffect(() => {
@@ -374,10 +615,21 @@ export function CommTimeComponent() {
   ]);
 
   // タイマーの制御機能
-  const toggleMeetingTimer = useCallback(() => {
+  const toggleMeetingTimer = useCallback(async () => {
     if (isMeetingRunning) {
       setIsMeetingRunning(false);
     } else {
+      // タイマー開始時にAudioContextをresumeする（モバイル対応）
+      if (tickSoundEnabled && tickAudioContextRef.current) {
+        try {
+          if (tickAudioContextRef.current.state === 'suspended') {
+            await tickAudioContextRef.current.resume();
+          }
+        } catch (error) {
+          console.error("AudioContextのresume失敗:", error);
+        }
+      }
+
       if (meetingStartTime === null) {
         setMeetingStartTime(new Date());
       } else {
@@ -389,7 +641,7 @@ export function CommTimeComponent() {
       }
       setIsMeetingRunning(true);
     }
-  }, [isMeetingRunning, meetingStartTime, meetingElapsedTime]);
+  }, [isMeetingRunning, meetingStartTime, meetingElapsedTime, tickSoundEnabled]);
 
   const resetMeetingTimer = useCallback(() => {
     setIsMeetingRunning(false);
@@ -398,10 +650,21 @@ export function CommTimeComponent() {
     setAlarmPoints(initialMeetingAlarmPoints);
   }, []);
 
-  const togglePomodoroTimer = useCallback(() => {
+  const togglePomodoroTimer = useCallback(async () => {
     if (isPomodoroRunning) {
       setIsPomodoroRunning(false);
     } else {
+      // タイマー開始時にAudioContextをresumeする（モバイル対応）
+      if (tickSoundEnabled && tickAudioContextRef.current) {
+        try {
+          if (tickAudioContextRef.current.state === 'suspended') {
+            await tickAudioContextRef.current.resume();
+          }
+        } catch (error) {
+          console.error("AudioContextのresume失敗:", error);
+        }
+      }
+
       if (pomodoroStartTime === null) {
         setPomodoroStartTime(new Date());
         setPomodoroElapsedTime(0);
@@ -414,7 +677,7 @@ export function CommTimeComponent() {
       }
       setIsPomodoroRunning(true);
     }
-  }, [isPomodoroRunning, pomodoroStartTime, pomodoroElapsedTime]);
+  }, [isPomodoroRunning, pomodoroStartTime, pomodoroElapsedTime, tickSoundEnabled]);
 
   const resetPomodoroTimer = useCallback(() => {
     setIsPomodoroRunning(false);
@@ -483,8 +746,12 @@ export function CommTimeComponent() {
 
   // 通知権限のリクエスト
   const requestNotificationPermission = useCallback(async () => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
-      console.warn("このブラウザは通知をサポートしていません");
+    if (typeof window === "undefined") return;
+
+    // iOS Safariなど、一部のブラウザでは通知がサポートされていない
+    if (!("Notification" in window) || !window.Notification) {
+      // 通知が使えない場合は、何もせずに戻る（エラーメッセージを出さない）
+      console.log("このブラウザでは通知機能が利用できません");
       return;
     }
 
@@ -493,11 +760,31 @@ export function CommTimeComponent() {
       setNotificationPermission(permission);
       if (permission === "granted") {
         setNotificationsEnabled(true);
+        // テスト通知を送信
+        try {
+          new Notification("Comm Time", {
+            body: "通知が有効になりました！",
+            icon: "/favicon.svg",
+          });
+        } catch (e) {
+          console.log("通知の送信に失敗しました:", e);
+        }
+      } else if (permission === "denied") {
+        console.log("通知が拒否されました");
       }
     } catch (error) {
       console.error("通知権限のリクエストに失敗しました:", error);
     }
   }, []);
+
+  // 通知トグル
+  const toggleNotifications = useCallback(() => {
+    if (notificationPermission !== "granted") {
+      requestNotificationPermission();
+    } else {
+      setNotificationsEnabled(!notificationsEnabled);
+    }
+  }, [notificationPermission, notificationsEnabled, requestNotificationPermission]);
 
   // TODO管理機能
   const addTodo = useCallback((text: string, isPomodoro: boolean) => {
@@ -652,7 +939,24 @@ export function CommTimeComponent() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-4 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-4 px-4 sm:px-6 lg:px-8 relative">
+      {/* フラッシュオーバーレイ - タップでアラーム停止 */}
+      {isFlashing && (
+        <div
+          className="fixed inset-0 bg-white z-50 animate-pulse cursor-pointer flex items-center justify-center"
+          onClick={stopAlarm}
+        >
+          <div className="text-center">
+            <p className="text-4xl sm:text-5xl lg:text-6xl font-bold text-red-600 mb-4 animate-bounce">
+              ⏰ TIME UP! ⏰
+            </p>
+            <p className="text-lg sm:text-xl lg:text-2xl text-gray-700 font-semibold">
+              タップして停止
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto">
         {/* ヘッダー */}
         <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 mb-4 sm:mb-6 border border-white/20">
@@ -665,7 +969,7 @@ export function CommTimeComponent() {
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                   Comm Time
                 </h1>
-                <p className="text-xs sm:text-sm text-gray-500 font-medium">
+                <p className="text-sm sm:text-base lg:text-lg text-gray-700 font-semibold tabular-nums">
                   現在時刻: {currentTime.toLocaleTimeString()}
                 </p>
               </div>
@@ -673,6 +977,31 @@ export function CommTimeComponent() {
 
             {/* 設定ボタン群 */}
             <div className="flex gap-2 items-center">
+              {/* アラーム停止ボタン（鳴っている時のみ表示） */}
+              {isAlarmRinging && (
+                <button
+                  type="button"
+                  onClick={stopAlarm}
+                  className="px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold shadow-lg hover:shadow-xl animate-pulse"
+                >
+                  <span className="text-sm sm:text-base">アラーム停止</span>
+                </button>
+              )}
+
+              {/* チクタク音設定 */}
+              <button
+                type="button"
+                onClick={() => setTickSoundEnabled(!tickSoundEnabled)}
+                className={`p-2 sm:p-2.5 rounded-xl transition-all duration-200 ${
+                  tickSoundEnabled
+                    ? "bg-gradient-to-br from-green-500 to-teal-500 text-white shadow-lg"
+                    : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                }`}
+                title={tickSoundEnabled ? "チクタク音 ON" : "チクタク音 OFF"}
+              >
+                <Volume2 className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+
               {/* バイブレーション設定 */}
               <button
                 type="button"
@@ -687,16 +1016,24 @@ export function CommTimeComponent() {
                 <Vibrate className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
 
+              {/* フラッシュ設定 */}
+              <button
+                type="button"
+                onClick={() => setFlashEnabled(!flashEnabled)}
+                className={`p-2 sm:p-2.5 rounded-xl transition-all duration-200 ${
+                  flashEnabled
+                    ? "bg-gradient-to-br from-yellow-500 to-orange-500 text-white shadow-lg"
+                    : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                }`}
+                title={flashEnabled ? "フラッシュ ON" : "フラッシュ OFF"}
+              >
+                <Zap className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+
               {/* 通知設定 */}
               <button
                 type="button"
-                onClick={() => {
-                  if (notificationPermission !== "granted") {
-                    requestNotificationPermission();
-                  } else {
-                    setNotificationsEnabled(!notificationsEnabled);
-                  }
-                }}
+                onClick={toggleNotifications}
                 className={`p-2 sm:p-2.5 rounded-xl transition-all duration-200 ${
                   notificationsEnabled
                     ? "bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg"
@@ -715,13 +1052,13 @@ export function CommTimeComponent() {
         </div>
 
         {/* タブ切り替え */}
-        <div className="flex gap-2 sm:gap-3 mb-4 sm:mb-6">
+        <div className="flex gap-3 sm:gap-4 mb-4 sm:mb-6">
           <button
             type="button"
             onClick={() => setActiveTab("meeting")}
             className={`flex-1 py-3 sm:py-4 px-4 sm:px-6 rounded-xl sm:rounded-2xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === "meeting"
-                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xl scale-105"
+                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xl"
                 : "bg-white/80 backdrop-blur-lg text-gray-700 hover:bg-white shadow-md hover:shadow-lg"
             }`}
           >
@@ -734,7 +1071,7 @@ export function CommTimeComponent() {
             onClick={() => setActiveTab("pomodoro")}
             className={`flex-1 py-3 sm:py-4 px-4 sm:px-6 rounded-xl sm:rounded-2xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === "pomodoro"
-                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xl scale-105"
+                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xl"
                 : "bg-white/80 backdrop-blur-lg text-gray-700 hover:bg-white shadow-md hover:shadow-lg"
             }`}
           >
@@ -752,16 +1089,58 @@ export function CommTimeComponent() {
                   ミーティングタイマー
                 </h2>
 
+                {/* カウントダウンモード切り替え */}
+                <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-xl p-4 mb-4 border border-cyan-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Timer className="w-5 h-5 text-cyan-600" />
+                      <span className="text-sm sm:text-base font-semibold text-gray-800">
+                        カウントダウンモード
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCountdownMode(!countdownMode)}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                        countdownMode
+                          ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md"
+                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                      }`}
+                    >
+                      {countdownMode ? "ON" : "OFF"}
+                    </button>
+                  </div>
+                  {countdownMode && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        終了時刻:
+                      </label>
+                      <input
+                        type="time"
+                        value={targetEndTime}
+                        onChange={(e) => setTargetEndTime(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 {/* タイマー表示 */}
                 <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 sm:p-8 mb-4 sm:mb-6 shadow-2xl">
                   <div className="text-4xl sm:text-5xl lg:text-6xl font-bold text-center mb-3 sm:mb-4 text-white tabular-nums tracking-tight">
-                    {formatTime(meetingElapsedTime)}
+                    {countdownMode
+                      ? formatTime(countdownSeconds)
+                      : formatTime(meetingElapsedTime)}
                   </div>
                   <div className="text-xl sm:text-2xl lg:text-3xl font-semibold text-center text-white/90 tabular-nums">
-                    残り:{" "}
-                    {formatTime(
-                      Math.max(0, alarmPoints[alarmPoints.length - 1]?.minutes * 60 -
-                        meetingElapsedTime)
+                    {countdownMode ? "残り時間" : (
+                      <>
+                        残り:{" "}
+                        {formatTime(
+                          Math.max(0, alarmPoints[alarmPoints.length - 1]?.minutes * 60 -
+                            meetingElapsedTime)
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
