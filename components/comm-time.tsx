@@ -809,6 +809,37 @@ export function CommTimeComponent() {
     }
   }, [notificationPermission, notificationsEnabled, requestNotificationPermission]);
 
+  // 設定を初期化
+  const handleResetSettings = useCallback(() => {
+    if (!confirm("すべての設定を初期化しますか？この操作は元に戻せません。")) {
+      return;
+    }
+
+    // すべての設定を初期値に戻す
+    setTickSoundEnabled(false);
+    setTickSoundVolume(5);
+    setNotificationsEnabled(false);
+    setVibrationEnabled(true);
+    setFlashEnabled(true);
+    setMeetingAlarmSettings(initialMeetingAlarmSettings);
+    setPomodoroSettings(initialPomodoroSettings);
+    setAlarmPoints(initialMeetingAlarmPoints);
+
+    // ローカルストレージも初期化
+    if (typeof window !== "undefined") {
+      localStorage.setItem("tickSoundEnabled", JSON.stringify(false));
+      localStorage.setItem("tickSoundVolume", JSON.stringify(5));
+      localStorage.setItem("notificationsEnabled", JSON.stringify(false));
+      localStorage.setItem("vibrationEnabled", JSON.stringify(true));
+      localStorage.setItem("flashEnabled", JSON.stringify(true));
+      localStorage.setItem("meetingAlarmSettings", JSON.stringify(initialMeetingAlarmSettings));
+      localStorage.setItem("pomodoroSettings", JSON.stringify(initialPomodoroSettings));
+      localStorage.setItem("alarmPoints", JSON.stringify(initialMeetingAlarmPoints));
+    }
+
+    alert("設定を初期化しました");
+  }, []);
+
   // TODO管理機能
   const addTodo = useCallback((text: string, isPomodoro: boolean) => {
     if (!text.trim()) return; // 空のTODOは追加しない
@@ -2124,7 +2155,7 @@ export function CommTimeComponent() {
 
         {/* 設定モーダル */}
         <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                 ⚙️ 設定
@@ -2280,6 +2311,21 @@ export function CommTimeComponent() {
                     </button>
                   </div>
                 </div>
+              </div>
+
+              {/* 設定初期化ボタン */}
+              <div className="pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={handleResetSettings}
+                  className="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white font-semibold text-sm transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  すべての設定を初期化
+                </button>
+                <p className="text-xs text-gray-500 text-center mt-2">
+                  ※ すべての設定が初期値に戻ります
+                </p>
               </div>
             </div>
           </DialogContent>
