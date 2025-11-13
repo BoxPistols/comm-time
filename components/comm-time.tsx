@@ -179,17 +179,15 @@ export function CommTimeComponent() {
     initialMeetingAlarmSettings
   );
   const [defaultMeetingAlarmPoints, setDefaultMeetingAlarmPoints] = useState<number[]>([30, 50, 60]);
-  const [defaultPomodoroWorkDuration, setDefaultPomodoroWorkDuration] = useState(25);
-  const [defaultPomodoroBreakDuration, setDefaultPomodoroBreakDuration] = useState(5);
-  const [defaultPomodoroCycles, setDefaultPomodoroCycles] = useState(4);
-  const [defaultPomodoroWorkAlarm, setDefaultPomodoroWorkAlarm] = useState<AlarmSettings>({
-    volume: 65,
-    frequency: 240,
-  });
-  const [defaultPomodoroBreakAlarm, setDefaultPomodoroBreakAlarm] = useState<AlarmSettings>({
-    volume: 36,
-    frequency: 740,
-  });
+  const [defaultPomodoroWorkDuration, setDefaultPomodoroWorkDuration] = useState(initialPomodoroSettings.workDuration);
+  const [defaultPomodoroBreakDuration, setDefaultPomodoroBreakDuration] = useState(initialPomodoroSettings.breakDuration);
+  const [defaultPomodoroCycles, setDefaultPomodoroCycles] = useState(initialPomodoroSettings.cycles);
+  const [defaultPomodoroWorkAlarm, setDefaultPomodoroWorkAlarm] = useState<AlarmSettings>(
+    initialPomodoroSettings.workAlarm
+  );
+  const [defaultPomodoroBreakAlarm, setDefaultPomodoroBreakAlarm] = useState<AlarmSettings>(
+    initialPomodoroSettings.breakAlarm
+  );
 
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
@@ -225,19 +223,19 @@ export function CommTimeComponent() {
       getStorageValue("defaultMeetingAlarmPoints", [30, 50, 60])
     );
     setDefaultPomodoroWorkDuration(
-      getStorageValue("defaultPomodoroWorkDuration", 25)
+      getStorageValue("defaultPomodoroWorkDuration", initialPomodoroSettings.workDuration)
     );
     setDefaultPomodoroBreakDuration(
-      getStorageValue("defaultPomodoroBreakDuration", 5)
+      getStorageValue("defaultPomodoroBreakDuration", initialPomodoroSettings.breakDuration)
     );
     setDefaultPomodoroCycles(
-      getStorageValue("defaultPomodoroCycles", 4)
+      getStorageValue("defaultPomodoroCycles", initialPomodoroSettings.cycles)
     );
     setDefaultPomodoroWorkAlarm(
-      getStorageValue("defaultPomodoroWorkAlarm", { volume: 65, frequency: 240 })
+      getStorageValue("defaultPomodoroWorkAlarm", initialPomodoroSettings.workAlarm)
     );
     setDefaultPomodoroBreakAlarm(
-      getStorageValue("defaultPomodoroBreakAlarm", { volume: 36, frequency: 740 })
+      getStorageValue("defaultPomodoroBreakAlarm", initialPomodoroSettings.breakAlarm)
     );
 
     // 通知権限の確認
@@ -2497,7 +2495,7 @@ export function CommTimeComponent() {
                           value={defaultMeetingAlarmSettings.frequency}
                           onChange={(e) => setDefaultMeetingAlarmSettings({
                             ...defaultMeetingAlarmSettings,
-                            frequency: parseInt(e.target.value)
+                            frequency: Math.max(100, parseInt(e.target.value) || 100)
                           })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                         />
@@ -2526,7 +2524,7 @@ export function CommTimeComponent() {
                           min="1"
                           max="120"
                           value={defaultPomodoroWorkDuration}
-                          onChange={(e) => setDefaultPomodoroWorkDuration(parseInt(e.target.value))}
+                          onChange={(e) => setDefaultPomodoroWorkDuration(Math.max(1, parseInt(e.target.value) || 1))}
                           className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
                         />
                       </label>
@@ -2537,7 +2535,7 @@ export function CommTimeComponent() {
                           min="1"
                           max="60"
                           value={defaultPomodoroBreakDuration}
-                          onChange={(e) => setDefaultPomodoroBreakDuration(parseInt(e.target.value))}
+                          onChange={(e) => setDefaultPomodoroBreakDuration(Math.max(1, parseInt(e.target.value) || 1))}
                           className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
                         />
                       </label>
@@ -2548,7 +2546,7 @@ export function CommTimeComponent() {
                           min="1"
                           max="10"
                           value={defaultPomodoroCycles}
-                          onChange={(e) => setDefaultPomodoroCycles(parseInt(e.target.value))}
+                          onChange={(e) => setDefaultPomodoroCycles(Math.max(1, parseInt(e.target.value) || 1))}
                           className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
                         />
                       </label>
@@ -2583,7 +2581,7 @@ export function CommTimeComponent() {
                                 value={defaultPomodoroWorkAlarm.frequency}
                                 onChange={(e) => setDefaultPomodoroWorkAlarm({
                                   ...defaultPomodoroWorkAlarm,
-                                  frequency: parseInt(e.target.value)
+                                  frequency: Math.max(100, parseInt(e.target.value) || 100)
                                 })}
                                 className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
                               />
@@ -2628,7 +2626,7 @@ export function CommTimeComponent() {
                                 value={defaultPomodoroBreakAlarm.frequency}
                                 onChange={(e) => setDefaultPomodoroBreakAlarm({
                                   ...defaultPomodoroBreakAlarm,
-                                  frequency: parseInt(e.target.value)
+                                  frequency: Math.max(100, parseInt(e.target.value) || 100)
                                 })}
                                 className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
                               />
