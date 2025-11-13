@@ -169,6 +169,22 @@ export function CommTimeComponent() {
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const titleBlinkIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // 初期値設定用のstate
+  const [defaultMeetingAlarmSettings, setDefaultMeetingAlarmSettings] = useState<AlarmSettings>(
+    initialMeetingAlarmSettings
+  );
+  const [defaultPomodoroWorkDuration, setDefaultPomodoroWorkDuration] = useState(25);
+  const [defaultPomodoroBreakDuration, setDefaultPomodoroBreakDuration] = useState(5);
+  const [defaultPomodoroCycles, setDefaultPomodoroCycles] = useState(4);
+  const [defaultPomodoroWorkAlarm, setDefaultPomodoroWorkAlarm] = useState<AlarmSettings>({
+    volume: 65,
+    frequency: 240,
+  });
+  const [defaultPomodoroBreakAlarm, setDefaultPomodoroBreakAlarm] = useState<AlarmSettings>({
+    volume: 36,
+    frequency: 740,
+  });
+
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
 
@@ -193,6 +209,26 @@ export function CommTimeComponent() {
     setTickSoundEnabled(getStorageValue("tickSoundEnabled", false));
     setTickSoundVolume(getStorageValue("tickSoundVolume", 5));
     setFlashEnabled(getStorageValue("flashEnabled", true));
+
+    // 初期値設定の読み込み
+    setDefaultMeetingAlarmSettings(
+      getStorageValue("defaultMeetingAlarmSettings", initialMeetingAlarmSettings)
+    );
+    setDefaultPomodoroWorkDuration(
+      getStorageValue("defaultPomodoroWorkDuration", 25)
+    );
+    setDefaultPomodoroBreakDuration(
+      getStorageValue("defaultPomodoroBreakDuration", 5)
+    );
+    setDefaultPomodoroCycles(
+      getStorageValue("defaultPomodoroCycles", 4)
+    );
+    setDefaultPomodoroWorkAlarm(
+      getStorageValue("defaultPomodoroWorkAlarm", { volume: 65, frequency: 240 })
+    );
+    setDefaultPomodoroBreakAlarm(
+      getStorageValue("defaultPomodoroBreakAlarm", { volume: 36, frequency: 740 })
+    );
 
     // 通知権限の確認
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -223,6 +259,14 @@ export function CommTimeComponent() {
       localStorage.setItem("tickSoundEnabled", JSON.stringify(tickSoundEnabled));
       localStorage.setItem("tickSoundVolume", JSON.stringify(tickSoundVolume));
       localStorage.setItem("flashEnabled", JSON.stringify(flashEnabled));
+
+      // 初期値設定の保存
+      localStorage.setItem("defaultMeetingAlarmSettings", JSON.stringify(defaultMeetingAlarmSettings));
+      localStorage.setItem("defaultPomodoroWorkDuration", JSON.stringify(defaultPomodoroWorkDuration));
+      localStorage.setItem("defaultPomodoroBreakDuration", JSON.stringify(defaultPomodoroBreakDuration));
+      localStorage.setItem("defaultPomodoroCycles", JSON.stringify(defaultPomodoroCycles));
+      localStorage.setItem("defaultPomodoroWorkAlarm", JSON.stringify(defaultPomodoroWorkAlarm));
+      localStorage.setItem("defaultPomodoroBreakAlarm", JSON.stringify(defaultPomodoroBreakAlarm));
     }
   }, [
     alarmPoints,
@@ -239,6 +283,12 @@ export function CommTimeComponent() {
     tickSoundEnabled,
     tickSoundVolume,
     flashEnabled,
+    defaultMeetingAlarmSettings,
+    defaultPomodoroWorkDuration,
+    defaultPomodoroBreakDuration,
+    defaultPomodoroCycles,
+    defaultPomodoroWorkAlarm,
+    defaultPomodoroBreakAlarm,
   ]);
 
   // 時間のフォーマット関数
@@ -808,6 +858,27 @@ export function CommTimeComponent() {
       setNotificationsEnabled(!notificationsEnabled);
     }
   }, [notificationPermission, notificationsEnabled, requestNotificationPermission]);
+
+  // 設定を初期値にリセット
+  const resetToDefaults = useCallback(() => {
+    setMeetingAlarmSettings(defaultMeetingAlarmSettings);
+    setPomodoroSettings({
+      ...pomodoroSettings,
+      workDuration: defaultPomodoroWorkDuration,
+      breakDuration: defaultPomodoroBreakDuration,
+      cycles: defaultPomodoroCycles,
+      workAlarm: defaultPomodoroWorkAlarm,
+      breakAlarm: defaultPomodoroBreakAlarm,
+    });
+  }, [
+    defaultMeetingAlarmSettings,
+    defaultPomodoroWorkDuration,
+    defaultPomodoroBreakDuration,
+    defaultPomodoroCycles,
+    defaultPomodoroWorkAlarm,
+    defaultPomodoroBreakAlarm,
+    pomodoroSettings,
+  ]);
 
   // TODO管理機能
   const addTodo = useCallback((text: string, isPomodoro: boolean) => {
@@ -2279,6 +2350,184 @@ export function CommTimeComponent() {
                       {flashEnabled ? "ON" : "OFF"}
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* 初期値設定 */}
+              <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-4 border border-orange-200">
+                <h3 className="text-lg font-bold mb-4 text-gray-800 flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-orange-600" />
+                  初期値設定
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  アラームやタイマーのデフォルト値を設定できます。これらの値は、設定をリセットする際に使用されます。
+                </p>
+
+                <div className="space-y-4">
+                  {/* ミーティングアラーム初期値 */}
+                  <div className="bg-white rounded-lg p-4">
+                    <h4 className="text-sm font-bold mb-3 text-gray-700">ミーティングアラーム</h4>
+                    <div className="space-y-3">
+                      <label className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-gray-600">デフォルト音量</span>
+                          <span className="text-xs font-bold text-orange-600">{defaultMeetingAlarmSettings.volume}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value={defaultMeetingAlarmSettings.volume}
+                          onChange={(e) => setDefaultMeetingAlarmSettings({
+                            ...defaultMeetingAlarmSettings,
+                            volume: parseInt(e.target.value)
+                          })}
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-600"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-gray-600">デフォルト周波数 (Hz)</span>
+                          <span className="text-xs font-bold text-orange-600">{defaultMeetingAlarmSettings.frequency}</span>
+                        </div>
+                        <input
+                          type="number"
+                          min="100"
+                          max="1000"
+                          step="10"
+                          value={defaultMeetingAlarmSettings.frequency}
+                          onChange={(e) => setDefaultMeetingAlarmSettings({
+                            ...defaultMeetingAlarmSettings,
+                            frequency: parseInt(e.target.value)
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* ポモドーロ初期値 */}
+                  <div className="bg-white rounded-lg p-4">
+                    <h4 className="text-sm font-bold mb-3 text-gray-700">ポモドーロタイマー</h4>
+                    <div className="grid grid-cols-3 gap-3 mb-3">
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-gray-600">作業時間 (分)</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="120"
+                          value={defaultPomodoroWorkDuration}
+                          onChange={(e) => setDefaultPomodoroWorkDuration(parseInt(e.target.value))}
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-gray-600">休憩時間 (分)</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="60"
+                          value={defaultPomodoroBreakDuration}
+                          onChange={(e) => setDefaultPomodoroBreakDuration(parseInt(e.target.value))}
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-xs font-medium text-gray-600">サイクル数</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={defaultPomodoroCycles}
+                          onChange={(e) => setDefaultPomodoroCycles(parseInt(e.target.value))}
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="space-y-3 mt-3">
+                      <div>
+                        <h5 className="text-xs font-semibold text-gray-600 mb-2">作業アラーム</h5>
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="flex flex-col gap-1">
+                            <span className="text-xs text-gray-600">音量: {defaultPomodoroWorkAlarm.volume}</span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={defaultPomodoroWorkAlarm.volume}
+                              onChange={(e) => setDefaultPomodoroWorkAlarm({
+                                ...defaultPomodoroWorkAlarm,
+                                volume: parseInt(e.target.value)
+                              })}
+                              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-600"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-xs text-gray-600">周波数: {defaultPomodoroWorkAlarm.frequency}Hz</span>
+                            <input
+                              type="number"
+                              min="100"
+                              max="1000"
+                              step="10"
+                              value={defaultPomodoroWorkAlarm.frequency}
+                              onChange={(e) => setDefaultPomodoroWorkAlarm({
+                                ...defaultPomodoroWorkAlarm,
+                                frequency: parseInt(e.target.value)
+                              })}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h5 className="text-xs font-semibold text-gray-600 mb-2">休憩アラーム</h5>
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="flex flex-col gap-1">
+                            <span className="text-xs text-gray-600">音量: {defaultPomodoroBreakAlarm.volume}</span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={defaultPomodoroBreakAlarm.volume}
+                              onChange={(e) => setDefaultPomodoroBreakAlarm({
+                                ...defaultPomodoroBreakAlarm,
+                                volume: parseInt(e.target.value)
+                              })}
+                              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-600"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-xs text-gray-600">周波数: {defaultPomodoroBreakAlarm.frequency}Hz</span>
+                            <input
+                              type="number"
+                              min="100"
+                              max="1000"
+                              step="10"
+                              value={defaultPomodoroBreakAlarm.frequency}
+                              onChange={(e) => setDefaultPomodoroBreakAlarm({
+                                ...defaultPomodoroBreakAlarm,
+                                frequency: parseInt(e.target.value)
+                              })}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* リセットボタン */}
+                  <button
+                    type="button"
+                    onClick={resetToDefaults}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    現在の設定を初期値にリセット
+                  </button>
                 </div>
               </div>
             </div>
