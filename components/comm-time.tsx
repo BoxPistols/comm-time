@@ -155,6 +155,7 @@ export function CommTimeComponent() {
 
   // 設定モーダルの状態
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   // TODOソート状態
   const [sortByDeadline, setSortByDeadline] = useState(false);
