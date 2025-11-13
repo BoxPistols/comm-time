@@ -12,8 +12,6 @@ import {
   Volume2,
   Clock,
   List,
-  ArrowUp,
-  ArrowDown,
   Bell,
   BellOff,
   Vibrate,
@@ -158,6 +156,9 @@ export function CommTimeComponent() {
 
   // TODOソート状態
   const [sortByDeadline, setSortByDeadline] = useState(false);
+
+  // 期限入力を展開中のTodoのID
+  const [expandedDeadlineTodoId, setExpandedDeadlineTodoId] = useState<string | null>(null);
 
   // フラッシュの状態
   const [isFlashing, setIsFlashing] = useState(false);
@@ -1009,47 +1010,6 @@ export function CommTimeComponent() {
     [meetingTodos, pomodoroTodos, linkTodoToAlarmPoint]
   );
 
-  // TODOの順序変更機能
-  const moveTodoUp = useCallback(
-    (index: number, isPomodoro: boolean) => {
-      if (index === 0) return;
-
-      const todos = isPomodoro ? pomodoroTodos : meetingTodos;
-      const newTodos = [...todos];
-      [newTodos[index - 1], newTodos[index]] = [
-        newTodos[index],
-        newTodos[index - 1],
-      ];
-
-      if (isPomodoro) {
-        setPomodorTodos(newTodos);
-      } else {
-        setMeetingTodos(newTodos);
-      }
-    },
-    [pomodoroTodos, meetingTodos]
-  );
-
-  const moveTodoDown = useCallback(
-    (index: number, isPomodoro: boolean) => {
-      const todos = isPomodoro ? pomodoroTodos : meetingTodos;
-      if (index === todos.length - 1) return;
-
-      const newTodos = [...todos];
-      [newTodos[index], newTodos[index + 1]] = [
-        newTodos[index + 1],
-        newTodos[index],
-      ];
-
-      if (isPomodoro) {
-        setPomodorTodos(newTodos);
-      } else {
-        setMeetingTodos(newTodos);
-      }
-    },
-    [pomodoroTodos, meetingTodos]
-  );
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-4 px-4 sm:px-6 lg:px-8 relative">
       {/* フラッシュオーバーレイ - タップでアラーム停止 */}
@@ -1868,6 +1828,7 @@ export function CommTimeComponent() {
                           key={todo.id}
                           draggableId={todo.id}
                           index={index}
+                          isDragDisabled={sortByDeadline}
                         >
                           {(provided, snapshot) => (
                             <li
@@ -1986,54 +1947,56 @@ export function CommTimeComponent() {
                                       return null;
                                     })()}
 
-                                    {/* 期限設定フォーム */}
-                                    <div className="flex gap-1 items-center flex-wrap">
-                                      <input
-                                        type="date"
-                                        value={todo.dueDate || ""}
-                                        onChange={(e) =>
-                                          updateTodoDeadline(
-                                            todo.id,
-                                            e.target.value || undefined,
-                                            todo.dueTime,
-                                            activeTab === "pomodoro"
-                                          )
-                                        }
-                                        className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                        placeholder="期限日"
-                                      />
-                                      <input
-                                        type="time"
-                                        value={todo.dueTime || ""}
-                                        onChange={(e) =>
-                                          updateTodoDeadline(
-                                            todo.id,
-                                            todo.dueDate,
-                                            e.target.value || undefined,
-                                            activeTab === "pomodoro"
-                                          )
-                                        }
-                                        className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                        placeholder="時刻"
-                                      />
-                                      {(todo.dueDate || todo.dueTime) && (
-                                        <button
-                                          type="button"
-                                          onClick={() =>
+                                    {/* 期限設定フォーム - 折りたたみ式 */}
+                                    {expandedDeadlineTodoId === todo.id && (
+                                      <div className="flex gap-1 items-center flex-wrap bg-gray-50 p-2 rounded-lg">
+                                        <input
+                                          type="date"
+                                          value={todo.dueDate || ""}
+                                          onChange={(e) =>
                                             updateTodoDeadline(
                                               todo.id,
-                                              undefined,
-                                              undefined,
+                                              e.target.value || undefined,
+                                              todo.dueTime,
                                               activeTab === "pomodoro"
                                             )
                                           }
-                                          className="text-xs px-2 py-1 bg-red-100 text-red-600 hover:bg-red-200 rounded transition-colors"
-                                          title="期限をクリア"
-                                        >
-                                          期限解除
-                                        </button>
-                                      )}
-                                    </div>
+                                          className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                          placeholder="期限日"
+                                        />
+                                        <input
+                                          type="time"
+                                          value={todo.dueTime || ""}
+                                          onChange={(e) =>
+                                            updateTodoDeadline(
+                                              todo.id,
+                                              todo.dueDate,
+                                              e.target.value || undefined,
+                                              activeTab === "pomodoro"
+                                            )
+                                          }
+                                          className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                          placeholder="時刻"
+                                        />
+                                        {(todo.dueDate || todo.dueTime) && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              updateTodoDeadline(
+                                                todo.id,
+                                                undefined,
+                                                undefined,
+                                                activeTab === "pomodoro"
+                                              )
+                                            }
+                                            className="text-xs px-2 py-1 bg-red-100 text-red-600 hover:bg-red-200 rounded transition-colors"
+                                            title="期限をクリア"
+                                          >
+                                            解除
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                   <div className="flex gap-1 flex-shrink-0 items-start">
                                     <button
@@ -2049,8 +2012,25 @@ export function CommTimeComponent() {
                                           ? "text-green-600 bg-green-100"
                                           : "text-gray-400 hover:text-green-600 hover:bg-green-100"
                                       }`}
+                                      title="完了/未完了"
                                     >
-                                      <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                      <Check className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setExpandedDeadlineTodoId(
+                                          expandedDeadlineTodoId === todo.id ? null : todo.id
+                                        )
+                                      }
+                                      className={`p-1.5 rounded-lg transition-colors duration-200 ${
+                                        expandedDeadlineTodoId === todo.id || todo.dueDate
+                                          ? "text-indigo-600 bg-indigo-100"
+                                          : "text-gray-400 hover:text-indigo-600 hover:bg-indigo-100"
+                                      }`}
+                                      title="期限を設定"
+                                    >
+                                      <Calendar className="w-4 h-4" />
                                     </button>
                                     <button
                                       type="button"
@@ -2058,8 +2038,9 @@ export function CommTimeComponent() {
                                         startEditingTodo(todo.id, todo.text)
                                       }
                                       className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors duration-200"
+                                      title="編集"
                                     >
-                                      <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                      <Edit className="w-4 h-4" />
                                     </button>
                                     <button
                                       type="button"
@@ -2070,41 +2051,9 @@ export function CommTimeComponent() {
                                         )
                                       }
                                       className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors duration-200"
+                                      title="削除"
                                     >
-                                      <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        moveTodoUp(
-                                          index,
-                                          activeTab === "pomodoro"
-                                        )
-                                      }
-                                      disabled={index === 0}
-                                      className="p-1.5 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                                    >
-                                      <ArrowUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        moveTodoDown(
-                                          index,
-                                          activeTab === "pomodoro"
-                                        )
-                                      }
-                                      disabled={
-                                        index ===
-                                        (activeTab === "meeting"
-                                          ? meetingTodos
-                                          : pomodoroTodos
-                                        ).length -
-                                          1
-                                      }
-                                      className="p-1.5 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                                    >
-                                      <ArrowDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                      <X className="w-4 h-4" />
                                     </button>
                                   </div>
                                 </>
