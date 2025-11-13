@@ -19,6 +19,8 @@ import {
   Vibrate,
   Timer,
   Zap,
+  Settings,
+  Calendar,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -26,6 +28,13 @@ import {
   Draggable,
   type DropResult,
 } from "react-beautiful-dnd";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 // 型定義
 type AlarmPoint = {
@@ -47,6 +56,8 @@ type TodoItem = {
   id: string;
   text: string;
   isCompleted: boolean;
+  dueDate?: string; // YYYY-MM-DD
+  dueTime?: string; // HH:MM
 };
 
 // 初期値の設定
@@ -139,7 +150,14 @@ export function CommTimeComponent() {
 
   // チクタク音の状態
   const [tickSoundEnabled, setTickSoundEnabled] = useState(false);
+  const [tickSoundVolume, setTickSoundVolume] = useState(5); // 0-100
   const tickAudioContextRef = useRef<AudioContext | null>(null);
+
+  // 設定モーダルの状態
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // TODOソート状態
+  const [sortByDeadline, setSortByDeadline] = useState(false);
 
   // フラッシュの状態
   const [isFlashing, setIsFlashing] = useState(false);
@@ -172,6 +190,7 @@ export function CommTimeComponent() {
     setCountdownMode(getStorageValue("countdownMode", false));
     setTargetEndTime(getStorageValue("targetEndTime", ""));
     setTickSoundEnabled(getStorageValue("tickSoundEnabled", false));
+    setTickSoundVolume(getStorageValue("tickSoundVolume", 5));
     setFlashEnabled(getStorageValue("flashEnabled", true));
 
     // 通知権限の確認
@@ -201,6 +220,7 @@ export function CommTimeComponent() {
       localStorage.setItem("countdownMode", JSON.stringify(countdownMode));
       localStorage.setItem("targetEndTime", targetEndTime);
       localStorage.setItem("tickSoundEnabled", JSON.stringify(tickSoundEnabled));
+      localStorage.setItem("tickSoundVolume", JSON.stringify(tickSoundVolume));
       localStorage.setItem("flashEnabled", JSON.stringify(flashEnabled));
     }
   }, [
@@ -216,6 +236,7 @@ export function CommTimeComponent() {
     countdownMode,
     targetEndTime,
     tickSoundEnabled,
+    tickSoundVolume,
     flashEnabled,
   ]);
 
@@ -465,7 +486,7 @@ export function CommTimeComponent() {
 
         oscillator.type = "sine";
         oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-        gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(tickSoundVolume / 100, audioContext.currentTime);
 
         oscillator.start();
         gainNode.gain.exponentialRampToValueAtTime(
@@ -477,7 +498,7 @@ export function CommTimeComponent() {
     } catch (error) {
       console.error("チクタク音の再生に失敗しました:", error);
     }
-  }, [tickSoundEnabled]);
+  }, [tickSoundEnabled, tickSoundVolume]);
 
   // ミーティングタイマーの更新
   useEffect(() => {
@@ -867,6 +888,96 @@ export function CommTimeComponent() {
     []
   );
 
+  // 期限の更新機能
+  const updateTodoDeadline = useCallback(
+    (id: string, dueDate: string | undefined, dueTime: string | undefined, isPomodoro: boolean) => {
+      const updateFunc = (prev: TodoItem[]) =>
+        prev.map((todo) =>
+          todo.id === id ? { ...todo, dueDate, dueTime } : todo
+        );
+
+      if (isPomodoro) {
+        setPomodorTodos(updateFunc);
+      } else {
+        setMeetingTodos(updateFunc);
+      }
+    },
+    []
+  );
+
+  // 期限延長機能
+  const extendDeadline = useCallback(
+    (id: string, days: number, isPomodoro: boolean) => {
+      const updateFunc = (prev: TodoItem[]) =>
+        prev.map((todo) => {
+          if (todo.id === id) {
+            const currentDate = todo.dueDate ? new Date(todo.dueDate) : new Date();
+            currentDate.setDate(currentDate.getDate() + days);
+            const newDueDate = currentDate.toISOString().split('T')[0];
+            return { ...todo, dueDate: newDueDate };
+          }
+          return todo;
+        });
+
+      if (isPomodoro) {
+        setPomodorTodos(updateFunc);
+      } else {
+        setMeetingTodos(updateFunc);
+      }
+    },
+    []
+  );
+
+  // 期限までの残り時間を取得
+  const getDeadlineStatus = useCallback((todo: TodoItem) => {
+    if (!todo.dueDate) return null;
+
+    const now = new Date();
+    const deadline = new Date(todo.dueDate);
+
+    if (todo.dueTime) {
+      const [hours, minutes] = todo.dueTime.split(':').map(Number);
+      deadline.setHours(hours, minutes, 0, 0);
+    } else {
+      deadline.setHours(23, 59, 59, 999);
+    }
+
+    const diffMs = deadline.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
+
+    return {
+      isOverdue: diffMs < 0,
+      isSoon: diffMs > 0 && diffHours <= 24,
+      diffDays,
+      diffHours,
+      diffMs,
+    };
+  }, []);
+
+  // Todoをソート（期限順）
+  const sortTodosByDeadline = useCallback((todos: TodoItem[]) => {
+    return [...todos].sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+
+      const dateA = new Date(a.dueDate);
+      const dateB = new Date(b.dueDate);
+
+      if (a.dueTime) {
+        const [hoursA, minutesA] = a.dueTime.split(':').map(Number);
+        dateA.setHours(hoursA, minutesA);
+      }
+      if (b.dueTime) {
+        const [hoursB, minutesB] = b.dueTime.split(':').map(Number);
+        dateB.setHours(hoursB, minutesB);
+      }
+
+      return dateA.getTime() - dateB.getTime();
+    });
+  }, []);
+
   // ドラッグ&ドロップの処理
   const onDragEnd = useCallback(
     (result: DropResult) => {
@@ -988,6 +1099,16 @@ export function CommTimeComponent() {
                   <span className="text-sm sm:text-base">アラーム停止</span>
                 </button>
               )}
+
+              {/* 設定ボタン */}
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                className="p-2 sm:p-2.5 rounded-xl bg-gradient-to-br from-gray-500 to-gray-600 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                title="設定"
+              >
+                <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
 
               {/* チクタク音設定 */}
               <button
@@ -1708,9 +1829,24 @@ export function CommTimeComponent() {
 
             {/* TODOリストセクション */}
             <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 border border-white/20">
-              <h3 className="text-base sm:text-lg font-bold mb-3 sm:mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                ✅ TODOリスト
-              </h3>
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-base sm:text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                  ✅ TODOリスト
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setSortByDeadline(!sortByDeadline)}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1 ${
+                    sortByDeadline
+                      ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md"
+                      : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                  }`}
+                  title="期限順にソート"
+                >
+                  <Calendar className="w-3 h-3" />
+                  期限順
+                </button>
+              </div>
 
               <DragDropContext onDragEnd={onDragEnd}>
                 <Droppable
@@ -1724,9 +1860,9 @@ export function CommTimeComponent() {
                       ref={provided.innerRef}
                       className="space-y-2 mb-3 sm:mb-4 max-h-[400px] overflow-y-auto"
                     >
-                      {(activeTab === "meeting"
-                        ? meetingTodos
-                        : pomodoroTodos
+                      {(sortByDeadline
+                        ? sortTodosByDeadline(activeTab === "meeting" ? meetingTodos : pomodoroTodos)
+                        : (activeTab === "meeting" ? meetingTodos : pomodoroTodos)
                       ).map((todo, index) => (
                         <Draggable
                           key={todo.id}
@@ -1783,16 +1919,123 @@ export function CommTimeComponent() {
                                 </>
                               ) : (
                                 <>
-                                  <span
-                                    className={`flex-1 text-xs sm:text-sm ${
-                                      todo.isCompleted
-                                        ? "line-through text-gray-500"
-                                        : "text-gray-800"
-                                    }`}
-                                  >
-                                    {todo.text}
-                                  </span>
-                                  <div className="flex gap-1 flex-shrink-0">
+                                  <div className="flex-1 space-y-2">
+                                    <span
+                                      className={`text-xs sm:text-sm block ${
+                                        todo.isCompleted
+                                          ? "line-through text-gray-500"
+                                          : "text-gray-800"
+                                      }`}
+                                    >
+                                      {todo.text}
+                                    </span>
+
+                                    {/* 期限表示 */}
+                                    {(() => {
+                                      const status = getDeadlineStatus(todo);
+                                      if (status) {
+                                        return (
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <div
+                                              className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${
+                                                status.isOverdue
+                                                  ? "bg-red-100 text-red-700 font-semibold"
+                                                  : status.isSoon
+                                                  ? "bg-yellow-100 text-yellow-700 font-semibold"
+                                                  : "bg-blue-100 text-blue-700"
+                                              }`}
+                                            >
+                                              <Calendar className="w-3 h-3" />
+                                              {todo.dueDate}
+                                              {todo.dueTime && ` ${todo.dueTime}`}
+                                              {status.isOverdue && " (期限切れ)"}
+                                              {!status.isOverdue && status.isSoon && ` (残り${status.diffHours}時間)`}
+                                              {!status.isOverdue && !status.isSoon && ` (残り${status.diffDays}日)`}
+                                            </div>
+
+                                            {/* 延長ボタン */}
+                                            <div className="flex gap-1">
+                                              <button
+                                                type="button"
+                                                onClick={() => extendDeadline(todo.id, 1, activeTab === "pomodoro")}
+                                                className="text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded transition-colors"
+                                                title="1日延長"
+                                              >
+                                                +1日
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => extendDeadline(todo.id, 3, activeTab === "pomodoro")}
+                                                className="text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded transition-colors"
+                                                title="3日延長"
+                                              >
+                                                +3日
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => extendDeadline(todo.id, 7, activeTab === "pomodoro")}
+                                                className="text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded transition-colors"
+                                                title="1週間延長"
+                                              >
+                                                +7日
+                                              </button>
+                                            </div>
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+
+                                    {/* 期限設定フォーム */}
+                                    <div className="flex gap-1 items-center flex-wrap">
+                                      <input
+                                        type="date"
+                                        value={todo.dueDate || ""}
+                                        onChange={(e) =>
+                                          updateTodoDeadline(
+                                            todo.id,
+                                            e.target.value || undefined,
+                                            todo.dueTime,
+                                            activeTab === "pomodoro"
+                                          )
+                                        }
+                                        className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                        placeholder="期限日"
+                                      />
+                                      <input
+                                        type="time"
+                                        value={todo.dueTime || ""}
+                                        onChange={(e) =>
+                                          updateTodoDeadline(
+                                            todo.id,
+                                            todo.dueDate,
+                                            e.target.value || undefined,
+                                            activeTab === "pomodoro"
+                                          )
+                                        }
+                                        className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                        placeholder="時刻"
+                                      />
+                                      {(todo.dueDate || todo.dueTime) && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            updateTodoDeadline(
+                                              todo.id,
+                                              undefined,
+                                              undefined,
+                                              activeTab === "pomodoro"
+                                            )
+                                          }
+                                          className="text-xs px-2 py-1 bg-red-100 text-red-600 hover:bg-red-200 rounded transition-colors"
+                                          title="期限をクリア"
+                                        >
+                                          期限解除
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-1 flex-shrink-0 items-start">
                                     <button
                                       type="button"
                                       onClick={() =>
@@ -1929,6 +2172,169 @@ export function CommTimeComponent() {
             </div>
           </div>
         </div>
+
+        {/* 設定モーダル */}
+        <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                ⚙️ 設定
+              </DialogTitle>
+              <DialogDescription>
+                サウンド、通知、その他の設定を調整できます
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6 mt-4">
+              {/* チクタク音設定 */}
+              <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-xl p-4 border border-green-200">
+                <h3 className="text-lg font-bold mb-4 text-gray-800 flex items-center gap-2">
+                  <Volume2 className="w-5 h-5 text-green-600" />
+                  チクタク音設定
+                </h3>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">チクタク音を有効にする</span>
+                    <button
+                      type="button"
+                      onClick={() => setTickSoundEnabled(!tickSoundEnabled)}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                        tickSoundEnabled
+                          ? "bg-gradient-to-r from-green-500 to-teal-500 text-white shadow-md"
+                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                      }`}
+                    >
+                      {tickSoundEnabled ? "ON" : "OFF"}
+                    </button>
+                  </div>
+
+                  {tickSoundEnabled && (
+                    <div className="bg-white rounded-lg p-4">
+                      <label className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-gray-700">音量</span>
+                          <span className="text-sm font-bold text-green-600">{tickSoundVolume}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value={tickSoundVolume}
+                          onChange={(e) => setTickSoundVolume(parseInt(e.target.value))}
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600"
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* アラーム設定サマリー */}
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
+                <h3 className="text-lg font-bold mb-4 text-gray-800">アラーム設定</h3>
+
+                <div className="space-y-3">
+                  <div className="bg-white rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold text-gray-700">ミーティングアラーム</span>
+                    </div>
+                    <div className="flex gap-4 text-xs text-gray-600">
+                      <span>音量: {meetingAlarmSettings.volume}</span>
+                      <span>周波数: {meetingAlarmSettings.frequency}Hz</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold text-gray-700">作業時間アラーム</span>
+                    </div>
+                    <div className="flex gap-4 text-xs text-gray-600">
+                      <span>音量: {pomodoroSettings.workAlarm.volume}</span>
+                      <span>周波数: {pomodoroSettings.workAlarm.frequency}Hz</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold text-gray-700">休憩時間アラーム</span>
+                    </div>
+                    <div className="flex gap-4 text-xs text-gray-600">
+                      <span>音量: {pomodoroSettings.breakAlarm.volume}</span>
+                      <span>周波数: {pomodoroSettings.breakAlarm.frequency}Hz</span>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-500 mt-3">
+                  ※ 各タイマーの設定画面で詳細を調整できます
+                </p>
+              </div>
+
+              {/* 通知・エフェクト設定 */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+                <h3 className="text-lg font-bold mb-4 text-gray-800">通知・エフェクト</h3>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between bg-white rounded-lg p-3">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-blue-600" />
+                      <span className="text-sm font-medium text-gray-700">通知</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleNotifications}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                        notificationsEnabled
+                          ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md"
+                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                      }`}
+                    >
+                      {notificationsEnabled ? "ON" : "OFF"}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between bg-white rounded-lg p-3">
+                    <div className="flex items-center gap-2">
+                      <Vibrate className="w-4 h-4 text-purple-600" />
+                      <span className="text-sm font-medium text-gray-700">バイブレーション</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setVibrationEnabled(!vibrationEnabled)}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                        vibrationEnabled
+                          ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md"
+                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                      }`}
+                    >
+                      {vibrationEnabled ? "ON" : "OFF"}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between bg-white rounded-lg p-3">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-yellow-600" />
+                      <span className="text-sm font-medium text-gray-700">フラッシュ</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFlashEnabled(!flashEnabled)}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                        flashEnabled
+                          ? "bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-md"
+                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                      }`}
+                    >
+                      {flashEnabled ? "ON" : "OFF"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
