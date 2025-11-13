@@ -153,6 +153,7 @@ export function CommTimeComponent() {
 
   // 設定モーダルの状態
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   // TODOソート状態
   const [sortByDeadline, setSortByDeadline] = useState(false);
@@ -808,6 +809,55 @@ export function CommTimeComponent() {
       setNotificationsEnabled(!notificationsEnabled);
     }
   }, [notificationPermission, notificationsEnabled, requestNotificationPermission]);
+
+  // 設定を初期化
+  const handleResetSettings = useCallback(() => {
+    // デフォルト設定値を一元管理
+    const defaultSettings = {
+      tickSoundEnabled: false,
+      tickSoundVolume: 5,
+      notificationsEnabled: false,
+      vibrationEnabled: true,
+      flashEnabled: true,
+      meetingAlarmSettings: initialMeetingAlarmSettings,
+      pomodoroSettings: initialPomodoroSettings,
+      alarmPoints: initialMeetingAlarmPoints,
+      meetingMemo: "",
+      pomodoroMemo: "",
+      meetingTodos: [],
+      pomodoroTodos: [],
+      countdownMode: false,
+      targetEndTime: "",
+    };
+
+    // すべてのStateを初期値に戻す
+    setTickSoundEnabled(defaultSettings.tickSoundEnabled);
+    setTickSoundVolume(defaultSettings.tickSoundVolume);
+    setNotificationsEnabled(defaultSettings.notificationsEnabled);
+    setVibrationEnabled(defaultSettings.vibrationEnabled);
+    setFlashEnabled(defaultSettings.flashEnabled);
+    setMeetingAlarmSettings(defaultSettings.meetingAlarmSettings);
+    setPomodoroSettings(defaultSettings.pomodoroSettings);
+    setAlarmPoints(defaultSettings.alarmPoints);
+    setMeetingMemo(defaultSettings.meetingMemo);
+    setPomodoroMemo(defaultSettings.pomodoroMemo);
+    setMeetingTodos(defaultSettings.meetingTodos);
+    setPomodorTodos(defaultSettings.pomodoroTodos);
+    setCountdownMode(defaultSettings.countdownMode);
+    setTargetEndTime(defaultSettings.targetEndTime);
+
+    // ローカルストレージも初期化
+    if (typeof window !== "undefined") {
+      Object.entries(defaultSettings).forEach(([key, value]) => {
+        localStorage.setItem(key, JSON.stringify(value));
+      });
+    }
+
+    // 確認ダイアログを閉じる
+    setResetConfirmOpen(false);
+    // 設定モーダルも閉じる
+    setSettingsOpen(false);
+  }, []);
 
   // TODO管理機能
   const addTodo = useCallback((text: string, isPomodoro: boolean) => {
@@ -2124,7 +2174,7 @@ export function CommTimeComponent() {
 
         {/* 設定モーダル */}
         <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                 ⚙️ 設定
@@ -2281,6 +2331,71 @@ export function CommTimeComponent() {
                   </div>
                 </div>
               </div>
+
+              {/* 設定初期化ボタン */}
+              <div className="pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setResetConfirmOpen(true)}
+                  className="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white font-semibold text-sm transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  すべての設定を初期化
+                </button>
+                <p className="text-xs text-gray-500 text-center mt-2">
+                  ※ メモ、TODO、タイマー設定などすべてが初期値に戻ります
+                </p>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* 設定初期化確認ダイアログ */}
+        <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-red-600 flex items-center gap-2">
+                <Settings className="w-5 h-5" />
+                設定の初期化
+              </DialogTitle>
+              <DialogDescription className="text-gray-600 pt-2">
+                本当にすべての設定を初期化しますか？
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3 py-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm font-semibold text-red-800 mb-2">以下の項目が初期化されます：</p>
+                <ul className="text-xs text-red-700 space-y-1 list-disc list-inside">
+                  <li>チクタク音の設定</li>
+                  <li>通知・バイブレーション・フラッシュ設定</li>
+                  <li>アラーム設定（音量・周波数）</li>
+                  <li>アラームポイント</li>
+                  <li>ミーティング・ポモドーロのメモ</li>
+                  <li>すべてのTODO</li>
+                  <li>カウントダウンモード設定</li>
+                </ul>
+                <p className="text-xs font-bold text-red-800 mt-3">
+                  ⚠️ この操作は元に戻せません
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setResetConfirmOpen(false)}
+                className="flex-1 px-4 py-3 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold transition-all duration-200"
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                onClick={handleResetSettings}
+                className="flex-1 px-4 py-3 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white font-semibold transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                初期化する
+              </button>
             </div>
           </DialogContent>
         </Dialog>
