@@ -155,7 +155,6 @@ export function CommTimeComponent() {
 
   // 設定モーダルの状態
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   // TODOソート状態
   const [sortByDeadline, setSortByDeadline] = useState(false);
@@ -1116,18 +1115,18 @@ export function CommTimeComponent() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-4 px-4 sm:px-6 lg:px-8 relative">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-4 px-4 sm:px-6 lg:px-8 relative">
       {/* フラッシュオーバーレイ - タップでアラーム停止 */}
       {isFlashing && (
         <div
-          className="fixed inset-0 bg-white z-50 animate-pulse cursor-pointer flex items-center justify-center"
+          className="fixed inset-0 bg-white dark:bg-gray-900 z-50 animate-pulse cursor-pointer flex items-center justify-center"
           onClick={stopAlarm}
         >
           <div className="text-center">
-            <p className="text-4xl sm:text-5xl lg:text-6xl font-bold text-red-600 mb-4 animate-bounce">
+            <p className="text-4xl sm:text-5xl lg:text-6xl font-bold text-red-600 dark:text-red-400 mb-4 animate-bounce">
               ⏰ TIME UP! ⏰
             </p>
-            <p className="text-lg sm:text-xl lg:text-2xl text-gray-700 font-semibold">
+            <p className="text-lg sm:text-xl lg:text-2xl text-gray-700 dark:text-gray-300 font-semibold">
               タップして停止
             </p>
           </div>
@@ -1136,17 +1135,17 @@ export function CommTimeComponent() {
 
       <div className="max-w-7xl mx-auto">
         {/* ヘッダー */}
-        <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 mb-4 sm:mb-6 border border-white/20">
+        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 mb-4 sm:mb-6 border border-white/20 dark:border-gray-700/20">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
                 <Clock className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
                   Comm Time
                 </h1>
-                <p className="text-sm sm:text-base lg:text-lg text-gray-700 font-semibold tabular-nums">
+                <p className="text-sm sm:text-base lg:text-lg text-gray-700 dark:text-gray-300 font-semibold tabular-nums">
                   現在時刻: {currentTime.toLocaleTimeString()}
                 </p>
               </div>
@@ -1182,7 +1181,7 @@ export function CommTimeComponent() {
                 className={`p-2 sm:p-2.5 rounded-xl transition-all duration-200 ${
                   tickSoundEnabled
                     ? "bg-gradient-to-br from-green-500 to-teal-500 text-white shadow-lg"
-                    : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                    : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                 }`}
                 title={tickSoundEnabled ? "チクタク音 ON" : "チクタク音 OFF"}
               >
@@ -1196,7 +1195,7 @@ export function CommTimeComponent() {
                 className={`p-2 sm:p-2.5 rounded-xl transition-all duration-200 ${
                   vibrationEnabled
                     ? "bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg"
-                    : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                    : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                 }`}
                 title={vibrationEnabled ? "バイブレーション ON" : "バイブレーション OFF"}
               >
@@ -1210,7 +1209,7 @@ export function CommTimeComponent() {
                 className={`p-2 sm:p-2.5 rounded-xl transition-all duration-200 ${
                   flashEnabled
                     ? "bg-gradient-to-br from-yellow-500 to-orange-500 text-white shadow-lg"
-                    : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                    : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                 }`}
                 title={flashEnabled ? "フラッシュ ON" : "フラッシュ OFF"}
               >
@@ -1224,7 +1223,7 @@ export function CommTimeComponent() {
                 className={`p-2 sm:p-2.5 rounded-xl transition-all duration-200 ${
                   notificationsEnabled
                     ? "bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg"
-                    : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                    : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                 }`}
                 title={notificationsEnabled ? "通知 ON" : "通知 OFF"}
               >
@@ -1246,7 +1245,7 @@ export function CommTimeComponent() {
             className={`flex-1 py-3 sm:py-4 px-4 sm:px-6 rounded-xl sm:rounded-2xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === "meeting"
                 ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xl"
-                : "bg-white/80 backdrop-blur-lg text-gray-700 hover:bg-white shadow-md hover:shadow-lg"
+                : "bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 shadow-md hover:shadow-lg"
             }`}
           >
             <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -1259,7 +1258,7 @@ export function CommTimeComponent() {
             className={`flex-1 py-3 sm:py-4 px-4 sm:px-6 rounded-xl sm:rounded-2xl font-semibold text-sm sm:text-base transition-all duration-200 flex items-center justify-center gap-2 ${
               activeTab === "pomodoro"
                 ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xl"
-                : "bg-white/80 backdrop-blur-lg text-gray-700 hover:bg-white shadow-md hover:shadow-lg"
+                : "bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 shadow-md hover:shadow-lg"
             }`}
           >
             <List className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -1271,17 +1270,17 @@ export function CommTimeComponent() {
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
           <div className="w-full lg:w-2/3">
             {activeTab === "meeting" && (
-              <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 border border-white/20">
-                <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 border border-white/20 dark:border-gray-700/20">
+                <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
                   ミーティングタイマー
                 </h2>
 
                 {/* カウントダウンモード切り替え */}
-                <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-xl p-4 mb-4 border border-cyan-100">
+                <div className="bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-950 dark:to-blue-950 rounded-xl p-4 mb-4 border border-cyan-100 dark:border-cyan-900">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <Timer className="w-5 h-5 text-cyan-600" />
-                      <span className="text-sm sm:text-base font-semibold text-gray-800">
+                      <Timer className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                      <span className="text-sm sm:text-base font-semibold text-gray-800 dark:text-gray-200">
                         カウントダウンモード
                       </span>
                     </div>
@@ -1291,7 +1290,7 @@ export function CommTimeComponent() {
                       className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                         countdownMode
                           ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md"
-                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                       }`}
                     >
                       {countdownMode ? "ON" : "OFF"}
@@ -1299,14 +1298,14 @@ export function CommTimeComponent() {
                   </div>
                   {countdownMode && (
                     <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                         終了時刻:
                       </label>
                       <input
                         type="time"
                         value={targetEndTime}
                         onChange={(e) => setTargetEndTime(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                       />
                     </div>
                   )}
@@ -1366,17 +1365,17 @@ export function CommTimeComponent() {
 
                 {/* 時間情報 */}
                 {meetingStartTime && (
-                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 border border-blue-100">
+                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 border border-blue-100 dark:border-blue-900">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-sm sm:text-base">
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-600 font-medium">開始:</span>
-                        <span className="text-gray-900 font-semibold">
+                        <span className="text-gray-600 dark:text-gray-400 font-medium">開始:</span>
+                        <span className="text-gray-900 dark:text-gray-100 font-semibold">
                           {meetingStartTime.toLocaleTimeString()}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-600 font-medium">終了予定:</span>
-                        <span className="text-gray-900 font-semibold">
+                        <span className="text-gray-600 dark:text-gray-400 font-medium">終了予定:</span>
+                        <span className="text-gray-900 dark:text-gray-100 font-semibold">
                           {getEndTime(
                             meetingStartTime,
                             alarmPoints[alarmPoints.length - 1]?.minutes * 60 || 0
@@ -1389,7 +1388,7 @@ export function CommTimeComponent() {
 
                 {/* アラームポイント */}
                 <div className="mb-6 sm:mb-8">
-                  <h3 className="text-base sm:text-lg font-bold mb-3 sm:mb-4 text-gray-800">
+                  <h3 className="text-base sm:text-lg font-bold mb-3 sm:mb-4 text-gray-800 dark:text-gray-200">
                     アラームポイント
                   </h3>
                   <div className="space-y-2 sm:space-y-3">
@@ -1398,8 +1397,8 @@ export function CommTimeComponent() {
                         key={point.id}
                         className={`flex flex-wrap items-center gap-2 p-3 rounded-xl transition-all duration-200 ${
                           point.isDone
-                            ? "bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200"
-                            : "bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200"
+                            ? "bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border border-green-200 dark:border-green-800"
+                            : "bg-gradient-to-r from-gray-50 to-blue-50 dark:from-gray-800 dark:to-blue-950 border border-gray-200 dark:border-gray-700"
                         }`}
                       >
                         <input
@@ -1409,30 +1408,30 @@ export function CommTimeComponent() {
                             updateAlarmPoint(point.id, parseInt(e.target.value) || 1)
                           }
                           min="1"
-                          className="w-16 sm:w-20 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          className="w-16 sm:w-20 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         />
-                        <span className="text-sm sm:text-base font-medium text-gray-700">分</span>
-                        <span className="text-sm sm:text-base font-mono font-semibold text-gray-900 bg-white px-2 sm:px-3 py-1 rounded-lg">
+                        <span className="text-sm sm:text-base font-medium text-gray-700 dark:text-gray-300">分</span>
+                        <span className="text-sm sm:text-base font-mono font-semibold text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 px-2 sm:px-3 py-1 rounded-lg">
                           {formatTime(point.remainingTime)}
                         </span>
                         {point.isDone ? (
-                          <span className="text-xs sm:text-sm font-semibold text-green-600 bg-green-100 px-2 sm:px-3 py-1 rounded-full">
+                          <span className="text-xs sm:text-sm font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900 px-2 sm:px-3 py-1 rounded-full">
                             ✓ 完了
                           </span>
                         ) : (
-                          <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">
+                          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 hidden sm:block">
                             終了予定: {getEndTime(meetingStartTime, point.minutes * 60)}
                           </span>
                         )}
                         {point.linkedTodo && (
-                          <span className="text-xs sm:text-sm text-blue-600 bg-blue-100 px-2 sm:px-3 py-1 rounded-full">
+                          <span className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900 px-2 sm:px-3 py-1 rounded-full">
                             {meetingTodos.find((todo) => todo.id === point.linkedTodo)?.text}
                           </span>
                         )}
                         <button
                           type="button"
                           onClick={() => removeAlarmPoint(point.id)}
-                          className="ml-auto p-1.5 sm:p-2 text-red-500 hover:text-red-600 hover:bg-red-100 rounded-lg transition-colors duration-200"
+                          className="ml-auto p-1.5 sm:p-2 text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors duration-200"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -1450,21 +1449,21 @@ export function CommTimeComponent() {
                 </div>
 
                 {/* アラーム設定 */}
-                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 sm:p-6 border border-purple-100">
-                  <h3 className="text-base sm:text-lg font-bold mb-4 text-gray-800">
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950 rounded-xl p-4 sm:p-6 border border-purple-100 dark:border-purple-900">
+                  <h3 className="text-base sm:text-lg font-bold mb-4 text-gray-800 dark:text-gray-200">
                     ミーティングアラーム設定
                   </h3>
 
                   <div className="space-y-4">
                     {/* 音量設定 */}
-                    <div className="bg-white rounded-lg p-3 sm:p-4">
+                    <div className="bg-white dark:bg-gray-700 rounded-lg p-3 sm:p-4">
                       <label className="flex flex-col gap-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />
-                            <span className="text-sm sm:text-base font-semibold text-gray-700">音量</span>
+                            <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 dark:text-indigo-400" />
+                            <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">音量</span>
                           </div>
-                          <span className="text-sm sm:text-base font-bold text-indigo-600">
+                          <span className="text-sm sm:text-base font-bold text-indigo-600 dark:text-indigo-400">
                             {meetingAlarmSettings.volume}
                           </span>
                         </div>
@@ -1480,15 +1479,15 @@ export function CommTimeComponent() {
                               volume: parseInt(e.target.value),
                             })
                           }
-                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                          className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                         />
                       </label>
                     </div>
 
                     {/* 周波数設定 */}
-                    <div className="bg-white rounded-lg p-3 sm:p-4">
+                    <div className="bg-white dark:bg-gray-700 rounded-lg p-3 sm:p-4">
                       <label className="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <span className="text-sm sm:text-base font-semibold text-gray-700">周波数:</span>
+                        <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">周波数:</span>
                         <input
                           type="number"
                           value={meetingAlarmSettings.frequency}
@@ -1498,9 +1497,9 @@ export function CommTimeComponent() {
                               frequency: parseInt(e.target.value) || 0,
                             })
                           }
-                          className="w-full sm:w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          className="w-full sm:w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         />
-                        <span className="text-sm sm:text-base text-gray-600">Hz</span>
+                        <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Hz</span>
                       </label>
                     </div>
 
@@ -1524,7 +1523,7 @@ export function CommTimeComponent() {
                   </div>
 
                   {/* その他オプション */}
-                  <div className="mt-4 pt-4 border-t border-purple-200">
+                  <div className="mt-4 pt-4 border-t border-purple-200 dark:border-purple-800">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
@@ -1532,7 +1531,7 @@ export function CommTimeComponent() {
                         onChange={(e) => setForceFocus(e.target.checked)}
                         className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500"
                       />
-                      <span className="text-xs sm:text-sm text-gray-700">
+                      <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">
                         アラーム時に強制的にこのタブにフォーカスする
                       </span>
                     </label>
@@ -1602,17 +1601,17 @@ export function CommTimeComponent() {
 
                 {/* 時間情報 */}
                 {pomodoroStartTime && (
-                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 border border-blue-100">
+                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 border border-blue-100 dark:border-blue-900">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-xs sm:text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-600 font-medium">開始:</span>
-                        <span className="text-gray-900 font-semibold">
+                        <span className="text-gray-600 dark:text-gray-400 font-medium">開始:</span>
+                        <span className="text-gray-900 dark:text-gray-100 font-semibold">
                           {pomodoroStartTime.toLocaleTimeString()}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-600 font-medium">終了予定:</span>
-                        <span className="text-gray-900 font-semibold">
+                        <span className="text-gray-600 dark:text-gray-400 font-medium">終了予定:</span>
+                        <span className="text-gray-900 dark:text-gray-100 font-semibold">
                           {getEndTime(
                             pomodoroStartTime,
                             (pomodoroState === "work"
@@ -1622,8 +1621,8 @@ export function CommTimeComponent() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-600 font-medium">残り:</span>
-                        <span className="text-gray-900 font-semibold">
+                        <span className="text-gray-600 dark:text-gray-400 font-medium">残り:</span>
+                        <span className="text-gray-900 dark:text-gray-100 font-semibold">
                           {getCountdown(
                             (pomodoroState === "work"
                               ? pomodoroSettings.workDuration
@@ -1637,15 +1636,15 @@ export function CommTimeComponent() {
                 )}
 
                 {/* ポモドーロ設定 */}
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 sm:p-6 mb-6 border border-blue-100">
-                  <h3 className="text-base sm:text-lg font-bold mb-4 text-gray-800">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 rounded-xl p-4 sm:p-6 mb-6 border border-blue-100 dark:border-blue-900">
+                  <h3 className="text-base sm:text-lg font-bold mb-4 text-gray-800 dark:text-gray-200">
                     ポモドーロ設定
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4">
-                    <div className="bg-white rounded-lg p-3">
+                    <div className="bg-white dark:bg-gray-700 rounded-lg p-3">
                       <label className="flex flex-col gap-2">
-                        <span className="text-xs sm:text-sm font-semibold text-gray-700">
+                        <span className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
                           作業時間
                         </span>
                         <div className="flex items-center gap-2">
@@ -1659,16 +1658,16 @@ export function CommTimeComponent() {
                               })
                             }
                             min="1"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                           />
-                          <span className="text-sm text-gray-600 whitespace-nowrap">分</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">分</span>
                         </div>
                       </label>
                     </div>
 
-                    <div className="bg-white rounded-lg p-3">
+                    <div className="bg-white dark:bg-gray-700 rounded-lg p-3">
                       <label className="flex flex-col gap-2">
-                        <span className="text-xs sm:text-sm font-semibold text-gray-700">
+                        <span className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
                           休憩時間
                         </span>
                         <div className="flex items-center gap-2">
@@ -1682,16 +1681,16 @@ export function CommTimeComponent() {
                               })
                             }
                             min="1"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                           />
-                          <span className="text-sm text-gray-600 whitespace-nowrap">分</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">分</span>
                         </div>
                       </label>
                     </div>
 
-                    <div className="bg-white rounded-lg p-3">
+                    <div className="bg-white dark:bg-gray-700 rounded-lg p-3">
                       <label className="flex flex-col gap-2">
-                        <span className="text-xs sm:text-sm font-semibold text-gray-700">
+                        <span className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
                           サイクル数
                         </span>
                         <input
@@ -1705,13 +1704,13 @@ export function CommTimeComponent() {
                           }
                           min="1"
                           disabled={pomodoroSettings.infiniteMode}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:text-gray-400 dark:disabled:text-gray-500"
                         />
                       </label>
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-lg p-3">
+                  <div className="bg-white dark:bg-gray-700 rounded-lg p-3">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
@@ -1724,7 +1723,7 @@ export function CommTimeComponent() {
                         }
                         className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500"
                       />
-                      <span className="text-xs sm:text-sm font-semibold text-gray-700">
+                      <span className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
                         無限モード（サイクル数無制限）
                       </span>
                     </label>
@@ -1732,20 +1731,20 @@ export function CommTimeComponent() {
                 </div>
 
                 {/* 作業時間アラーム設定 */}
-                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-4 sm:p-6 mb-4 border border-blue-100">
-                  <h3 className="text-base sm:text-lg font-bold mb-4 text-gray-800">
+                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950 rounded-xl p-4 sm:p-6 mb-4 border border-blue-100 dark:border-blue-900">
+                  <h3 className="text-base sm:text-lg font-bold mb-4 text-gray-800 dark:text-gray-200">
                     🎯 作業時間アラーム設定
                   </h3>
 
                   <div className="space-y-4">
-                    <div className="bg-white rounded-lg p-3 sm:p-4">
+                    <div className="bg-white dark:bg-gray-700 rounded-lg p-3 sm:p-4">
                       <label className="flex flex-col gap-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                            <span className="text-sm sm:text-base font-semibold text-gray-700">音量</span>
+                            <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
+                            <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">音量</span>
                           </div>
-                          <span className="text-sm sm:text-base font-bold text-blue-600">
+                          <span className="text-sm sm:text-base font-bold text-blue-600 dark:text-blue-400">
                             {pomodoroSettings.workAlarm.volume}
                           </span>
                         </div>
@@ -1764,15 +1763,15 @@ export function CommTimeComponent() {
                               },
                             })
                           }
-                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                          className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-600"
                         />
                       </label>
                     </div>
 
                     <div className="flex gap-2">
-                      <div className="bg-white rounded-lg p-3 sm:p-4 flex-1">
+                      <div className="bg-white dark:bg-gray-700 rounded-lg p-3 sm:p-4 flex-1">
                         <label className="flex flex-col sm:flex-row sm:items-center gap-2">
-                          <span className="text-sm sm:text-base font-semibold text-gray-700">周波数:</span>
+                          <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">周波数:</span>
                           <input
                             type="number"
                             value={pomodoroSettings.workAlarm.frequency}
@@ -1785,9 +1784,9 @@ export function CommTimeComponent() {
                                 },
                               })
                             }
-                            className="w-full sm:w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full sm:w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           />
-                          <span className="text-sm sm:text-base text-gray-600">Hz</span>
+                          <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Hz</span>
                         </label>
                       </div>
                       <button
@@ -1802,20 +1801,20 @@ export function CommTimeComponent() {
                 </div>
 
                 {/* 休憩時間アラーム設定 */}
-                <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl p-4 sm:p-6 border border-orange-100">
-                  <h3 className="text-base sm:text-lg font-bold mb-4 text-gray-800">
+                <div className="bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-950 dark:to-yellow-950 rounded-xl p-4 sm:p-6 border border-orange-100 dark:border-orange-900">
+                  <h3 className="text-base sm:text-lg font-bold mb-4 text-gray-800 dark:text-gray-200">
                     ☕ 休憩時間アラーム設定
                   </h3>
 
                   <div className="space-y-4">
-                    <div className="bg-white rounded-lg p-3 sm:p-4">
+                    <div className="bg-white dark:bg-gray-700 rounded-lg p-3 sm:p-4">
                       <label className="flex flex-col gap-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" />
-                            <span className="text-sm sm:text-base font-semibold text-gray-700">音量</span>
+                            <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 dark:text-orange-400" />
+                            <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">音量</span>
                           </div>
-                          <span className="text-sm sm:text-base font-bold text-orange-600">
+                          <span className="text-sm sm:text-base font-bold text-orange-600 dark:text-orange-400">
                             {pomodoroSettings.breakAlarm.volume}
                           </span>
                         </div>
@@ -1834,15 +1833,15 @@ export function CommTimeComponent() {
                               },
                             })
                           }
-                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-600"
+                          className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-orange-600"
                         />
                       </label>
                     </div>
 
                     <div className="flex gap-2">
-                      <div className="bg-white rounded-lg p-3 sm:p-4 flex-1">
+                      <div className="bg-white dark:bg-gray-700 rounded-lg p-3 sm:p-4 flex-1">
                         <label className="flex flex-col sm:flex-row sm:items-center gap-2">
-                          <span className="text-sm sm:text-base font-semibold text-gray-700">周波数:</span>
+                          <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">周波数:</span>
                           <input
                             type="number"
                             value={pomodoroSettings.breakAlarm.frequency}
@@ -1855,9 +1854,9 @@ export function CommTimeComponent() {
                                 },
                               })
                             }
-                            className="w-full sm:w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            className="w-full sm:w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                           />
-                          <span className="text-sm sm:text-base text-gray-600">Hz</span>
+                          <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Hz</span>
                         </label>
                       </div>
                       <button
@@ -1876,8 +1875,8 @@ export function CommTimeComponent() {
 
           <div className="w-full lg:w-1/3">
             {/* メモセクション */}
-            <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 mb-4 border border-white/20">
-              <h3 className="text-base sm:text-lg font-bold mb-3 sm:mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 mb-4 border border-white/20 dark:border-gray-700/20">
+              <h3 className="text-base sm:text-lg font-bold mb-3 sm:mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
                 📝 メモ
               </h3>
               <textarea
@@ -1887,15 +1886,15 @@ export function CommTimeComponent() {
                     ? setMeetingMemo(e.target.value)
                     : setPomodoroMemo(e.target.value)
                 }
-                className="w-full h-32 sm:h-40 p-3 sm:p-4 border border-gray-300 rounded-xl text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                className="w-full h-32 sm:h-40 p-3 sm:p-4 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-xl text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                 placeholder="メモを入力してください..."
               />
             </div>
 
             {/* TODOリストセクション */}
-            <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 border border-white/20">
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 border border-white/20 dark:border-gray-700/20">
               <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <h3 className="text-base sm:text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                <h3 className="text-base sm:text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
                   ✅ TODOリスト
                 </h3>
                 <button
@@ -1904,7 +1903,7 @@ export function CommTimeComponent() {
                   className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1 ${
                     sortByDeadline
                       ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md"
-                      : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                   }`}
                   title="期限順にソート"
                 >
@@ -1942,8 +1941,8 @@ export function CommTimeComponent() {
                               {...provided.dragHandleProps}
                               className={`flex items-start gap-2 p-2 sm:p-3 rounded-xl transition-all duration-200 ${
                                 todo.isCompleted
-                                  ? "bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200"
-                                  : "bg-white border border-gray-200"
+                                  ? "bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border border-green-200 dark:border-green-800"
+                                  : "bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600"
                               } ${
                                 snapshot.isDragging
                                   ? "shadow-2xl scale-105"
@@ -1958,7 +1957,7 @@ export function CommTimeComponent() {
                                     onChange={(e) =>
                                       setEditingTodoText(e.target.value)
                                     }
-                                    className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                    className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                                   />
                                   <div className="flex gap-1">
                                     <button
@@ -1989,8 +1988,8 @@ export function CommTimeComponent() {
                                     <span
                                       className={`text-xs sm:text-sm block ${
                                         todo.isCompleted
-                                          ? "line-through text-gray-500"
-                                          : "text-gray-800"
+                                          ? "line-through text-gray-500 dark:text-gray-400"
+                                          : "text-gray-800 dark:text-gray-200"
                                       }`}
                                     >
                                       {todo.text}
@@ -2024,7 +2023,7 @@ export function CommTimeComponent() {
                                               <button
                                                 type="button"
                                                 onClick={() => extendDeadline(todo.id, 1, activeTab === "pomodoro")}
-                                                className="text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded transition-colors"
+                                                className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
                                                 title="1日延長"
                                               >
                                                 +1日
@@ -2032,7 +2031,7 @@ export function CommTimeComponent() {
                                               <button
                                                 type="button"
                                                 onClick={() => extendDeadline(todo.id, 3, activeTab === "pomodoro")}
-                                                className="text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded transition-colors"
+                                                className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
                                                 title="3日延長"
                                               >
                                                 +3日
@@ -2040,7 +2039,7 @@ export function CommTimeComponent() {
                                               <button
                                                 type="button"
                                                 onClick={() => extendDeadline(todo.id, 7, activeTab === "pomodoro")}
-                                                className="text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded transition-colors"
+                                                className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
                                                 title="1週間延長"
                                               >
                                                 +7日
@@ -2054,7 +2053,7 @@ export function CommTimeComponent() {
 
                                     {/* 期限設定フォーム - 折りたたみ式 */}
                                     {expandedDeadlineTodoId === todo.id && (
-                                      <div className="flex gap-1 items-center flex-wrap bg-gray-50 p-2 rounded-lg">
+                                      <div className="flex gap-1 items-center flex-wrap bg-gray-50 dark:bg-gray-700 p-2 rounded-lg">
                                         <input
                                           type="date"
                                           value={todo.dueDate || ""}
@@ -2066,7 +2065,7 @@ export function CommTimeComponent() {
                                               activeTab === "pomodoro"
                                             )
                                           }
-                                          className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                          className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                                           placeholder="期限日"
                                         />
                                         <input
@@ -2080,7 +2079,7 @@ export function CommTimeComponent() {
                                               activeTab === "pomodoro"
                                             )
                                           }
-                                          className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                          className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                                           placeholder="時刻"
                                         />
                                         {(todo.dueDate || todo.dueTime) && (
@@ -2094,7 +2093,7 @@ export function CommTimeComponent() {
                                                 activeTab === "pomodoro"
                                               )
                                             }
-                                            className="text-xs px-2 py-1 bg-red-100 text-red-600 hover:bg-red-200 rounded transition-colors"
+                                            className="text-xs px-2 py-1 bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 rounded transition-colors"
                                             title="期限をクリア"
                                           >
                                             解除
@@ -2199,7 +2198,7 @@ export function CommTimeComponent() {
                       }
                     }
                   }}
-                  className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-xl text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-xl text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   placeholder="新しいTODOを入力..."
                   ref={todoInputRef}
                 />
@@ -2242,22 +2241,22 @@ export function CommTimeComponent() {
             <div className="flex-1 overflow-y-auto px-6 py-6">
               <div className="space-y-6 max-w-6xl mx-auto">
               {/* チクタク音設定 */}
-              <div className="bg-gradient-to-r from-green-50 to-teal-50 rounded-xl p-4 border border-green-200">
-                <h3 className="text-lg font-bold mb-4 text-gray-800 flex items-center gap-2">
-                  <Volume2 className="w-5 h-5 text-green-600" />
+              <div className="bg-gradient-to-r from-green-50 to-teal-50 dark:from-green-950 dark:to-teal-950 rounded-xl p-4 border border-green-200 dark:border-green-800">
+                <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                  <Volume2 className="w-5 h-5 text-green-600 dark:text-green-400" />
                   チクタク音設定
                 </h3>
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">チクタク音を有効にする</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">チクタク音を有効にする</span>
                     <button
                       type="button"
                       onClick={() => setTickSoundEnabled(!tickSoundEnabled)}
                       className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                         tickSoundEnabled
                           ? "bg-gradient-to-r from-green-500 to-teal-500 text-white shadow-md"
-                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                       }`}
                     >
                       {tickSoundEnabled ? "ON" : "OFF"}
@@ -2265,11 +2264,11 @@ export function CommTimeComponent() {
                   </div>
 
                   {tickSoundEnabled && (
-                    <div className="bg-white rounded-lg p-4">
+                    <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
                       <label className="flex flex-col gap-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold text-gray-700">音量</span>
-                          <span className="text-sm font-bold text-green-600">{tickSoundVolume}</span>
+                          <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">音量</span>
+                          <span className="text-sm font-bold text-green-600 dark:text-green-400">{tickSoundVolume}</span>
                         </div>
                         <input
                           type="range"
@@ -2278,7 +2277,7 @@ export function CommTimeComponent() {
                           step="1"
                           value={tickSoundVolume}
                           onChange={(e) => setTickSoundVolume(parseInt(e.target.value))}
-                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600"
+                          className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-green-600"
                         />
                       </label>
                     </div>
@@ -2287,55 +2286,55 @@ export function CommTimeComponent() {
               </div>
 
               {/* アラーム設定サマリー */}
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
-                <h3 className="text-lg font-bold mb-4 text-gray-800">アラーム設定</h3>
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
+                <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200">アラーム設定</h3>
 
                 <div className="space-y-3">
-                  <div className="bg-white rounded-lg p-3">
+                  <div className="bg-white dark:bg-gray-700 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-gray-700">ミーティングアラーム</span>
+                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">ミーティングアラーム</span>
                     </div>
-                    <div className="flex gap-4 text-xs text-gray-600">
+                    <div className="flex gap-4 text-xs text-gray-600 dark:text-gray-400">
                       <span>音量: {meetingAlarmSettings.volume}</span>
                       <span>周波数: {meetingAlarmSettings.frequency}Hz</span>
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-lg p-3">
+                  <div className="bg-white dark:bg-gray-700 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-gray-700">作業時間アラーム</span>
+                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">作業時間アラーム</span>
                     </div>
-                    <div className="flex gap-4 text-xs text-gray-600">
+                    <div className="flex gap-4 text-xs text-gray-600 dark:text-gray-400">
                       <span>音量: {pomodoroSettings.workAlarm.volume}</span>
                       <span>周波数: {pomodoroSettings.workAlarm.frequency}Hz</span>
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-lg p-3">
+                  <div className="bg-white dark:bg-gray-700 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-gray-700">休憩時間アラーム</span>
+                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">休憩時間アラーム</span>
                     </div>
-                    <div className="flex gap-4 text-xs text-gray-600">
+                    <div className="flex gap-4 text-xs text-gray-600 dark:text-gray-400">
                       <span>音量: {pomodoroSettings.breakAlarm.volume}</span>
                       <span>周波数: {pomodoroSettings.breakAlarm.frequency}Hz</span>
                     </div>
                   </div>
                 </div>
 
-                <p className="text-xs text-gray-500 mt-3">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
                   ※ 各タイマーの設定画面で詳細を調整できます
                 </p>
               </div>
 
               {/* 通知・エフェクト設定 */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
-                <h3 className="text-lg font-bold mb-4 text-gray-800">通知・エフェクト</h3>
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200">通知・エフェクト</h3>
 
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between bg-white rounded-lg p-3">
+                  <div className="flex items-center justify-between bg-white dark:bg-gray-700 rounded-lg p-3">
                     <div className="flex items-center gap-2">
-                      <Bell className="w-4 h-4 text-blue-600" />
-                      <span className="text-sm font-medium text-gray-700">通知</span>
+                      <Bell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">通知</span>
                     </div>
                     <button
                       type="button"
@@ -2343,17 +2342,17 @@ export function CommTimeComponent() {
                       className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                         notificationsEnabled
                           ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md"
-                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                       }`}
                     >
                       {notificationsEnabled ? "ON" : "OFF"}
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between bg-white rounded-lg p-3">
+                  <div className="flex items-center justify-between bg-white dark:bg-gray-700 rounded-lg p-3">
                     <div className="flex items-center gap-2">
-                      <Vibrate className="w-4 h-4 text-purple-600" />
-                      <span className="text-sm font-medium text-gray-700">バイブレーション</span>
+                      <Vibrate className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">バイブレーション</span>
                     </div>
                     <button
                       type="button"
@@ -2361,17 +2360,17 @@ export function CommTimeComponent() {
                       className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                         vibrationEnabled
                           ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md"
-                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                       }`}
                     >
                       {vibrationEnabled ? "ON" : "OFF"}
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between bg-white rounded-lg p-3">
+                  <div className="flex items-center justify-between bg-white dark:bg-gray-700 rounded-lg p-3">
                     <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-yellow-600" />
-                      <span className="text-sm font-medium text-gray-700">フラッシュ</span>
+                      <Zap className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">フラッシュ</span>
                     </div>
                     <button
                       type="button"
@@ -2379,17 +2378,17 @@ export function CommTimeComponent() {
                       className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                         flashEnabled
                           ? "bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-md"
-                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                       }`}
                     >
                       {flashEnabled ? "ON" : "OFF"}
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between bg-white rounded-lg p-3">
+                  <div className="flex items-center justify-between bg-white dark:bg-gray-700 rounded-lg p-3">
                     <div className="flex items-center gap-2">
-                      {darkMode ? <Moon className="w-4 h-4 text-indigo-600" /> : <Sun className="w-4 h-4 text-amber-600" />}
-                      <span className="text-sm font-medium text-gray-700">ダークモード</span>
+                      {darkMode ? <Moon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> : <Sun className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">ダークモード</span>
                     </div>
                     <button
                       type="button"
@@ -2397,7 +2396,7 @@ export function CommTimeComponent() {
                       className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                         darkMode
                           ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md"
-                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                       }`}
                     >
                       {darkMode ? "ON" : "OFF"}
@@ -2407,26 +2406,26 @@ export function CommTimeComponent() {
               </div>
 
               {/* 初期値設定 */}
-              <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-4 border border-orange-200">
-                <h3 className="text-lg font-bold mb-4 text-gray-800 flex items-center gap-2">
-                  <Settings className="w-5 h-5 text-orange-600" />
+              <div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950 dark:to-red-950 rounded-xl p-4 border border-orange-200 dark:border-orange-800">
+                <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-orange-600 dark:text-orange-400" />
                   初期値設定
                 </h3>
-                <p className="text-sm text-gray-600 mb-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                   アラームやタイマーのデフォルト値を設定できます。これらの値は、設定をリセットする際に使用されます。
                 </p>
 
                 <div className="space-y-4">
                   {/* ミーティングアラーム初期値 */}
-                  <div className="bg-white rounded-lg p-4">
-                    <h4 className="text-sm font-bold mb-3 text-gray-700">ミーティングアラーム</h4>
+                  <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
+                    <h4 className="text-sm font-bold mb-3 text-gray-700 dark:text-gray-300">ミーティングアラーム</h4>
                     <div className="space-y-4">
                       {/* アラームポイント設定 */}
                       <div className="space-y-2">
-                        <label className="text-xs font-medium text-gray-600">デフォルトアラームポイント (分)</label>
+                        <label className="text-xs font-medium text-gray-600 dark:text-gray-400">デフォルトアラームポイント (分)</label>
                         <div className="flex flex-wrap gap-2">
                           {defaultMeetingAlarmPoints.map((point, index) => (
-                            <div key={index} className="flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded">
+                            <div key={index} className="flex items-center gap-1 bg-indigo-50 dark:bg-indigo-900 px-2 py-1 rounded">
                               <input
                                 type="number"
                                 min="1"
@@ -2437,15 +2436,15 @@ export function CommTimeComponent() {
                                   newPoints[index] = parseInt(e.target.value) || 1;
                                   setDefaultMeetingAlarmPoints(newPoints);
                                 }}
-                                className="w-14 px-1 py-0.5 border border-gray-300 rounded text-xs"
+                                className="w-14 px-1 py-0.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-xs"
                               />
-                              <span className="text-xs text-gray-600">分</span>
+                              <span className="text-xs text-gray-600 dark:text-gray-400">分</span>
                               <button
                                 type="button"
                                 onClick={() => {
                                   setDefaultMeetingAlarmPoints(defaultMeetingAlarmPoints.filter((_, i) => i !== index));
                                 }}
-                                className="text-red-500 hover:text-red-700"
+                                className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                               >
                                 <X className="w-3 h-3" />
                               </button>
@@ -2465,8 +2464,8 @@ export function CommTimeComponent() {
                       {/* 音量設定 */}
                       <label className="flex flex-col gap-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-gray-600">デフォルト音量</span>
-                          <span className="text-xs font-bold text-orange-600">{defaultMeetingAlarmSettings.volume}</span>
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">デフォルト音量</span>
+                          <span className="text-xs font-bold text-orange-600 dark:text-orange-400">{defaultMeetingAlarmSettings.volume}</span>
                         </div>
                         <input
                           type="range"
@@ -2478,15 +2477,15 @@ export function CommTimeComponent() {
                             ...defaultMeetingAlarmSettings,
                             volume: parseInt(e.target.value)
                           })}
-                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-600"
+                          className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-orange-600"
                         />
                       </label>
 
                       {/* 周波数設定 */}
                       <label className="flex flex-col gap-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-gray-600">デフォルト周波数 (Hz)</span>
-                          <span className="text-xs font-bold text-orange-600">{defaultMeetingAlarmSettings.frequency}</span>
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">デフォルト周波数 (Hz)</span>
+                          <span className="text-xs font-bold text-orange-600 dark:text-orange-400">{defaultMeetingAlarmSettings.frequency}</span>
                         </div>
                         <input
                           type="number"
@@ -2498,7 +2497,7 @@ export function CommTimeComponent() {
                             ...defaultMeetingAlarmSettings,
                             frequency: Math.max(100, parseInt(e.target.value) || 100)
                           })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg text-sm"
                         />
                       </label>
 
@@ -2515,51 +2514,51 @@ export function CommTimeComponent() {
                   </div>
 
                   {/* ポモドーロ初期値 */}
-                  <div className="bg-white rounded-lg p-4">
-                    <h4 className="text-sm font-bold mb-3 text-gray-700">ポモドーロタイマー</h4>
+                  <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
+                    <h4 className="text-sm font-bold mb-3 text-gray-700 dark:text-gray-300">ポモドーロタイマー</h4>
                     <div className="grid grid-cols-3 gap-3 mb-3">
                       <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-gray-600">作業時間 (分)</span>
+                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">作業時間 (分)</span>
                         <input
                           type="number"
                           min="1"
                           max="120"
                           value={defaultPomodoroWorkDuration}
                           onChange={(e) => setDefaultPomodoroWorkDuration(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                          className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-sm"
                         />
                       </label>
                       <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-gray-600">休憩時間 (分)</span>
+                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">休憩時間 (分)</span>
                         <input
                           type="number"
                           min="1"
                           max="60"
                           value={defaultPomodoroBreakDuration}
                           onChange={(e) => setDefaultPomodoroBreakDuration(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                          className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-sm"
                         />
                       </label>
                       <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-gray-600">サイクル数</span>
+                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">サイクル数</span>
                         <input
                           type="number"
                           min="1"
                           max="10"
                           value={defaultPomodoroCycles}
                           onChange={(e) => setDefaultPomodoroCycles(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                          className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-sm"
                         />
                       </label>
                     </div>
 
                     <div className="space-y-3 mt-3">
                       <div>
-                        <h5 className="text-xs font-semibold text-gray-600 mb-2">作業アラーム</h5>
+                        <h5 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">作業アラーム</h5>
                         <div className="space-y-2">
                           <div className="grid grid-cols-2 gap-2">
                             <label className="flex flex-col gap-1">
-                              <span className="text-xs text-gray-600">音量: {defaultPomodoroWorkAlarm.volume}</span>
+                              <span className="text-xs text-gray-600 dark:text-gray-400">音量: {defaultPomodoroWorkAlarm.volume}</span>
                               <input
                                 type="range"
                                 min="0"
@@ -2569,11 +2568,11 @@ export function CommTimeComponent() {
                                   ...defaultPomodoroWorkAlarm,
                                   volume: parseInt(e.target.value)
                                 })}
-                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-600"
+                                className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-orange-600"
                               />
                             </label>
                             <label className="flex flex-col gap-1">
-                              <span className="text-xs text-gray-600">周波数: {defaultPomodoroWorkAlarm.frequency}Hz</span>
+                              <span className="text-xs text-gray-600 dark:text-gray-400">周波数: {defaultPomodoroWorkAlarm.frequency}Hz</span>
                               <input
                                 type="number"
                                 min="100"
@@ -2584,7 +2583,7 @@ export function CommTimeComponent() {
                                   ...defaultPomodoroWorkAlarm,
                                   frequency: Math.max(100, parseInt(e.target.value) || 100)
                                 })}
-                                className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-xs"
                               />
                             </label>
                           </div>
@@ -2600,11 +2599,11 @@ export function CommTimeComponent() {
                       </div>
 
                       <div>
-                        <h5 className="text-xs font-semibold text-gray-600 mb-2">休憩アラーム</h5>
+                        <h5 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">休憩アラーム</h5>
                         <div className="space-y-2">
                           <div className="grid grid-cols-2 gap-2">
                             <label className="flex flex-col gap-1">
-                              <span className="text-xs text-gray-600">音量: {defaultPomodoroBreakAlarm.volume}</span>
+                              <span className="text-xs text-gray-600 dark:text-gray-400">音量: {defaultPomodoroBreakAlarm.volume}</span>
                               <input
                                 type="range"
                                 min="0"
@@ -2614,11 +2613,11 @@ export function CommTimeComponent() {
                                   ...defaultPomodoroBreakAlarm,
                                   volume: parseInt(e.target.value)
                                 })}
-                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-600"
+                                className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-orange-600"
                               />
                             </label>
                             <label className="flex flex-col gap-1">
-                              <span className="text-xs text-gray-600">周波数: {defaultPomodoroBreakAlarm.frequency}Hz</span>
+                              <span className="text-xs text-gray-600 dark:text-gray-400">周波数: {defaultPomodoroBreakAlarm.frequency}Hz</span>
                               <input
                                 type="number"
                                 min="100"
@@ -2629,7 +2628,7 @@ export function CommTimeComponent() {
                                   ...defaultPomodoroBreakAlarm,
                                   frequency: Math.max(100, parseInt(e.target.value) || 100)
                                 })}
-                                className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-xs"
                               />
                             </label>
                           </div>
