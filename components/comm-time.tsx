@@ -1541,7 +1541,7 @@ export function CommTimeComponent() {
             )}
 
             {activeTab === "pomodoro" && (
-              <div className="bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 border border-white/20">
+              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 border border-white/20 dark:border-gray-700/20">
                 <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                   ポモドーロタイマー
                 </h2>
@@ -2229,7 +2229,7 @@ export function CommTimeComponent() {
         {/* 設定モーダル */}
         <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
           <DialogContent className="max-w-7xl h-[95vh] p-0 flex flex-col overflow-hidden">
-            <DialogHeader className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
+            <DialogHeader className="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 shadow-sm">
               <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                 ⚙️ 設定
               </DialogTitle>
