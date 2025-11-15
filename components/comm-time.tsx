@@ -21,6 +21,10 @@ import {
   Calendar,
   Moon,
   Sun,
+  LogIn,
+  LogOut,
+  User,
+  Database,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -35,6 +39,10 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { AuthDialog } from "@/components/auth-dialog";
+import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseTodos } from "@/hooks/useSupabaseTodos";
+import { useSupabaseMemos } from "@/hooks/useSupabaseMemos";
 
 // 型定義
 type AlarmPoint = {
@@ -88,6 +96,11 @@ const initialPomodoroSettings = {
 };
 
 export function CommTimeComponent() {
+  // 認証関連
+  const { user, isAuthenticated, signOut } = useAuth();
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  const [useDatabase, setUseDatabase] = useState(false);
+
   // ローカルストレージから安全に値を取得するヘルパー関数
   const getStorageValue = (key: string, defaultValue: unknown) => {
     if (typeof window !== "undefined") {
@@ -136,6 +149,17 @@ export function CommTimeComponent() {
   const [newPomodoroTodo, setNewPomodoroTodo] = useState("");
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
   const [editingTodoText, setEditingTodoText] = useState("");
+
+  // Supabaseフック（ログイン時のみ使用）
+  // TODO: 将来的にLocalStorageの代わりにSupabaseを使用するように実装
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _meetingSupabaseTodos = useSupabaseTodos("meeting", useDatabase ? user : null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _pomodoroSupabaseTodos = useSupabaseTodos("pomodoro", useDatabase ? user : null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _meetingSupabaseMemos = useSupabaseMemos("meeting", useDatabase ? user : null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _pomodoroSupabaseMemos = useSupabaseMemos("pomodoro", useDatabase ? user : null);
 
   // その他の状態
   const [forceFocus, setForceFocus] = useState(false);
@@ -1153,6 +1177,45 @@ export function CommTimeComponent() {
 
             {/* 設定ボタン群 */}
             <div className="flex gap-2 items-center">
+              {/* ログイン/ユーザー情報 */}
+              {isAuthenticated && user ? (
+                <div className="flex items-center gap-2">
+                  <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg">
+                    <User className="w-4 h-4" />
+                    <span className="text-xs font-medium">{user.email}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUseDatabase(!useDatabase)}
+                    className={`p-2 rounded-xl transition-all duration-200 ${
+                      useDatabase
+                        ? "bg-gradient-to-br from-green-500 to-emerald-500 text-white shadow-lg"
+                        : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                    }`}
+                    title={useDatabase ? "データベース連携 ON" : "データベース連携 OFF"}
+                  >
+                    <Database className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={signOut}
+                    className="p-2 rounded-xl bg-gradient-to-br from-gray-500 to-gray-600 text-white hover:shadow-lg transition-all"
+                    title="ログアウト"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAuthDialogOpen(true)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium hover:shadow-lg transition-all"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span className="hidden sm:inline text-sm">ログイン</span>
+                </button>
+              )}
+
               {/* アラーム停止ボタン（鳴っている時のみ表示） */}
               {isAlarmRinging && (
                 <button
@@ -2660,6 +2723,16 @@ export function CommTimeComponent() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* 認証ダイアログ */}
+        <AuthDialog
+          open={authDialogOpen}
+          onOpenChange={setAuthDialogOpen}
+          onSuccess={() => {
+            // ログイン成功時にデータベース連携を有効化
+            setUseDatabase(true);
+          }}
+        />
       </div>
     </div>
   );
