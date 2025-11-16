@@ -152,7 +152,7 @@ Supabaseは自動的にREST APIを生成します。
 
 **エンドポイント**: `https://your-project-url.supabase.co/rest/v1/`
 
-**認証**: `Authorization: Bearer YOUR_ANON_KEY` ヘッダーが必要
+**認証**: `apikey: YOUR_ANON_KEY` と `Authorization: Bearer YOUR_USER_TOKEN` ヘッダーが必要
 
 #### TODO取得の例
 
