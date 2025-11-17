@@ -14,7 +14,7 @@ export type LocalTodoItem = {
   alarmPointId?: string
 }
 
-export function useSupabaseTodos(type: "meeting" | "pomodoro", user: User | null) {
+export function useSupabaseTodos(user: User | null) {
   const [todos, setTodos] = useState<LocalTodoItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -53,7 +53,6 @@ export function useSupabaseTodos(type: "meeting" | "pomodoro", user: User | null
         .from("todos")
         .select("*")
         .eq("user_id", user.id)
-        .eq("type", type)
         .order("order_index", { ascending: true })
         .order("created_at", { ascending: false })
 
@@ -79,7 +78,6 @@ export function useSupabaseTodos(type: "meeting" | "pomodoro", user: User | null
         .from("todos")
         .insert({
           user_id: user.id,
-          type,
           text,
           is_completed: false,
           order_index: orderIndex,
@@ -149,14 +147,14 @@ export function useSupabaseTodos(type: "meeting" | "pomodoro", user: User | null
   // 初回ロード
   useEffect(() => {
     fetchTodos()
-  }, [user, type])
+  }, [user])
 
   // リアルタイム同期（最適化版）
   useEffect(() => {
     if (!user) return
 
     const channel = supabase
-      .channel(`todos-${type}`)
+      .channel(`todos-${user.id}`)
       .on(
         "postgres_changes",
         {
@@ -201,7 +199,7 @@ export function useSupabaseTodos(type: "meeting" | "pomodoro", user: User | null
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user, type])
+  }, [user])
 
   return {
     todos,
