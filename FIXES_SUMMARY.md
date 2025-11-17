@@ -2,7 +2,36 @@
 
 ## 修正した問題
 
-### 1. ✅ メモ重複エラー (PGRST116) の修正 🆕
+### 1. ✅ LocalStorage保存問題の修正 🆕
+**問題**: ログインしていないユーザーで、メモやTODOがLocalStorageに保存されない
+
+**原因**:
+- データ保存のuseEffectが初回レンダリング時に実行され、初期状態（空文字列・空配列）をLocalStorageに保存していた
+- その後、LocalStorageからデータを読み込むuseEffectが実行されても、既にLocalStorageが空データで上書きされている
+- React 18のStrictモードでuseEffectが2回実行されることで問題が顕在化
+
+**修正内容**:
+- データ保存useEffectに `mounted` フラグチェックを追加
+- `if (!mounted) return;` で初回レンダリング時の保存を防ぐ
+- 初期データ読み込み完了後（`mounted === true`）のみLocalStorageに保存
+
+**実行順序**:
+1. **初回レンダリング**: `mounted = false`
+2. **初期データ読み込みuseEffect**: LocalStorageからデータを読み込み → state更新
+3. **setMounted(true)**: マウント完了
+4. **データ保存useEffect**: `mounted === true` なので保存を実行
+
+**影響**:
+- ✅ ログインしないユーザーでもメモ・TODOが正しく保存される
+- ✅ LocalStorageモードが正常に動作する
+- ✅ ページリロード後もデータが保持される
+
+**ファイル**:
+- `components/comm-time.tsx:315-406` (データ保存useEffect)
+
+---
+
+### 2. ✅ メモ重複エラー (PGRST116) の修正
 **問題**: データベースから複数のメモが返され、以下のエラーが発生していました：
 ```
 Error fetching memo: PGRST116
@@ -48,7 +77,7 @@ Error fetching memo: PGRST116
 
 ---
 
-### 2. ✅ Hydration Error の完全修正
+### 3. ✅ Hydration Error の完全修正
 **問題**: `react-beautiful-dnd` がSSR時に異なるIDを生成してHydration warningが発生していました。
 
 **修正内容**:
@@ -59,7 +88,7 @@ Error fetching memo: PGRST116
 
 **ファイル**: `components/comm-time.tsx:101-121`
 
-### 3. ✅ データベース連携エラーの修正
+### 4. ✅ データベース連携エラーの修正
 **問題**: Supabase未設定時にデータベース機能を有効化しようとしてもエラーメッセージが表示されませんでした。
 
 **修正内容**:
@@ -69,7 +98,7 @@ Error fetching memo: PGRST116
 
 **ファイル**: `components/comm-time.tsx:1322-1349`
 
-### 4. ✅ Input Form エラーの修正
+### 5. ✅ Input Form エラーの修正
 **問題**: メモ入力時にSupabaseへの保存エラーが発生し、1文字入力するごとにエラーが表示されていました。
 
 **修正内容**:
@@ -83,7 +112,7 @@ Error fetching memo: PGRST116
 
 **ファイル**: `components/comm-time.tsx:1248-1270`
 
-### 5. ✅ Supabase設定状態の可視化
+### 6. ✅ Supabase設定状態の可視化
 **問題**: Supabaseが正しく設定されているかユーザーが確認できませんでした。
 
 **修正内容**:
@@ -215,11 +244,12 @@ Tests:       113 passed, 113 total
 ## まとめ
 
 ### 修正完了
-1. ✅ **メモ重複エラー (PGRST116)** - ユニーク制約追加と自動クリーンアップで完全解決 🆕
-2. ✅ **Hydration Error** - SSR/CSR分離で完全解決
-3. ✅ **Input formエラー** - 楽観的更新とエラーハンドリングで解決
-4. ✅ **データベース設定チェック** - ユーザーフレンドリーなガイダンス追加
-5. ✅ **エラーハンドリング** - 堅牢性向上
+1. ✅ **LocalStorage保存問題** - ログインしないユーザーでも正常にデータ保存される 🆕
+2. ✅ **メモ重複エラー (PGRST116)** - ユニーク制約追加と自動クリーンアップで完全解決
+3. ✅ **Hydration Error** - SSR/CSR分離で完全解決
+4. ✅ **Input formエラー** - 楽観的更新とエラーハンドリングで解決
+5. ✅ **データベース設定チェック** - ユーザーフレンドリーなガイダンス追加
+6. ✅ **エラーハンドリング** - 堅牢性向上
 
 ### 次のステップ
 
