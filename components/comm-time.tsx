@@ -102,9 +102,6 @@ export function CommTimeComponent() {
   const [useDatabase, setUseDatabase] = useState(false);
   const [showLoginButton, setShowLoginButton] = useState(false);
 
-  // クライアントサイドのマウント状態
-  const [showLoginButton, setShowLoginButton] = useState(false);
-
   // ローカルストレージから安全に値を取得するヘルパー関数
   const getStorageValue = (key: string, defaultValue: unknown) => {
     if (typeof window !== "undefined") {
