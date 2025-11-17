@@ -96,6 +96,9 @@ const initialPomodoroSettings = {
 };
 
 export function CommTimeComponent() {
+  // クライアントサイドマウント状態（Hydration error回避）
+  const [mounted, setMounted] = useState(false);
+
   // 認証関連
   const { user, isAuthenticated, signOut } = useAuth();
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
@@ -214,6 +217,7 @@ export function CommTimeComponent() {
 
   // クライアントサイドの初期化（Hydration error回避）
   useEffect(() => {
+    setMounted(true);
     setCurrentTime(new Date());
 
     // URLパラメータチェック
@@ -1250,6 +1254,18 @@ export function CommTimeComponent() {
     },
     [meetingTodos, pomodoroTodos, linkTodoToAlarmPoint]
   );
+
+  // SSR時はローディング表示（Hydration error回避）
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-4 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-300">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-4 px-4 sm:px-6 lg:px-8 relative">
