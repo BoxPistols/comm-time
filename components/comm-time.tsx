@@ -312,8 +312,11 @@ export function CommTimeComponent() {
     }
   }, []);
 
-  // データの自動保存
+  // データの自動保存（初期データ読み込み後のみ）
   useEffect(() => {
+    // mountedフラグで初回レンダリング時の保存を防ぐ
+    if (!mounted) return;
+
     if (typeof window !== "undefined") {
       localStorage.setItem("alarmPoints", JSON.stringify(alarmPoints));
       localStorage.setItem(
@@ -377,6 +380,7 @@ export function CommTimeComponent() {
       );
     }
   }, [
+    mounted, // mountedを依存配列に追加
     alarmPoints,
     meetingAlarmSettings,
     pomodoroSettings,
