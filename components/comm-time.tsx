@@ -102,6 +102,9 @@ export function CommTimeComponent() {
   const [useDatabase, setUseDatabase] = useState(false);
   const [showLoginButton, setShowLoginButton] = useState(false);
 
+  // クライアントサイドのマウント状態
+  const [showLoginButton, setShowLoginButton] = useState(false);
+
   // ローカルストレージから安全に値を取得するヘルパー関数
   const getStorageValue = (key: string, defaultValue: unknown) => {
     if (typeof window !== "undefined") {
@@ -118,7 +121,7 @@ export function CommTimeComponent() {
   };
 
   // 状態変数の定義
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("meeting");
 
   // ミーティングタイマー関連の状態
@@ -212,8 +215,11 @@ export function CommTimeComponent() {
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
 
-  // URLパラメータチェック（クライアントサイドのみ）
+  // クライアントサイドの初期化（Hydration error回避）
   useEffect(() => {
+    setCurrentTime(new Date());
+
+    // URLパラメータチェック
     const params = new URLSearchParams(window.location.search);
     setShowLoginButton(params.get('user') === 'login');
   }, []);
@@ -1280,7 +1286,7 @@ export function CommTimeComponent() {
                   Comm Time
                 </h1>
                 <p className="text-sm sm:text-base lg:text-lg text-gray-700 dark:text-gray-300 font-semibold tabular-nums">
-                  現在時刻: {currentTime.toLocaleTimeString()}
+                  現在時刻: {currentTime ? currentTime.toLocaleTimeString() : '--:--:--'}
                 </p>
               </div>
             </div>
