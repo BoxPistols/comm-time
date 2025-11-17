@@ -43,6 +43,7 @@ import { AuthDialog } from "@/components/auth-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useSupabaseTodos } from "@/hooks/useSupabaseTodos";
 import { useSupabaseMemos } from "@/hooks/useSupabaseMemos";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 // 型定義
 type AlarmPoint = {
@@ -1245,28 +1246,28 @@ export function CommTimeComponent() {
   }, []);
 
   // メモの更新機能
-  const handleMemoChange = useCallback(
-    (content: string, isPomodoro: boolean) => {
-      if (useDatabase && user) {
-        // データベースモード: Supabaseを使用
+  const handleMemoChange = useCallback((content: string, isPomodoro: boolean) => {
+    // まずローカル状態を即座に更新（UX向上）
+    if (isPomodoro) {
+      setPomodoroMemo(content);
+    } else {
+      setMeetingMemo(content);
+    }
+
+    // データベースモードかつログイン済みの場合のみSupabaseに保存
+    if (useDatabase && user) {
+      try {
         if (isPomodoro) {
           pomodoroSupabaseMemos.saveMemo(content);
-          setPomodoroMemo(content); // ローカル状態も即座に更新
         } else {
           meetingSupabaseMemos.saveMemo(content);
-          setMeetingMemo(content); // ローカル状態も即座に更新
         }
-      } else {
-        // ローカルモード: LocalStorageを使用
-        if (isPomodoro) {
-          setPomodoroMemo(content);
-        } else {
-          setMeetingMemo(content);
-        }
+      } catch (error) {
+        console.error("Error saving memo to Supabase:", error);
+        // エラーが発生してもローカル状態は保持される
       }
-    },
-    [useDatabase, user, pomodoroSupabaseMemos, meetingSupabaseMemos]
-  );
+    }
+  }, [useDatabase, user, pomodoroSupabaseMemos, meetingSupabaseMemos]);
 
   // TODOとアラームポイントのリンク機能
   const linkTodoToAlarmPoint = useCallback(
@@ -1483,7 +1484,23 @@ export function CommTimeComponent() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setUseDatabase(!useDatabase)}
+                        onClick={() => {
+                          if (!isSupabaseConfigured && !useDatabase) {
+                            alert(
+                              'Supabaseが設定されていません。\n\n' +
+                              'データベース機能を使用するには：\n' +
+                              '1. https://supabase.com/dashboard でプロジェクトを作成\n' +
+                              '2. プロジェクトのURLとAPIキーを取得\n' +
+                              '3. .env.local ファイルに以下を設定：\n' +
+                              '   NEXT_PUBLIC_SUPABASE_URL=your-project-url\n' +
+                              '   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key\n' +
+                              '4. 開発サーバーを再起動\n\n' +
+                              '詳細は SUPABASE_SETUP.md を参照してください。'
+                            );
+                            return;
+                          }
+                          setUseDatabase(!useDatabase);
+                        }}
                         className={`p-2 rounded-xl transition-all duration-200 ${
                           useDatabase
                             ? "bg-gradient-to-br from-green-500 to-emerald-500 text-white shadow-lg"
