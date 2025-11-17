@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { supabase, type Memo } from "@/lib/supabase"
 import type { User } from "@supabase/supabase-js"
 
-export function useSupabaseMemos(type: "meeting" | "pomodoro", user: User | null) {
+export function useSupabaseMemos(user: User | null) {
   const [memo, setMemo] = useState<string>("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -22,27 +22,18 @@ export function useSupabaseMemos(type: "meeting" | "pomodoro", user: User | null
     setError(null)
 
     try {
-      // 複数のメモが存在する場合は最新のものを取得
+      // ユーザーのメモを取得（1ユーザー1メモ）
       const { data, error } = await supabase
         .from("memos")
         .select("*")
         .eq("user_id", user.id)
-        .eq("type", type)
-        .order("updated_at", { ascending: false })
-        .limit(1)
+        .maybeSingle()
 
       if (error) throw error
 
-      if (data && data.length > 0) {
-        const latestMemo = data[0]
-        setMemo(latestMemo.content)
-        setMemoId(latestMemo.id)
-
-        // 重複メモがある場合は削除（クリーンアップ）
-        if (data.length > 1) {
-          console.warn(`Found ${data.length} duplicate memos for type ${type}, cleaning up...`)
-          await cleanupDuplicateMemos(latestMemo.id)
-        }
+      if (data) {
+        setMemo(data.content)
+        setMemoId(data.id)
       } else {
         setMemo("")
         setMemoId(null)
@@ -52,28 +43,6 @@ export function useSupabaseMemos(type: "meeting" | "pomodoro", user: User | null
       console.error("Error fetching memo:", err)
     } finally {
       setLoading(false)
-    }
-  }
-
-  // 重複したメモを削除
-  const cleanupDuplicateMemos = async (keepId: string) => {
-    if (!user) return
-
-    try {
-      const { error } = await supabase
-        .from("memos")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("type", type)
-        .neq("id", keepId)
-
-      if (error) {
-        console.error("Error cleaning up duplicate memos:", error)
-      } else {
-        console.log(`Cleaned up duplicate memos for type ${type}`)
-      }
-    } catch (err: any) {
-      console.error("Error in cleanupDuplicateMemos:", err)
     }
   }
 
@@ -88,13 +57,12 @@ export function useSupabaseMemos(type: "meeting" | "pomodoro", user: User | null
         .upsert(
           {
             user_id: user.id,
-            type,
             content,
             updated_at: new Date().toISOString(),
           },
           {
-            onConflict: "user_id,type",  // ユニーク制約に基づく
-            ignoreDuplicates: false,      // 重複時は更新する
+            onConflict: "user_id",  // ユニーク制約に基づく（1ユーザー1メモ）
+            ignoreDuplicates: false,  // 重複時は更新する
           }
         )
         .select()
@@ -136,14 +104,14 @@ export function useSupabaseMemos(type: "meeting" | "pomodoro", user: User | null
   // 初回ロード
   useEffect(() => {
     fetchMemo()
-  }, [user, type])
+  }, [user])
 
   // リアルタイム同期（最適化版）
   useEffect(() => {
     if (!user) return
 
     const channel = supabase
-      .channel(`memos-${type}`)
+      .channel(`memos-${user.id}`)
       .on(
         "postgres_changes",
         {
@@ -159,7 +127,7 @@ export function useSupabaseMemos(type: "meeting" | "pomodoro", user: User | null
           switch (payload.eventType) {
             case 'INSERT':
             case 'UPDATE':
-              if (payload.new && payload.new.type === type) {
+              if (payload.new) {
                 setMemo(payload.new.content || "")
                 setMemoId(payload.new.id)
               }
@@ -182,7 +150,7 @@ export function useSupabaseMemos(type: "meeting" | "pomodoro", user: User | null
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user, type, memoId])
+  }, [user, memoId])
 
   return {
     memo,

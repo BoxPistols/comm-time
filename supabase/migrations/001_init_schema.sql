@@ -9,22 +9,20 @@ CREATE TABLE IF NOT EXISTS profiles (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 2. Memos テーブル（メモ）
+-- 2. Memos テーブル（メモ）- 共通メモ
 CREATE TABLE IF NOT EXISTS memos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('meeting', 'pomodoro')),
   content TEXT DEFAULT '',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(user_id, type)  -- 1ユーザーにつき各タイプ1つまで
+  UNIQUE(user_id)  -- 1ユーザーにつき1つのメモ
 );
 
--- 3. Todos テーブル（TODOリスト）
+-- 3. Todos テーブル（TODOリスト）- 共通TODO
 CREATE TABLE IF NOT EXISTS todos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('meeting', 'pomodoro')),
   text TEXT NOT NULL,
   is_completed BOOLEAN DEFAULT FALSE,
   due_date DATE,
@@ -36,9 +34,9 @@ CREATE TABLE IF NOT EXISTS todos (
 );
 
 -- インデックス作成（パフォーマンス最適化）
-CREATE INDEX IF NOT EXISTS idx_memos_user_type ON memos(user_id, type);
-CREATE INDEX IF NOT EXISTS idx_todos_user_type ON todos(user_id, type);
-CREATE INDEX IF NOT EXISTS idx_todos_order ON todos(user_id, type, order_index);
+CREATE INDEX IF NOT EXISTS idx_memos_user ON memos(user_id);
+CREATE INDEX IF NOT EXISTS idx_todos_user ON todos(user_id);
+CREATE INDEX IF NOT EXISTS idx_todos_user_order ON todos(user_id, order_index);
 
 -- Row Level Security (RLS) 有効化
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
