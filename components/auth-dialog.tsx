@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog"
 import { auth } from "@/lib/supabase"
 
@@ -20,11 +20,29 @@ export function AuthDialog({ open, onOpenChange, onSuccess }: AuthDialogProps) {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
+  // メモリリーク防止のためのタイマー参照
+  const closeTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // コンポーネントのクリーンアップ
+  useEffect(() => {
+    return () => {
+      // アンマウント時にタイマーをクリア
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current)
+      }
+    }
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
     setMessage(null)
+
+    // 既存のタイマーをクリア
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+    }
 
     try {
       if (mode === "signup") {
@@ -35,10 +53,11 @@ export function AuthDialog({ open, onOpenChange, onSuccess }: AuthDialogProps) {
         setEmail("")
         setPassword("")
 
-        // 数秒後にダイアログを閉じる
-        setTimeout(() => {
+        // 数秒後にダイアログを閉じる（メモリリーク対策済み）
+        closeTimerRef.current = setTimeout(() => {
           onOpenChange(false)
           setMessage(null)
+          closeTimerRef.current = null
         }, 3000)
       } else {
         const { error } = await auth.signIn(email, password)
@@ -51,10 +70,11 @@ export function AuthDialog({ open, onOpenChange, onSuccess }: AuthDialogProps) {
         // 成功時のコールバックを呼ぶ
         if (onSuccess) onSuccess()
 
-        // ダイアログを閉じる
-        setTimeout(() => {
+        // ダイアログを閉じる（メモリリーク対策済み）
+        closeTimerRef.current = setTimeout(() => {
           onOpenChange(false)
           setMessage(null)
+          closeTimerRef.current = null
         }, 1000)
       }
     } catch (err) {

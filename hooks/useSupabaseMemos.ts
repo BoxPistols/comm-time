@@ -112,7 +112,7 @@ export function useSupabaseMemos(type: "meeting" | "pomodoro", user: User | null
     fetchMemo()
   }, [user, type])
 
-  // リアルタイム同期
+  // リアルタイム同期（最適化版）
   useEffect(() => {
     if (!user) return
 
@@ -128,7 +128,27 @@ export function useSupabaseMemos(type: "meeting" | "pomodoro", user: User | null
         },
         (payload) => {
           console.log("Memo change received:", payload)
-          fetchMemo()
+
+          // payloadを使って効率的にローカルstateを更新
+          switch (payload.eventType) {
+            case 'INSERT':
+            case 'UPDATE':
+              if (payload.new && payload.new.type === type) {
+                setMemo(payload.new.content || "")
+                setMemoId(payload.new.id)
+              }
+              break
+            case 'DELETE':
+              if (payload.old && payload.old.id === memoId) {
+                setMemo("")
+                setMemoId(null)
+              }
+              break
+            default:
+              // フォールバック: 再取得
+              fetchMemo()
+              break
+          }
         }
       )
       .subscribe()
@@ -136,7 +156,7 @@ export function useSupabaseMemos(type: "meeting" | "pomodoro", user: User | null
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user, type])
+  }, [user, type, memoId])
 
   return {
     memo,

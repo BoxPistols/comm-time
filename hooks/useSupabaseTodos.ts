@@ -151,7 +151,7 @@ export function useSupabaseTodos(type: "meeting" | "pomodoro", user: User | null
     fetchTodos()
   }, [user, type])
 
-  // リアルタイム同期
+  // リアルタイム同期（最適化版）
   useEffect(() => {
     if (!user) return
 
@@ -167,7 +167,33 @@ export function useSupabaseTodos(type: "meeting" | "pomodoro", user: User | null
         },
         (payload) => {
           console.log("Todo change received:", payload)
-          fetchTodos()
+
+          // payloadを使って効率的にローカルstateを更新
+          switch (payload.eventType) {
+            case 'INSERT':
+              if (payload.new) {
+                setTodos((prev) => [...prev, convertToLocal(payload.new as SupabaseTodoItem)])
+              }
+              break
+            case 'UPDATE':
+              if (payload.new) {
+                setTodos((prev) =>
+                  prev.map((todo) =>
+                    todo.id === payload.new.id ? convertToLocal(payload.new as SupabaseTodoItem) : todo
+                  )
+                )
+              }
+              break
+            case 'DELETE':
+              if (payload.old) {
+                setTodos((prev) => prev.filter((todo) => todo.id !== payload.old.id))
+              }
+              break
+            default:
+              // フォールバック: 全件再取得
+              fetchTodos()
+              break
+          }
         }
       )
       .subscribe()

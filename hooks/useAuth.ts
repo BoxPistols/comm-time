@@ -9,21 +9,8 @@ export function useAuth() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // 初回ロード時に現在のユーザーを取得
-    const initAuth = async () => {
-      try {
-        const currentUser = await auth.getCurrentUser()
-        setUser(currentUser)
-      } catch (error) {
-        console.error("Error getting current user:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    initAuth()
-
-    // 認証状態の変更を監視
+    // onAuthStateChangeは初回実行時に現在のセッションを返すため、
+    // これだけで初期状態と変更の両方をハンドルできます
     const { data: authListener } = auth.onAuthStateChange((_event, session: Session | null) => {
       setUser(session?.user ?? null)
       setLoading(false)
