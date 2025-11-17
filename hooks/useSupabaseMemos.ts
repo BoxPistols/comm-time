@@ -22,18 +22,27 @@ export function useSupabaseMemos(type: "meeting" | "pomodoro", user: User | null
     setError(null)
 
     try {
+      // 複数のメモが存在する場合は最新のものを取得
       const { data, error } = await supabase
         .from("memos")
         .select("*")
         .eq("user_id", user.id)
         .eq("type", type)
-        .maybeSingle()
+        .order("updated_at", { ascending: false })
+        .limit(1)
 
       if (error) throw error
 
-      if (data) {
-        setMemo(data.content)
-        setMemoId(data.id)
+      if (data && data.length > 0) {
+        const latestMemo = data[0]
+        setMemo(latestMemo.content)
+        setMemoId(latestMemo.id)
+
+        // 重複メモがある場合は削除（クリーンアップ）
+        if (data.length > 1) {
+          console.warn(`Found ${data.length} duplicate memos for type ${type}, cleaning up...`)
+          await cleanupDuplicateMemos(latestMemo.id)
+        }
       } else {
         setMemo("")
         setMemoId(null)
@@ -46,40 +55,57 @@ export function useSupabaseMemos(type: "meeting" | "pomodoro", user: User | null
     }
   }
 
+  // 重複したメモを削除
+  const cleanupDuplicateMemos = async (keepId: string) => {
+    if (!user) return
+
+    try {
+      const { error } = await supabase
+        .from("memos")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("type", type)
+        .neq("id", keepId)
+
+      if (error) {
+        console.error("Error cleaning up duplicate memos:", error)
+      } else {
+        console.log(`Cleaned up duplicate memos for type ${type}`)
+      }
+    } catch (err: any) {
+      console.error("Error in cleanupDuplicateMemos:", err)
+    }
+  }
+
   // メモを保存（作成または更新）
   const saveMemo = async (content: string) => {
     if (!user) return
 
     try {
-      if (memoId) {
-        // 更新
-        const { error } = await supabase
-          .from("memos")
-          .update({ content })
-          .eq("id", memoId)
-          .eq("user_id", user.id)
-
-        if (error) throw error
-      } else {
-        // 新規作成
-        const { data, error } = await supabase
-          .from("memos")
-          .insert({
+      // UPSERT: 存在すれば更新、なければ作成
+      const { data, error } = await supabase
+        .from("memos")
+        .upsert(
+          {
             user_id: user.id,
             type,
             content,
-          })
-          .select()
-          .single()
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "user_id,type",  // ユニーク制約に基づく
+            ignoreDuplicates: false,      // 重複時は更新する
+          }
+        )
+        .select()
+        .single()
 
-        if (error) throw error
+      if (error) throw error
 
-        if (data) {
-          setMemoId(data.id)
-        }
+      if (data) {
+        setMemo(data.content)
+        setMemoId(data.id)
       }
-
-      setMemo(content)
     } catch (err: any) {
       setError(err.message)
       console.error("Error saving memo:", err)

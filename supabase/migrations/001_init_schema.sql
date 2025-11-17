@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS memos (
   type TEXT NOT NULL CHECK (type IN ('meeting', 'pomodoro')),
   content TEXT DEFAULT '',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, type)  -- 1ユーザーにつき各タイプ1つまで
 );
 
 -- 3. Todos テーブル（TODOリスト）
