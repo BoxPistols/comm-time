@@ -44,6 +44,19 @@ export function AuthDialog({ open, onOpenChange, onSuccess }: AuthDialogProps) {
       clearTimeout(closeTimerRef.current)
     }
 
+    // メールアドレス制限チェック
+    const allowedEmailsStr = process.env.NEXT_PUBLIC_ALLOWED_EMAILS || ""
+    if (allowedEmailsStr) {
+      const allowedEmails = allowedEmailsStr.split(',').map(e => e.trim().toLowerCase())
+      const userEmail = email.trim().toLowerCase()
+
+      if (!allowedEmails.includes(userEmail)) {
+        setError("このメールアドレスでのログインは許可されていません。")
+        setLoading(false)
+        return
+      }
+    }
+
     try {
       if (mode === "signup") {
         const { error } = await auth.signUp(email, password)

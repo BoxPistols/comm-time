@@ -100,6 +100,7 @@ export function CommTimeComponent() {
   const { user, isAuthenticated, signOut } = useAuth();
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [useDatabase, setUseDatabase] = useState(false);
+  const [showLoginButton, setShowLoginButton] = useState(false);
 
   // ローカルストレージから安全に値を取得するヘルパー関数
   const getStorageValue = (key: string, defaultValue: unknown) => {
@@ -210,6 +211,12 @@ export function CommTimeComponent() {
 
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
+
+  // URLパラメータチェック（クライアントサイドのみ）
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setShowLoginButton(params.get('user') === 'login');
+  }, []);
 
   // 初期データのロード
   useEffect(() => {
@@ -1280,43 +1287,47 @@ export function CommTimeComponent() {
 
             {/* 設定ボタン群 */}
             <div className="flex gap-2 items-center">
-              {/* ログイン/ユーザー情報 */}
-              {isAuthenticated && user ? (
-                <div className="flex items-center gap-2">
-                  <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg">
-                    <User className="w-4 h-4" />
-                    <span className="text-xs font-medium">{user.email}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setUseDatabase(!useDatabase)}
-                    className={`p-2 rounded-xl transition-all duration-200 ${
-                      useDatabase
-                        ? "bg-gradient-to-br from-green-500 to-emerald-500 text-white shadow-lg"
-                        : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-                    }`}
-                    title={useDatabase ? "データベース連携 ON" : "データベース連携 OFF"}
-                  >
-                    <Database className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={signOut}
-                    className="p-2 rounded-xl bg-gradient-to-br from-gray-500 to-gray-600 text-white hover:shadow-lg transition-all"
-                    title="ログアウト"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setAuthDialogOpen(true)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium hover:shadow-lg transition-all"
-                >
-                  <LogIn className="w-4 h-4" />
-                  <span className="hidden sm:inline text-sm">ログイン</span>
-                </button>
+              {/* ログイン/ユーザー情報 (URLパラメータ ?user=login の時のみ表示) */}
+              {showLoginButton && (
+                <>
+                  {isAuthenticated && user ? (
+                    <div className="flex items-center gap-2">
+                      <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg">
+                        <User className="w-4 h-4" />
+                        <span className="text-xs font-medium">{user.email}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setUseDatabase(!useDatabase)}
+                        className={`p-2 rounded-xl transition-all duration-200 ${
+                          useDatabase
+                            ? "bg-gradient-to-br from-green-500 to-emerald-500 text-white shadow-lg"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                        }`}
+                        title={useDatabase ? "データベース連携 ON" : "データベース連携 OFF"}
+                      >
+                        <Database className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={signOut}
+                        className="p-2 rounded-xl bg-gradient-to-br from-gray-500 to-gray-600 text-white hover:shadow-lg transition-all"
+                        title="ログアウト"
+                      >
+                        <LogOut className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setAuthDialogOpen(true)}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium hover:shadow-lg transition-all"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      <span className="hidden sm:inline text-sm">ログイン</span>
+                    </button>
+                  )}
+                </>
               )}
 
               {/* アラーム停止ボタン（鳴っている時のみ表示） */}
