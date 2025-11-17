@@ -21,6 +21,10 @@ import {
   Calendar,
   Moon,
   Sun,
+  LogIn,
+  LogOut,
+  User,
+  Database,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -35,6 +39,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { AuthDialog } from "@/components/auth-dialog";
+import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseTodos } from "@/hooks/useSupabaseTodos";
+import { useSupabaseMemos } from "@/hooks/useSupabaseMemos";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 // 型定義
 type AlarmPoint = {
@@ -88,6 +97,16 @@ const initialPomodoroSettings = {
 };
 
 export function CommTimeComponent() {
+  // クライアントサイドマウント状態（Hydration error回避）
+  const [mounted, setMounted] = useState(false);
+
+  // 認証関連
+  const { user, isAuthenticated, signOut } = useAuth();
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  const [useDatabase, setUseDatabase] = useState(false);
+  // クライアントサイドのマウント状態
+  const [showLoginButton, setShowLoginButton] = useState(false);
+
   // ローカルストレージから安全に値を取得するヘルパー関数
   const getStorageValue = (key: string, defaultValue: unknown) => {
     if (typeof window !== "undefined") {
@@ -104,7 +123,7 @@ export function CommTimeComponent() {
   };
 
   // 状態変数の定義
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("meeting");
 
   // ミーティングタイマー関連の状態
@@ -137,11 +156,30 @@ export function CommTimeComponent() {
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
   const [editingTodoText, setEditingTodoText] = useState("");
 
+  // Supabaseフック（データベースモード有効時に使用）
+  const meetingSupabaseTodos = useSupabaseTodos(
+    "meeting",
+    useDatabase ? user : null
+  );
+  const pomodoroSupabaseTodos = useSupabaseTodos(
+    "pomodoro",
+    useDatabase ? user : null
+  );
+  const meetingSupabaseMemos = useSupabaseMemos(
+    "meeting",
+    useDatabase ? user : null
+  );
+  const pomodoroSupabaseMemos = useSupabaseMemos(
+    "pomodoro",
+    useDatabase ? user : null
+  );
+
   // その他の状態
   const [forceFocus, setForceFocus] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermission>("default");
 
   // カウントダウンモードの状態
   const [countdownMode, setCountdownMode] = useState(false);
@@ -160,7 +198,9 @@ export function CommTimeComponent() {
   const [sortByDeadline, setSortByDeadline] = useState(false);
 
   // 期限入力を展開中のTodoのID
-  const [expandedDeadlineTodoId, setExpandedDeadlineTodoId] = useState<string | null>(null);
+  const [expandedDeadlineTodoId, setExpandedDeadlineTodoId] = useState<
+    string | null
+  >(null);
 
   // フラッシュの状態
   const [isFlashing, setIsFlashing] = useState(false);
@@ -175,22 +215,35 @@ export function CommTimeComponent() {
   const titleBlinkIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // 初期値設定用のstate
-  const [defaultMeetingAlarmSettings, setDefaultMeetingAlarmSettings] = useState<AlarmSettings>(
-    initialMeetingAlarmSettings
+  const [defaultMeetingAlarmSettings, setDefaultMeetingAlarmSettings] =
+    useState<AlarmSettings>(initialMeetingAlarmSettings);
+  const [defaultMeetingAlarmPoints, setDefaultMeetingAlarmPoints] = useState<
+    number[]
+  >([30, 50, 60]);
+  const [defaultPomodoroWorkDuration, setDefaultPomodoroWorkDuration] =
+    useState(initialPomodoroSettings.workDuration);
+  const [defaultPomodoroBreakDuration, setDefaultPomodoroBreakDuration] =
+    useState(initialPomodoroSettings.breakDuration);
+  const [defaultPomodoroCycles, setDefaultPomodoroCycles] = useState(
+    initialPomodoroSettings.cycles
   );
-  const [defaultMeetingAlarmPoints, setDefaultMeetingAlarmPoints] = useState<number[]>([30, 50, 60]);
-  const [defaultPomodoroWorkDuration, setDefaultPomodoroWorkDuration] = useState(initialPomodoroSettings.workDuration);
-  const [defaultPomodoroBreakDuration, setDefaultPomodoroBreakDuration] = useState(initialPomodoroSettings.breakDuration);
-  const [defaultPomodoroCycles, setDefaultPomodoroCycles] = useState(initialPomodoroSettings.cycles);
-  const [defaultPomodoroWorkAlarm, setDefaultPomodoroWorkAlarm] = useState<AlarmSettings>(
-    initialPomodoroSettings.workAlarm
-  );
-  const [defaultPomodoroBreakAlarm, setDefaultPomodoroBreakAlarm] = useState<AlarmSettings>(
-    initialPomodoroSettings.breakAlarm
-  );
+  const [defaultPomodoroWorkAlarm, setDefaultPomodoroWorkAlarm] =
+    useState<AlarmSettings>(initialPomodoroSettings.workAlarm);
+  const [defaultPomodoroBreakAlarm, setDefaultPomodoroBreakAlarm] =
+    useState<AlarmSettings>(initialPomodoroSettings.breakAlarm);
 
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
+
+  // クライアントサイドの初期化（Hydration error回避）
+  useEffect(() => {
+    setMounted(true);
+    setCurrentTime(new Date());
+
+    // URLパラメータチェック
+    const params = new URLSearchParams(window.location.search);
+    setShowLoginButton(params.get("user") === "login");
+  }, []);
 
   // 初期データのロード
   useEffect(() => {
@@ -217,25 +270,40 @@ export function CommTimeComponent() {
 
     // 初期値設定の読み込み
     setDefaultMeetingAlarmSettings(
-      getStorageValue("defaultMeetingAlarmSettings", initialMeetingAlarmSettings)
+      getStorageValue(
+        "defaultMeetingAlarmSettings",
+        initialMeetingAlarmSettings
+      )
     );
     setDefaultMeetingAlarmPoints(
       getStorageValue("defaultMeetingAlarmPoints", [30, 50, 60])
     );
     setDefaultPomodoroWorkDuration(
-      getStorageValue("defaultPomodoroWorkDuration", initialPomodoroSettings.workDuration)
+      getStorageValue(
+        "defaultPomodoroWorkDuration",
+        initialPomodoroSettings.workDuration
+      )
     );
     setDefaultPomodoroBreakDuration(
-      getStorageValue("defaultPomodoroBreakDuration", initialPomodoroSettings.breakDuration)
+      getStorageValue(
+        "defaultPomodoroBreakDuration",
+        initialPomodoroSettings.breakDuration
+      )
     );
     setDefaultPomodoroCycles(
       getStorageValue("defaultPomodoroCycles", initialPomodoroSettings.cycles)
     );
     setDefaultPomodoroWorkAlarm(
-      getStorageValue("defaultPomodoroWorkAlarm", initialPomodoroSettings.workAlarm)
+      getStorageValue(
+        "defaultPomodoroWorkAlarm",
+        initialPomodoroSettings.workAlarm
+      )
     );
     setDefaultPomodoroBreakAlarm(
-      getStorageValue("defaultPomodoroBreakAlarm", initialPomodoroSettings.breakAlarm)
+      getStorageValue(
+        "defaultPomodoroBreakAlarm",
+        initialPomodoroSettings.breakAlarm
+      )
     );
 
     // 通知権限の確認
@@ -244,8 +312,11 @@ export function CommTimeComponent() {
     }
   }, []);
 
-  // データの自動保存
+  // データの自動保存（初期データ読み込み後のみ）
   useEffect(() => {
+    // mountedフラグで初回レンダリング時の保存を防ぐ
+    if (!mounted) return;
+
     if (typeof window !== "undefined") {
       localStorage.setItem("alarmPoints", JSON.stringify(alarmPoints));
       localStorage.setItem(
@@ -260,25 +331,56 @@ export function CommTimeComponent() {
       localStorage.setItem("pomodoroMemo", pomodoroMemo);
       localStorage.setItem("meetingTodos", JSON.stringify(meetingTodos));
       localStorage.setItem("pomodoroTodos", JSON.stringify(pomodoroTodos));
-      localStorage.setItem("notificationsEnabled", JSON.stringify(notificationsEnabled));
-      localStorage.setItem("vibrationEnabled", JSON.stringify(vibrationEnabled));
+      localStorage.setItem(
+        "notificationsEnabled",
+        JSON.stringify(notificationsEnabled)
+      );
+      localStorage.setItem(
+        "vibrationEnabled",
+        JSON.stringify(vibrationEnabled)
+      );
       localStorage.setItem("countdownMode", JSON.stringify(countdownMode));
       localStorage.setItem("targetEndTime", targetEndTime);
-      localStorage.setItem("tickSoundEnabled", JSON.stringify(tickSoundEnabled));
+      localStorage.setItem(
+        "tickSoundEnabled",
+        JSON.stringify(tickSoundEnabled)
+      );
       localStorage.setItem("tickSoundVolume", JSON.stringify(tickSoundVolume));
       localStorage.setItem("flashEnabled", JSON.stringify(flashEnabled));
       localStorage.setItem("darkMode", JSON.stringify(darkMode));
 
       // 初期値設定の保存
-      localStorage.setItem("defaultMeetingAlarmSettings", JSON.stringify(defaultMeetingAlarmSettings));
-      localStorage.setItem("defaultMeetingAlarmPoints", JSON.stringify(defaultMeetingAlarmPoints));
-      localStorage.setItem("defaultPomodoroWorkDuration", JSON.stringify(defaultPomodoroWorkDuration));
-      localStorage.setItem("defaultPomodoroBreakDuration", JSON.stringify(defaultPomodoroBreakDuration));
-      localStorage.setItem("defaultPomodoroCycles", JSON.stringify(defaultPomodoroCycles));
-      localStorage.setItem("defaultPomodoroWorkAlarm", JSON.stringify(defaultPomodoroWorkAlarm));
-      localStorage.setItem("defaultPomodoroBreakAlarm", JSON.stringify(defaultPomodoroBreakAlarm));
+      localStorage.setItem(
+        "defaultMeetingAlarmSettings",
+        JSON.stringify(defaultMeetingAlarmSettings)
+      );
+      localStorage.setItem(
+        "defaultMeetingAlarmPoints",
+        JSON.stringify(defaultMeetingAlarmPoints)
+      );
+      localStorage.setItem(
+        "defaultPomodoroWorkDuration",
+        JSON.stringify(defaultPomodoroWorkDuration)
+      );
+      localStorage.setItem(
+        "defaultPomodoroBreakDuration",
+        JSON.stringify(defaultPomodoroBreakDuration)
+      );
+      localStorage.setItem(
+        "defaultPomodoroCycles",
+        JSON.stringify(defaultPomodoroCycles)
+      );
+      localStorage.setItem(
+        "defaultPomodoroWorkAlarm",
+        JSON.stringify(defaultPomodoroWorkAlarm)
+      );
+      localStorage.setItem(
+        "defaultPomodoroBreakAlarm",
+        JSON.stringify(defaultPomodoroBreakAlarm)
+      );
     }
   }, [
+    mounted, // mountedを依存配列に追加
     alarmPoints,
     meetingAlarmSettings,
     pomodoroSettings,
@@ -301,6 +403,69 @@ export function CommTimeComponent() {
     defaultPomodoroCycles,
     defaultPomodoroWorkAlarm,
     defaultPomodoroBreakAlarm,
+  ]);
+
+  // Supabaseデータの同期（データベースモード有効時）
+  useEffect(() => {
+    if (useDatabase && user) {
+      // ミーティングTODOsをSupabaseから同期
+      if (
+        meetingSupabaseTodos.todos.length > 0 ||
+        !meetingSupabaseTodos.loading
+      ) {
+        setMeetingTodos(meetingSupabaseTodos.todos);
+      }
+    }
+  }, [
+    useDatabase,
+    user,
+    meetingSupabaseTodos.todos,
+    meetingSupabaseTodos.loading,
+  ]);
+
+  useEffect(() => {
+    if (useDatabase && user) {
+      // ポモドーロTODOsをSupabaseから同期
+      if (
+        pomodoroSupabaseTodos.todos.length > 0 ||
+        !pomodoroSupabaseTodos.loading
+      ) {
+        setPomodorTodos(pomodoroSupabaseTodos.todos);
+      }
+    }
+  }, [
+    useDatabase,
+    user,
+    pomodoroSupabaseTodos.todos,
+    pomodoroSupabaseTodos.loading,
+  ]);
+
+  useEffect(() => {
+    if (useDatabase && user) {
+      // ミーティングメモをSupabaseから同期
+      if (!meetingSupabaseMemos.loading) {
+        setMeetingMemo(meetingSupabaseMemos.memo);
+      }
+    }
+  }, [
+    useDatabase,
+    user,
+    meetingSupabaseMemos.memo,
+    meetingSupabaseMemos.loading,
+  ]);
+
+  useEffect(() => {
+    if (useDatabase && user) {
+      // ポモドーロメモをSupabaseから同期
+      if (!pomodoroSupabaseMemos.loading) {
+        setPomodoroMemo(pomodoroSupabaseMemos.memo);
+      }
+    }
+  }, [
+    useDatabase,
+    user,
+    pomodoroSupabaseMemos.memo,
+    pomodoroSupabaseMemos.loading,
   ]);
 
   // ダークモード適用
@@ -328,7 +493,9 @@ export function CommTimeComponent() {
   const createAlarmAudio = useCallback((settings: AlarmSettings) => {
     try {
       // Web Audio APIで音を生成してBlobを作成
-      const win = window as typeof window & { webkitAudioContext?: typeof AudioContext };
+      const win = window as typeof window & {
+        webkitAudioContext?: typeof AudioContext;
+      };
       const AudioContextClass = win.AudioContext || win.webkitAudioContext;
       if (!AudioContextClass) return null;
 
@@ -342,7 +509,9 @@ export function CommTimeComponent() {
       // サイン波を生成
       for (let i = 0; i < numSamples; i++) {
         const t = i / sampleRate;
-        channelData[i] = Math.sin(2 * Math.PI * settings.frequency * t) * (settings.volume / 100);
+        channelData[i] =
+          Math.sin(2 * Math.PI * settings.frequency * t) *
+          (settings.volume / 100);
       }
 
       // WAVファイルとしてエンコード
@@ -382,10 +551,10 @@ export function CommTimeComponent() {
       }
     };
 
-    writeString(0, 'RIFF');
+    writeString(0, "RIFF");
     view.setUint32(4, 36 + dataLength, true);
-    writeString(8, 'WAVE');
-    writeString(12, 'fmt ');
+    writeString(8, "WAVE");
+    writeString(12, "fmt ");
     view.setUint32(16, 16, true);
     view.setUint16(20, format, true);
     view.setUint16(22, numChannels, true);
@@ -393,18 +562,22 @@ export function CommTimeComponent() {
     view.setUint32(28, sampleRate * blockAlign, true);
     view.setUint16(32, blockAlign, true);
     view.setUint16(34, bitDepth, true);
-    writeString(36, 'data');
+    writeString(36, "data");
     view.setUint32(40, dataLength, true);
 
     // PCMデータを書き込み
     let offset = 44;
     for (let i = 0; i < len; i++) {
       const sample = Math.max(-1, Math.min(1, data[i]));
-      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      view.setInt16(
+        offset,
+        sample < 0 ? sample * 0x8000 : sample * 0x7fff,
+        true
+      );
       offset += 2;
     }
 
-    return new Blob([arrayBuffer], { type: 'audio/wav' });
+    return new Blob([arrayBuffer], { type: "audio/wav" });
   };
 
   // アラーム停止機能
@@ -486,7 +659,9 @@ export function CommTimeComponent() {
       let titleBlink = false;
       titleBlinkIntervalRef.current = setInterval(() => {
         titleBlink = !titleBlink;
-        document.title = titleBlink ? "🔔🔔🔔 " + message + " 🔔🔔🔔" : "⚠️⚠️⚠️ TIME UP! ⚠️⚠️⚠️";
+        document.title = titleBlink
+          ? "🔔🔔🔔 " + message + " 🔔🔔🔔"
+          : "⚠️⚠️⚠️ TIME UP! ⚠️⚠️⚠️";
       }, 500);
 
       // フォーカス
@@ -494,7 +669,15 @@ export function CommTimeComponent() {
         window.focus();
       }
     },
-    [forceFocus, vibrationEnabled, notificationsEnabled, notificationPermission, flashEnabled, createAlarmAudio, stopAlarm]
+    [
+      forceFocus,
+      vibrationEnabled,
+      notificationsEnabled,
+      notificationPermission,
+      flashEnabled,
+      createAlarmAudio,
+      stopAlarm,
+    ]
   );
 
   // 現在時刻の更新
@@ -524,8 +707,8 @@ export function CommTimeComponent() {
     };
 
     if (isAlarmRinging && !isFlashing) {
-      window.addEventListener('click', handleClick);
-      return () => window.removeEventListener('click', handleClick);
+      window.addEventListener("click", handleClick);
+      return () => window.removeEventListener("click", handleClick);
     }
   }, [isAlarmRinging, isFlashing, stopAlarm]);
 
@@ -535,7 +718,9 @@ export function CommTimeComponent() {
 
     try {
       if (!tickAudioContextRef.current) {
-        const win = window as typeof window & { webkitAudioContext?: typeof AudioContext };
+        const win = window as typeof window & {
+          webkitAudioContext?: typeof AudioContext;
+        };
         const AudioContextClass = win.AudioContext || win.webkitAudioContext;
         if (AudioContextClass) {
           tickAudioContextRef.current = new AudioContextClass();
@@ -546,12 +731,12 @@ export function CommTimeComponent() {
       if (!audioContext) return;
 
       // モバイルブラウザ対応: AudioContextがsuspendedの場合はresume
-      if (audioContext.state === 'suspended') {
+      if (audioContext.state === "suspended") {
         await audioContext.resume();
       }
 
       // AudioContextがrunning状態の時のみ音を再生
-      if (audioContext.state === 'running') {
+      if (audioContext.state === "running") {
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
 
@@ -560,7 +745,10 @@ export function CommTimeComponent() {
 
         oscillator.type = "sine";
         oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-        gainNode.gain.setValueAtTime(tickSoundVolume / 100, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(
+          tickSoundVolume / 100,
+          audioContext.currentTime
+        );
 
         oscillator.start();
         gainNode.gain.exponentialRampToValueAtTime(
@@ -624,7 +812,16 @@ export function CommTimeComponent() {
         document.title = "CT";
       }
     };
-  }, [isMeetingRunning, meetingStartTime, formatTime, countdownMode, targetEndTime, playAlarm, meetingAlarmSettings, playTickSound]);
+  }, [
+    isMeetingRunning,
+    meetingStartTime,
+    formatTime,
+    countdownMode,
+    targetEndTime,
+    playAlarm,
+    meetingAlarmSettings,
+    playTickSound,
+  ]);
 
   // アラームポイントの更新
   useEffect(() => {
@@ -636,7 +833,10 @@ export function CommTimeComponent() {
             if (!point.isDone) {
               const newRemainingTime = Math.max(0, point.remainingTime - 1);
               if (newRemainingTime === 0) {
-                playAlarm(meetingAlarmSettings, `${point.minutes}分経過しました`);
+                playAlarm(
+                  meetingAlarmSettings,
+                  `${point.minutes}分経過しました`
+                );
                 return {
                   ...point,
                   isDone: true,
@@ -686,7 +886,9 @@ export function CommTimeComponent() {
           newState === "work"
             ? pomodoroSettings.workAlarm
             : pomodoroSettings.breakAlarm,
-          newState === "work" ? "休憩終了！作業を開始してください" : "お疲れ様です！休憩時間です"
+          newState === "work"
+            ? "休憩終了！作業を開始してください"
+            : "お疲れ様です！休憩時間です"
         );
 
         if (newState === "work") {
@@ -718,7 +920,7 @@ export function CommTimeComponent() {
       // タイマー開始時にAudioContextをresumeする（モバイル対応）
       if (tickSoundEnabled && tickAudioContextRef.current) {
         try {
-          if (tickAudioContextRef.current.state === 'suspended') {
+          if (tickAudioContextRef.current.state === "suspended") {
             await tickAudioContextRef.current.resume();
           }
         } catch (error) {
@@ -737,7 +939,12 @@ export function CommTimeComponent() {
       }
       setIsMeetingRunning(true);
     }
-  }, [isMeetingRunning, meetingStartTime, meetingElapsedTime, tickSoundEnabled]);
+  }, [
+    isMeetingRunning,
+    meetingStartTime,
+    meetingElapsedTime,
+    tickSoundEnabled,
+  ]);
 
   const resetMeetingTimer = useCallback(() => {
     setIsMeetingRunning(false);
@@ -753,7 +960,7 @@ export function CommTimeComponent() {
       // タイマー開始時にAudioContextをresumeする（モバイル対応）
       if (tickSoundEnabled && tickAudioContextRef.current) {
         try {
-          if (tickAudioContextRef.current.state === 'suspended') {
+          if (tickAudioContextRef.current.state === "suspended") {
             await tickAudioContextRef.current.resume();
           }
         } catch (error) {
@@ -773,7 +980,12 @@ export function CommTimeComponent() {
       }
       setIsPomodoroRunning(true);
     }
-  }, [isPomodoroRunning, pomodoroStartTime, pomodoroElapsedTime, tickSoundEnabled]);
+  }, [
+    isPomodoroRunning,
+    pomodoroStartTime,
+    pomodoroElapsedTime,
+    tickSoundEnabled,
+  ]);
 
   const resetPomodoroTimer = useCallback(() => {
     setIsPomodoroRunning(false);
@@ -880,7 +1092,11 @@ export function CommTimeComponent() {
     } else {
       setNotificationsEnabled(!notificationsEnabled);
     }
-  }, [notificationPermission, notificationsEnabled, requestNotificationPermission]);
+  }, [
+    notificationPermission,
+    notificationsEnabled,
+    requestNotificationPermission,
+  ]);
 
   // 設定を初期値にリセット
   const resetToDefaults = useCallback(() => {
@@ -904,71 +1120,123 @@ export function CommTimeComponent() {
   ]);
 
   // 音のプレビュー機能
-  const previewSound = useCallback((settings: AlarmSettings) => {
-    const audio = createAlarmAudio(settings);
-    if (audio) {
-      audio.play().catch((error) => {
-        console.error("音のプレビュー再生に失敗:", error);
-      });
-    }
-  }, [createAlarmAudio]);
+  const previewSound = useCallback(
+    (settings: AlarmSettings) => {
+      const audio = createAlarmAudio(settings);
+      if (audio) {
+        audio.play().catch((error) => {
+          console.error("音のプレビュー再生に失敗:", error);
+        });
+      }
+    },
+    [createAlarmAudio]
+  );
 
   // TODO管理機能
-  const addTodo = useCallback((text: string, isPomodoro: boolean) => {
-    if (!text.trim()) return; // 空のTODOは追加しない
+  const addTodo = useCallback(
+    (text: string, isPomodoro: boolean) => {
+      if (!text.trim()) return; // 空のTODOは追加しない
 
-    const newTodo = {
-      id: Date.now().toString(),
-      text: text.trim(),
-      isCompleted: false,
-    };
+      if (useDatabase && user) {
+        // データベースモード: Supabaseを使用
+        if (isPomodoro) {
+          pomodoroSupabaseTodos.addTodo(text.trim());
+        } else {
+          meetingSupabaseTodos.addTodo(text.trim());
+        }
+      } else {
+        // ローカルモード: LocalStorageを使用
+        const newTodo = {
+          id: Date.now().toString(),
+          text: text.trim(),
+          isCompleted: false,
+        };
 
-    if (isPomodoro) {
-      setPomodorTodos((prev) => [...prev, newTodo]);
-    } else {
-      setMeetingTodos((prev) => [...prev, newTodo]);
-    }
-  }, []);
+        if (isPomodoro) {
+          setPomodorTodos((prev) => [...prev, newTodo]);
+        } else {
+          setMeetingTodos((prev) => [...prev, newTodo]);
+        }
+      }
+    },
+    [useDatabase, user, pomodoroSupabaseTodos, meetingSupabaseTodos]
+  );
 
-  const toggleTodo = useCallback((id: string, isPomodoro: boolean) => {
-    const updateTodos = (prev: TodoItem[]) =>
-      prev.map((todo) =>
-        todo.id === id ? { ...todo, isCompleted: !todo.isCompleted } : todo
-      );
+  const toggleTodo = useCallback(
+    (id: string, isPomodoro: boolean) => {
+      if (useDatabase && user) {
+        // データベースモード: Supabaseを使用
+        if (isPomodoro) {
+          pomodoroSupabaseTodos.toggleTodo(id);
+        } else {
+          meetingSupabaseTodos.toggleTodo(id);
+        }
+      } else {
+        // ローカルモード: LocalStorageを使用
+        const updateTodos = (prev: TodoItem[]) =>
+          prev.map((todo) =>
+            todo.id === id ? { ...todo, isCompleted: !todo.isCompleted } : todo
+          );
 
-    if (isPomodoro) {
-      setPomodorTodos(updateTodos);
-    } else {
-      setMeetingTodos(updateTodos);
-    }
-  }, []);
+        if (isPomodoro) {
+          setPomodorTodos(updateTodos);
+        } else {
+          setMeetingTodos(updateTodos);
+        }
+      }
+    },
+    [useDatabase, user, pomodoroSupabaseTodos, meetingSupabaseTodos]
+  );
 
-  const removeTodo = useCallback((id: string, isPomodoro: boolean) => {
-    if (isPomodoro) {
-      setPomodorTodos((prev) => prev.filter((todo) => todo.id !== id));
-    } else {
-      setMeetingTodos((prev) => prev.filter((todo) => todo.id !== id));
-    }
-  }, []);
+  const removeTodo = useCallback(
+    (id: string, isPomodoro: boolean) => {
+      if (useDatabase && user) {
+        // データベースモード: Supabaseを使用
+        if (isPomodoro) {
+          pomodoroSupabaseTodos.removeTodo(id);
+        } else {
+          meetingSupabaseTodos.removeTodo(id);
+        }
+      } else {
+        // ローカルモード: LocalStorageを使用
+        if (isPomodoro) {
+          setPomodorTodos((prev) => prev.filter((todo) => todo.id !== id));
+        } else {
+          setMeetingTodos((prev) => prev.filter((todo) => todo.id !== id));
+        }
+      }
+    },
+    [useDatabase, user, pomodoroSupabaseTodos, meetingSupabaseTodos]
+  );
 
   const updateTodo = useCallback(
     (id: string, newText: string, isPomodoro: boolean) => {
       if (!newText.trim()) return; // 空のテキストの場合は更新しない
 
-      const updateFunc = (prev: TodoItem[]) =>
-        prev.map((todo) =>
-          todo.id === id ? { ...todo, text: newText.trim() } : todo
-        );
-
-      if (isPomodoro) {
-        setPomodorTodos(updateFunc);
+      if (useDatabase && user) {
+        // データベースモード: Supabaseを使用
+        if (isPomodoro) {
+          pomodoroSupabaseTodos.updateTodo(id, { text: newText.trim() });
+        } else {
+          meetingSupabaseTodos.updateTodo(id, { text: newText.trim() });
+        }
       } else {
-        setMeetingTodos(updateFunc);
+        // ローカルモード: LocalStorageを使用
+        const updateFunc = (prev: TodoItem[]) =>
+          prev.map((todo) =>
+            todo.id === id ? { ...todo, text: newText.trim() } : todo
+          );
+
+        if (isPomodoro) {
+          setPomodorTodos(updateFunc);
+        } else {
+          setMeetingTodos(updateFunc);
+        }
       }
       setEditingTodoId(null);
       setEditingTodoText("");
     },
-    []
+    [useDatabase, user, pomodoroSupabaseTodos, meetingSupabaseTodos]
   );
 
   const startEditingTodo = useCallback((id: string, text: string) => {
@@ -980,6 +1248,30 @@ export function CommTimeComponent() {
     setEditingTodoId(null);
     setEditingTodoText("");
   }, []);
+
+  // メモの更新機能
+  const handleMemoChange = useCallback((content: string, isPomodoro: boolean) => {
+    // まずローカル状態を即座に更新（UX向上）
+    if (isPomodoro) {
+      setPomodoroMemo(content);
+    } else {
+      setMeetingMemo(content);
+    }
+
+    // データベースモードかつログイン済みの場合のみSupabaseに保存
+    if (useDatabase && user) {
+      try {
+        if (isPomodoro) {
+          pomodoroSupabaseMemos.saveMemo(content);
+        } else {
+          meetingSupabaseMemos.saveMemo(content);
+        }
+      } catch (error) {
+        console.error("Error saving memo to Supabase:", error);
+        // エラーが発生してもローカル状態は保持される
+      }
+    }
+  }, [useDatabase, user, pomodoroSupabaseMemos, meetingSupabaseMemos]);
 
   // TODOとアラームポイントのリンク機能
   const linkTodoToAlarmPoint = useCallback(
@@ -995,19 +1287,34 @@ export function CommTimeComponent() {
 
   // 期限の更新機能
   const updateTodoDeadline = useCallback(
-    (id: string, dueDate: string | undefined, dueTime: string | undefined, isPomodoro: boolean) => {
-      const updateFunc = (prev: TodoItem[]) =>
-        prev.map((todo) =>
-          todo.id === id ? { ...todo, dueDate, dueTime } : todo
-        );
-
-      if (isPomodoro) {
-        setPomodorTodos(updateFunc);
+    (
+      id: string,
+      dueDate: string | undefined,
+      dueTime: string | undefined,
+      isPomodoro: boolean
+    ) => {
+      if (useDatabase && user) {
+        // データベースモード: Supabaseを使用
+        if (isPomodoro) {
+          pomodoroSupabaseTodos.updateTodo(id, { dueDate, dueTime });
+        } else {
+          meetingSupabaseTodos.updateTodo(id, { dueDate, dueTime });
+        }
       } else {
-        setMeetingTodos(updateFunc);
+        // ローカルモード: LocalStorageを使用
+        const updateFunc = (prev: TodoItem[]) =>
+          prev.map((todo) =>
+            todo.id === id ? { ...todo, dueDate, dueTime } : todo
+          );
+
+        if (isPomodoro) {
+          setPomodorTodos(updateFunc);
+        } else {
+          setMeetingTodos(updateFunc);
+        }
       }
     },
-    []
+    [useDatabase, user, pomodoroSupabaseTodos, meetingSupabaseTodos]
   );
 
   // 期限延長機能
@@ -1016,9 +1323,11 @@ export function CommTimeComponent() {
       const updateFunc = (prev: TodoItem[]) =>
         prev.map((todo) => {
           if (todo.id === id) {
-            const currentDate = todo.dueDate ? new Date(todo.dueDate) : new Date();
+            const currentDate = todo.dueDate
+              ? new Date(todo.dueDate)
+              : new Date();
             currentDate.setDate(currentDate.getDate() + days);
-            const newDueDate = currentDate.toISOString().split('T')[0];
+            const newDueDate = currentDate.toISOString().split("T")[0];
             return { ...todo, dueDate: newDueDate };
           }
           return todo;
@@ -1041,7 +1350,7 @@ export function CommTimeComponent() {
     const deadline = new Date(todo.dueDate);
 
     if (todo.dueTime) {
-      const [hours, minutes] = todo.dueTime.split(':').map(Number);
+      const [hours, minutes] = todo.dueTime.split(":").map(Number);
       deadline.setHours(hours, minutes, 0, 0);
     } else {
       deadline.setHours(23, 59, 59, 999);
@@ -1071,11 +1380,11 @@ export function CommTimeComponent() {
       const dateB = new Date(b.dueDate);
 
       if (a.dueTime) {
-        const [hoursA, minutesA] = a.dueTime.split(':').map(Number);
+        const [hoursA, minutesA] = a.dueTime.split(":").map(Number);
         dateA.setHours(hoursA, minutesA);
       }
       if (b.dueTime) {
-        const [hoursB, minutesB] = b.dueTime.split(':').map(Number);
+        const [hoursB, minutesB] = b.dueTime.split(":").map(Number);
         dateB.setHours(hoursB, minutesB);
       }
 
@@ -1114,6 +1423,18 @@ export function CommTimeComponent() {
     [meetingTodos, pomodoroTodos, linkTodoToAlarmPoint]
   );
 
+  // SSR時はローディング表示（Hydration error回避）
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-4 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-300">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-4 px-4 sm:px-6 lg:px-8 relative">
       {/* フラッシュオーバーレイ - タップでアラーム停止 */}
@@ -1146,13 +1467,79 @@ export function CommTimeComponent() {
                   Comm Time
                 </h1>
                 <p className="text-sm sm:text-base lg:text-lg text-gray-700 dark:text-gray-300 font-semibold tabular-nums">
-                  現在時刻: {currentTime.toLocaleTimeString()}
+                  現在時刻:{" "}
+                  {currentTime ? currentTime.toLocaleTimeString() : "--:--:--"}
                 </p>
               </div>
             </div>
 
             {/* 設定ボタン群 */}
             <div className="flex gap-2 items-center">
+              {/* ログイン/ユーザー情報 (URLパラメータ ?user=login の時のみ表示) */}
+              {showLoginButton && (
+                <>
+                  {isAuthenticated && user ? (
+                    <div className="flex items-center gap-2">
+                      <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg">
+                        <User className="w-4 h-4" />
+                        <span className="text-xs font-medium">
+                          {user.email}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isSupabaseConfigured && !useDatabase) {
+                            alert(
+                              'Supabaseが設定されていません。\n\n' +
+                              'データベース機能を使用するには：\n' +
+                              '1. https://supabase.com/dashboard でプロジェクトを作成\n' +
+                              '2. プロジェクトのURLとAPIキーを取得\n' +
+                              '3. .env.local ファイルに以下を設定：\n' +
+                              '   NEXT_PUBLIC_SUPABASE_URL=your-project-url\n' +
+                              '   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key\n' +
+                              '4. 開発サーバーを再起動\n\n' +
+                              '詳細は SUPABASE_SETUP.md を参照してください。'
+                            );
+                            return;
+                          }
+                          setUseDatabase(!useDatabase);
+                        }}
+                        className={`p-2 rounded-xl transition-all duration-200 ${
+                          useDatabase
+                            ? "bg-gradient-to-br from-green-500 to-emerald-500 text-white shadow-lg"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                        }`}
+                        title={
+                          useDatabase
+                            ? "データベース連携 ON"
+                            : "データベース連携 OFF"
+                        }
+                      >
+                        <Database className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={signOut}
+                        className="p-2 rounded-xl bg-gradient-to-br from-gray-500 to-gray-600 text-white hover:shadow-lg transition-all"
+                        title="ログアウト"
+                      >
+                        <LogOut className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setAuthDialogOpen(true)}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium hover:shadow-lg transition-all"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      <span className="hidden sm:inline text-sm">ログイン</span>
+                    </button>
+                  )}
+                </>
+              )}
+
               {/* アラーム停止ボタン（鳴っている時のみ表示） */}
               {isAlarmRinging && (
                 <button
@@ -1197,7 +1584,11 @@ export function CommTimeComponent() {
                     ? "bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg"
                     : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                 }`}
-                title={vibrationEnabled ? "バイブレーション ON" : "バイブレーション OFF"}
+                title={
+                  vibrationEnabled
+                    ? "バイブレーション ON"
+                    : "バイブレーション OFF"
+                }
               >
                 <Vibrate className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
@@ -1319,12 +1710,17 @@ export function CommTimeComponent() {
                       : formatTime(meetingElapsedTime)}
                   </div>
                   <div className="text-xl sm:text-2xl lg:text-3xl font-semibold text-center text-white/90 tabular-nums">
-                    {countdownMode ? "残り時間" : (
+                    {countdownMode ? (
+                      "残り時間"
+                    ) : (
                       <>
                         残り:{" "}
                         {formatTime(
-                          Math.max(0, alarmPoints[alarmPoints.length - 1]?.minutes * 60 -
-                            meetingElapsedTime)
+                          Math.max(
+                            0,
+                            alarmPoints[alarmPoints.length - 1]?.minutes * 60 -
+                              meetingElapsedTime
+                          )
                         )}
                       </>
                     )}
@@ -1368,17 +1764,22 @@ export function CommTimeComponent() {
                   <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 border border-blue-100 dark:border-blue-900">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-sm sm:text-base">
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-600 dark:text-gray-400 font-medium">開始:</span>
+                        <span className="text-gray-600 dark:text-gray-400 font-medium">
+                          開始:
+                        </span>
                         <span className="text-gray-900 dark:text-gray-100 font-semibold">
                           {meetingStartTime.toLocaleTimeString()}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-600 dark:text-gray-400 font-medium">終了予定:</span>
+                        <span className="text-gray-600 dark:text-gray-400 font-medium">
+                          終了予定:
+                        </span>
                         <span className="text-gray-900 dark:text-gray-100 font-semibold">
                           {getEndTime(
                             meetingStartTime,
-                            alarmPoints[alarmPoints.length - 1]?.minutes * 60 || 0
+                            alarmPoints[alarmPoints.length - 1]?.minutes * 60 ||
+                              0
                           )}
                         </span>
                       </div>
@@ -1405,12 +1806,17 @@ export function CommTimeComponent() {
                           type="number"
                           value={point.minutes}
                           onChange={(e) =>
-                            updateAlarmPoint(point.id, parseInt(e.target.value) || 1)
+                            updateAlarmPoint(
+                              point.id,
+                              parseInt(e.target.value) || 1
+                            )
                           }
                           min="1"
                           className="w-16 sm:w-20 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         />
-                        <span className="text-sm sm:text-base font-medium text-gray-700 dark:text-gray-300">分</span>
+                        <span className="text-sm sm:text-base font-medium text-gray-700 dark:text-gray-300">
+                          分
+                        </span>
                         <span className="text-sm sm:text-base font-mono font-semibold text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 px-2 sm:px-3 py-1 rounded-lg">
                           {formatTime(point.remainingTime)}
                         </span>
@@ -1420,12 +1826,17 @@ export function CommTimeComponent() {
                           </span>
                         ) : (
                           <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 hidden sm:block">
-                            終了予定: {getEndTime(meetingStartTime, point.minutes * 60)}
+                            終了予定:{" "}
+                            {getEndTime(meetingStartTime, point.minutes * 60)}
                           </span>
                         )}
                         {point.linkedTodo && (
                           <span className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900 px-2 sm:px-3 py-1 rounded-full">
-                            {meetingTodos.find((todo) => todo.id === point.linkedTodo)?.text}
+                            {
+                              meetingTodos.find(
+                                (todo) => todo.id === point.linkedTodo
+                              )?.text
+                            }
                           </span>
                         )}
                         <button
@@ -1444,7 +1855,9 @@ export function CommTimeComponent() {
                     className="mt-3 sm:mt-4 w-full sm:w-auto px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                   >
                     <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span className="text-sm sm:text-base">アラームポイントを追加</span>
+                    <span className="text-sm sm:text-base">
+                      アラームポイントを追加
+                    </span>
                   </button>
                 </div>
 
@@ -1461,7 +1874,9 @@ export function CommTimeComponent() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 dark:text-indigo-400" />
-                            <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">音量</span>
+                            <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">
+                              音量
+                            </span>
                           </div>
                           <span className="text-sm sm:text-base font-bold text-indigo-600 dark:text-indigo-400">
                             {meetingAlarmSettings.volume}
@@ -1487,7 +1902,9 @@ export function CommTimeComponent() {
                     {/* 周波数設定 */}
                     <div className="bg-white dark:bg-gray-700 rounded-lg p-3 sm:p-4">
                       <label className="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">周波数:</span>
+                        <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">
+                          周波数:
+                        </span>
                         <input
                           type="number"
                           value={meetingAlarmSettings.frequency}
@@ -1499,7 +1916,9 @@ export function CommTimeComponent() {
                           }
                           className="w-full sm:w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         />
-                        <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Hz</span>
+                        <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                          Hz
+                        </span>
                       </label>
                     </div>
 
@@ -1507,14 +1926,18 @@ export function CommTimeComponent() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => playAlarm(meetingAlarmSettings, "アラームテスト")}
+                        onClick={() =>
+                          playAlarm(meetingAlarmSettings, "アラームテスト")
+                        }
                         className="flex-1 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg text-sm sm:text-base"
                       >
                         テスト
                       </button>
                       <button
                         type="button"
-                        onClick={() => setMeetingAlarmSettings(initialMeetingAlarmSettings)}
+                        onClick={() =>
+                          setMeetingAlarmSettings(initialMeetingAlarmSettings)
+                        }
                         className="px-4 py-2.5 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg text-sm sm:text-base"
                       >
                         リセット
@@ -1562,7 +1985,9 @@ export function CommTimeComponent() {
                   </div>
                   <div className="text-base sm:text-lg text-center text-white/80 font-medium">
                     サイクル: {pomodoroCycles} /{" "}
-                    {pomodoroSettings.infiniteMode ? "∞" : pomodoroSettings.cycles}
+                    {pomodoroSettings.infiniteMode
+                      ? "∞"
+                      : pomodoroSettings.cycles}
                   </div>
                 </div>
 
@@ -1604,13 +2029,17 @@ export function CommTimeComponent() {
                   <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 border border-blue-100 dark:border-blue-900">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-xs sm:text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-600 dark:text-gray-400 font-medium">開始:</span>
+                        <span className="text-gray-600 dark:text-gray-400 font-medium">
+                          開始:
+                        </span>
                         <span className="text-gray-900 dark:text-gray-100 font-semibold">
                           {pomodoroStartTime.toLocaleTimeString()}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-600 dark:text-gray-400 font-medium">終了予定:</span>
+                        <span className="text-gray-600 dark:text-gray-400 font-medium">
+                          終了予定:
+                        </span>
                         <span className="text-gray-900 dark:text-gray-100 font-semibold">
                           {getEndTime(
                             pomodoroStartTime,
@@ -1621,7 +2050,9 @@ export function CommTimeComponent() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-600 dark:text-gray-400 font-medium">残り:</span>
+                        <span className="text-gray-600 dark:text-gray-400 font-medium">
+                          残り:
+                        </span>
                         <span className="text-gray-900 dark:text-gray-100 font-semibold">
                           {getCountdown(
                             (pomodoroState === "work"
@@ -1654,13 +2085,18 @@ export function CommTimeComponent() {
                             onChange={(e) =>
                               setPomodoroSettings({
                                 ...pomodoroSettings,
-                                workDuration: Math.max(1, parseInt(e.target.value) || 1),
+                                workDuration: Math.max(
+                                  1,
+                                  parseInt(e.target.value) || 1
+                                ),
                               })
                             }
                             min="1"
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                           />
-                          <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">分</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                            分
+                          </span>
                         </div>
                       </label>
                     </div>
@@ -1677,13 +2113,18 @@ export function CommTimeComponent() {
                             onChange={(e) =>
                               setPomodoroSettings({
                                 ...pomodoroSettings,
-                                breakDuration: Math.max(1, parseInt(e.target.value) || 1),
+                                breakDuration: Math.max(
+                                  1,
+                                  parseInt(e.target.value) || 1
+                                ),
                               })
                             }
                             min="1"
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                           />
-                          <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">分</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                            分
+                          </span>
                         </div>
                       </label>
                     </div>
@@ -1699,7 +2140,10 @@ export function CommTimeComponent() {
                           onChange={(e) =>
                             setPomodoroSettings({
                               ...pomodoroSettings,
-                              cycles: Math.max(1, parseInt(e.target.value) || 1),
+                              cycles: Math.max(
+                                1,
+                                parseInt(e.target.value) || 1
+                              ),
                             })
                           }
                           min="1"
@@ -1742,7 +2186,9 @@ export function CommTimeComponent() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
-                            <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">音量</span>
+                            <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">
+                              音量
+                            </span>
                           </div>
                           <span className="text-sm sm:text-base font-bold text-blue-600 dark:text-blue-400">
                             {pomodoroSettings.workAlarm.volume}
@@ -1771,7 +2217,9 @@ export function CommTimeComponent() {
                     <div className="flex gap-2">
                       <div className="bg-white dark:bg-gray-700 rounded-lg p-3 sm:p-4 flex-1">
                         <label className="flex flex-col sm:flex-row sm:items-center gap-2">
-                          <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">周波数:</span>
+                          <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">
+                            周波数:
+                          </span>
                           <input
                             type="number"
                             value={pomodoroSettings.workAlarm.frequency}
@@ -1786,12 +2234,19 @@ export function CommTimeComponent() {
                             }
                             className="w-full sm:w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           />
-                          <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Hz</span>
+                          <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                            Hz
+                          </span>
                         </label>
                       </div>
                       <button
                         type="button"
-                        onClick={() => playAlarm(pomodoroSettings.workAlarm, "作業時間アラームテスト")}
+                        onClick={() =>
+                          playAlarm(
+                            pomodoroSettings.workAlarm,
+                            "作業時間アラームテスト"
+                          )
+                        }
                         className="px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg text-sm sm:text-base whitespace-nowrap"
                       >
                         テスト
@@ -1812,7 +2267,9 @@ export function CommTimeComponent() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600 dark:text-orange-400" />
-                            <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">音量</span>
+                            <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">
+                              音量
+                            </span>
                           </div>
                           <span className="text-sm sm:text-base font-bold text-orange-600 dark:text-orange-400">
                             {pomodoroSettings.breakAlarm.volume}
@@ -1841,7 +2298,9 @@ export function CommTimeComponent() {
                     <div className="flex gap-2">
                       <div className="bg-white dark:bg-gray-700 rounded-lg p-3 sm:p-4 flex-1">
                         <label className="flex flex-col sm:flex-row sm:items-center gap-2">
-                          <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">周波数:</span>
+                          <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">
+                            周波数:
+                          </span>
                           <input
                             type="number"
                             value={pomodoroSettings.breakAlarm.frequency}
@@ -1856,12 +2315,19 @@ export function CommTimeComponent() {
                             }
                             className="w-full sm:w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                           />
-                          <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Hz</span>
+                          <span className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                            Hz
+                          </span>
                         </label>
                       </div>
                       <button
                         type="button"
-                        onClick={() => playAlarm(pomodoroSettings.breakAlarm, "休憩時間アラームテスト")}
+                        onClick={() =>
+                          playAlarm(
+                            pomodoroSettings.breakAlarm,
+                            "休憩時間アラームテスト"
+                          )
+                        }
                         className="px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg text-sm sm:text-base whitespace-nowrap"
                       >
                         テスト
@@ -1882,9 +2348,7 @@ export function CommTimeComponent() {
               <textarea
                 value={activeTab === "meeting" ? meetingMemo : pomodoroMemo}
                 onChange={(e) =>
-                  activeTab === "meeting"
-                    ? setMeetingMemo(e.target.value)
-                    : setPomodoroMemo(e.target.value)
+                  handleMemoChange(e.target.value, activeTab === "pomodoro")
                 }
                 className="w-full h-32 sm:h-40 p-3 sm:p-4 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-xl text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                 placeholder="メモを入力してください..."
@@ -1925,8 +2389,14 @@ export function CommTimeComponent() {
                       className="space-y-2 mb-3 sm:mb-4 max-h-[400px] overflow-y-auto"
                     >
                       {(sortByDeadline
-                        ? sortTodosByDeadline(activeTab === "meeting" ? meetingTodos : pomodoroTodos)
-                        : (activeTab === "meeting" ? meetingTodos : pomodoroTodos)
+                        ? sortTodosByDeadline(
+                            activeTab === "meeting"
+                              ? meetingTodos
+                              : pomodoroTodos
+                          )
+                        : activeTab === "meeting"
+                        ? meetingTodos
+                        : pomodoroTodos
                       ).map((todo, index) => (
                         <Draggable
                           key={todo.id}
@@ -2012,17 +2482,29 @@ export function CommTimeComponent() {
                                             >
                                               <Calendar className="w-3 h-3" />
                                               {todo.dueDate}
-                                              {todo.dueTime && ` ${todo.dueTime}`}
-                                              {status.isOverdue && " (期限切れ)"}
-                                              {!status.isOverdue && status.isSoon && ` (残り${status.diffHours}時間)`}
-                                              {!status.isOverdue && !status.isSoon && ` (残り${status.diffDays}日)`}
+                                              {todo.dueTime &&
+                                                ` ${todo.dueTime}`}
+                                              {status.isOverdue &&
+                                                " (期限切れ)"}
+                                              {!status.isOverdue &&
+                                                status.isSoon &&
+                                                ` (残り${status.diffHours}時間)`}
+                                              {!status.isOverdue &&
+                                                !status.isSoon &&
+                                                ` (残り${status.diffDays}日)`}
                                             </div>
 
                                             {/* 延長ボタン */}
                                             <div className="flex gap-1">
                                               <button
                                                 type="button"
-                                                onClick={() => extendDeadline(todo.id, 1, activeTab === "pomodoro")}
+                                                onClick={() =>
+                                                  extendDeadline(
+                                                    todo.id,
+                                                    1,
+                                                    activeTab === "pomodoro"
+                                                  )
+                                                }
                                                 className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
                                                 title="1日延長"
                                               >
@@ -2030,7 +2512,13 @@ export function CommTimeComponent() {
                                               </button>
                                               <button
                                                 type="button"
-                                                onClick={() => extendDeadline(todo.id, 3, activeTab === "pomodoro")}
+                                                onClick={() =>
+                                                  extendDeadline(
+                                                    todo.id,
+                                                    3,
+                                                    activeTab === "pomodoro"
+                                                  )
+                                                }
                                                 className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
                                                 title="3日延長"
                                               >
@@ -2038,7 +2526,13 @@ export function CommTimeComponent() {
                                               </button>
                                               <button
                                                 type="button"
-                                                onClick={() => extendDeadline(todo.id, 7, activeTab === "pomodoro")}
+                                                onClick={() =>
+                                                  extendDeadline(
+                                                    todo.id,
+                                                    7,
+                                                    activeTab === "pomodoro"
+                                                  )
+                                                }
                                                 className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
                                                 title="1週間延長"
                                               >
@@ -2124,11 +2618,14 @@ export function CommTimeComponent() {
                                       type="button"
                                       onClick={() =>
                                         setExpandedDeadlineTodoId(
-                                          expandedDeadlineTodoId === todo.id ? null : todo.id
+                                          expandedDeadlineTodoId === todo.id
+                                            ? null
+                                            : todo.id
                                         )
                                       }
                                       className={`p-1.5 rounded-lg transition-colors duration-200 ${
-                                        expandedDeadlineTodoId === todo.id || todo.dueDate
+                                        expandedDeadlineTodoId === todo.id ||
+                                        todo.dueDate
                                           ? "text-indigo-600 bg-indigo-100"
                                           : "text-gray-400 hover:text-indigo-600 hover:bg-indigo-100"
                                       }`}
@@ -2240,426 +2737,559 @@ export function CommTimeComponent() {
 
             <div className="flex-1 overflow-y-auto px-6 py-6">
               <div className="space-y-6 max-w-6xl mx-auto">
-              {/* チクタク音設定 */}
-              <div className="bg-gradient-to-r from-green-50 to-teal-50 dark:from-green-950 dark:to-teal-950 rounded-xl p-4 border border-green-200 dark:border-green-800">
-                <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                  <Volume2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-                  チクタク音設定
-                </h3>
+                {/* チクタク音設定 */}
+                <div className="bg-gradient-to-r from-green-50 to-teal-50 dark:from-green-950 dark:to-teal-950 rounded-xl p-4 border border-green-200 dark:border-green-800">
+                  <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                    <Volume2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    チクタク音設定
+                  </h3>
 
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">チクタク音を有効にする</span>
-                    <button
-                      type="button"
-                      onClick={() => setTickSoundEnabled(!tickSoundEnabled)}
-                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                        tickSoundEnabled
-                          ? "bg-gradient-to-r from-green-500 to-teal-500 text-white shadow-md"
-                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-                      }`}
-                    >
-                      {tickSoundEnabled ? "ON" : "OFF"}
-                    </button>
-                  </div>
-
-                  {tickSoundEnabled && (
-                    <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
-                      <label className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">音量</span>
-                          <span className="text-sm font-bold text-green-600 dark:text-green-400">{tickSoundVolume}</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          step="1"
-                          value={tickSoundVolume}
-                          onChange={(e) => setTickSoundVolume(parseInt(e.target.value))}
-                          className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-green-600"
-                        />
-                      </label>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* アラーム設定サマリー */}
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
-                <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200">アラーム設定</h3>
-
-                <div className="space-y-3">
-                  <div className="bg-white dark:bg-gray-700 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">ミーティングアラーム</span>
-                    </div>
-                    <div className="flex gap-4 text-xs text-gray-600 dark:text-gray-400">
-                      <span>音量: {meetingAlarmSettings.volume}</span>
-                      <span>周波数: {meetingAlarmSettings.frequency}Hz</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-white dark:bg-gray-700 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">作業時間アラーム</span>
-                    </div>
-                    <div className="flex gap-4 text-xs text-gray-600 dark:text-gray-400">
-                      <span>音量: {pomodoroSettings.workAlarm.volume}</span>
-                      <span>周波数: {pomodoroSettings.workAlarm.frequency}Hz</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-white dark:bg-gray-700 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">休憩時間アラーム</span>
-                    </div>
-                    <div className="flex gap-4 text-xs text-gray-600 dark:text-gray-400">
-                      <span>音量: {pomodoroSettings.breakAlarm.volume}</span>
-                      <span>周波数: {pomodoroSettings.breakAlarm.frequency}Hz</span>
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
-                  ※ 各タイマーの設定画面で詳細を調整できます
-                </p>
-              </div>
-
-              {/* 通知・エフェクト設定 */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
-                <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200">通知・エフェクト</h3>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between bg-white dark:bg-gray-700 rounded-lg p-3">
-                    <div className="flex items-center gap-2">
-                      <Bell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">通知</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={toggleNotifications}
-                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                        notificationsEnabled
-                          ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md"
-                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-                      }`}
-                    >
-                      {notificationsEnabled ? "ON" : "OFF"}
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between bg-white dark:bg-gray-700 rounded-lg p-3">
-                    <div className="flex items-center gap-2">
-                      <Vibrate className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">バイブレーション</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setVibrationEnabled(!vibrationEnabled)}
-                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                        vibrationEnabled
-                          ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md"
-                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-                      }`}
-                    >
-                      {vibrationEnabled ? "ON" : "OFF"}
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between bg-white dark:bg-gray-700 rounded-lg p-3">
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">フラッシュ</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setFlashEnabled(!flashEnabled)}
-                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                        flashEnabled
-                          ? "bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-md"
-                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-                      }`}
-                    >
-                      {flashEnabled ? "ON" : "OFF"}
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between bg-white dark:bg-gray-700 rounded-lg p-3">
-                    <div className="flex items-center gap-2">
-                      {darkMode ? <Moon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> : <Sun className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">ダークモード</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setDarkMode(!darkMode)}
-                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                        darkMode
-                          ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md"
-                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-                      }`}
-                    >
-                      {darkMode ? "ON" : "OFF"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* 初期値設定 */}
-              <div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950 dark:to-red-950 rounded-xl p-4 border border-orange-200 dark:border-orange-800">
-                <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                  <Settings className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                  初期値設定
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  アラームやタイマーのデフォルト値を設定できます。これらの値は、設定をリセットする際に使用されます。
-                </p>
-
-                <div className="space-y-4">
-                  {/* ミーティングアラーム初期値 */}
-                  <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
-                    <h4 className="text-sm font-bold mb-3 text-gray-700 dark:text-gray-300">ミーティングアラーム</h4>
-                    <div className="space-y-4">
-                      {/* アラームポイント設定 */}
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-gray-600 dark:text-gray-400">デフォルトアラームポイント (分)</label>
-                        <div className="flex flex-wrap gap-2">
-                          {defaultMeetingAlarmPoints.map((point, index) => (
-                            <div key={index} className="flex items-center gap-1 bg-indigo-50 dark:bg-indigo-900 px-2 py-1 rounded">
-                              <input
-                                type="number"
-                                min="1"
-                                max="180"
-                                value={point}
-                                onChange={(e) => {
-                                  const newPoints = [...defaultMeetingAlarmPoints];
-                                  newPoints[index] = parseInt(e.target.value) || 1;
-                                  setDefaultMeetingAlarmPoints(newPoints);
-                                }}
-                                className="w-14 px-1 py-0.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-xs"
-                              />
-                              <span className="text-xs text-gray-600 dark:text-gray-400">分</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDefaultMeetingAlarmPoints(defaultMeetingAlarmPoints.filter((_, i) => i !== index));
-                                }}
-                                className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => setDefaultMeetingAlarmPoints([...defaultMeetingAlarmPoints, 30])}
-                            className="px-2 py-1 bg-indigo-500 hover:bg-indigo-600 text-white text-xs rounded flex items-center gap-1"
-                          >
-                            <Plus className="w-3 h-3" />
-                            追加
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* 音量設定 */}
-                      <label className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">デフォルト音量</span>
-                          <span className="text-xs font-bold text-orange-600 dark:text-orange-400">{defaultMeetingAlarmSettings.volume}</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          step="1"
-                          value={defaultMeetingAlarmSettings.volume}
-                          onChange={(e) => setDefaultMeetingAlarmSettings({
-                            ...defaultMeetingAlarmSettings,
-                            volume: parseInt(e.target.value)
-                          })}
-                          className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-orange-600"
-                        />
-                      </label>
-
-                      {/* 周波数設定 */}
-                      <label className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">デフォルト周波数 (Hz)</span>
-                          <span className="text-xs font-bold text-orange-600 dark:text-orange-400">{defaultMeetingAlarmSettings.frequency}</span>
-                        </div>
-                        <input
-                          type="number"
-                          min="100"
-                          max="1000"
-                          step="10"
-                          value={defaultMeetingAlarmSettings.frequency}
-                          onChange={(e) => setDefaultMeetingAlarmSettings({
-                            ...defaultMeetingAlarmSettings,
-                            frequency: Math.max(100, parseInt(e.target.value) || 100)
-                          })}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg text-sm"
-                        />
-                      </label>
-
-                      {/* テストボタン */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        チクタク音を有効にする
+                      </span>
                       <button
                         type="button"
-                        onClick={() => previewSound(defaultMeetingAlarmSettings)}
-                        className="w-full px-3 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white text-xs font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                        onClick={() => setTickSoundEnabled(!tickSoundEnabled)}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                          tickSoundEnabled
+                            ? "bg-gradient-to-r from-green-500 to-teal-500 text-white shadow-md"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                        }`}
                       >
-                        <Volume2 className="w-4 h-4" />
-                        音をテスト
+                        {tickSoundEnabled ? "ON" : "OFF"}
+                      </button>
+                    </div>
+
+                    {tickSoundEnabled && (
+                      <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
+                        <label className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                              音量
+                            </span>
+                            <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                              {tickSoundVolume}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={tickSoundVolume}
+                            onChange={(e) =>
+                              setTickSoundVolume(parseInt(e.target.value))
+                            }
+                            className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-green-600"
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* アラーム設定サマリー */}
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
+                  <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200">
+                    アラーム設定
+                  </h3>
+
+                  <div className="space-y-3">
+                    <div className="bg-white dark:bg-gray-700 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          ミーティングアラーム
+                        </span>
+                      </div>
+                      <div className="flex gap-4 text-xs text-gray-600 dark:text-gray-400">
+                        <span>音量: {meetingAlarmSettings.volume}</span>
+                        <span>周波数: {meetingAlarmSettings.frequency}Hz</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-gray-700 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          作業時間アラーム
+                        </span>
+                      </div>
+                      <div className="flex gap-4 text-xs text-gray-600 dark:text-gray-400">
+                        <span>音量: {pomodoroSettings.workAlarm.volume}</span>
+                        <span>
+                          周波数: {pomodoroSettings.workAlarm.frequency}Hz
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-gray-700 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          休憩時間アラーム
+                        </span>
+                      </div>
+                      <div className="flex gap-4 text-xs text-gray-600 dark:text-gray-400">
+                        <span>音量: {pomodoroSettings.breakAlarm.volume}</span>
+                        <span>
+                          周波数: {pomodoroSettings.breakAlarm.frequency}Hz
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+                    ※ 各タイマーの設定画面で詳細を調整できます
+                  </p>
+                </div>
+
+                {/* 通知・エフェクト設定 */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                  <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200">
+                    通知・エフェクト
+                  </h3>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between bg-white dark:bg-gray-700 rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <Bell className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          通知
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={toggleNotifications}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                          notificationsEnabled
+                            ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                        }`}
+                      >
+                        {notificationsEnabled ? "ON" : "OFF"}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-white dark:bg-gray-700 rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <Vibrate className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          バイブレーション
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setVibrationEnabled(!vibrationEnabled)}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                          vibrationEnabled
+                            ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                        }`}
+                      >
+                        {vibrationEnabled ? "ON" : "OFF"}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-white dark:bg-gray-700 rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          フラッシュ
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFlashEnabled(!flashEnabled)}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                          flashEnabled
+                            ? "bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-md"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                        }`}
+                      >
+                        {flashEnabled ? "ON" : "OFF"}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-white dark:bg-gray-700 rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        {darkMode ? (
+                          <Moon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                        ) : (
+                          <Sun className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                        )}
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          ダークモード
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDarkMode(!darkMode)}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                          darkMode
+                            ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                        }`}
+                      >
+                        {darkMode ? "ON" : "OFF"}
                       </button>
                     </div>
                   </div>
-
-                  {/* ポモドーロ初期値 */}
-                  <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
-                    <h4 className="text-sm font-bold mb-3 text-gray-700 dark:text-gray-300">ポモドーロタイマー</h4>
-                    <div className="grid grid-cols-3 gap-3 mb-3">
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">作業時間 (分)</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="120"
-                          value={defaultPomodoroWorkDuration}
-                          onChange={(e) => setDefaultPomodoroWorkDuration(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-sm"
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">休憩時間 (分)</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="60"
-                          value={defaultPomodoroBreakDuration}
-                          onChange={(e) => setDefaultPomodoroBreakDuration(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-sm"
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">サイクル数</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="10"
-                          value={defaultPomodoroCycles}
-                          onChange={(e) => setDefaultPomodoroCycles(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-sm"
-                        />
-                      </label>
-                    </div>
-
-                    <div className="space-y-3 mt-3">
-                      <div>
-                        <h5 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">作業アラーム</h5>
-                        <div className="space-y-2">
-                          <div className="grid grid-cols-2 gap-2">
-                            <label className="flex flex-col gap-1">
-                              <span className="text-xs text-gray-600 dark:text-gray-400">音量: {defaultPomodoroWorkAlarm.volume}</span>
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={defaultPomodoroWorkAlarm.volume}
-                                onChange={(e) => setDefaultPomodoroWorkAlarm({
-                                  ...defaultPomodoroWorkAlarm,
-                                  volume: parseInt(e.target.value)
-                                })}
-                                className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-orange-600"
-                              />
-                            </label>
-                            <label className="flex flex-col gap-1">
-                              <span className="text-xs text-gray-600 dark:text-gray-400">周波数: {defaultPomodoroWorkAlarm.frequency}Hz</span>
-                              <input
-                                type="number"
-                                min="100"
-                                max="1000"
-                                step="10"
-                                value={defaultPomodoroWorkAlarm.frequency}
-                                onChange={(e) => setDefaultPomodoroWorkAlarm({
-                                  ...defaultPomodoroWorkAlarm,
-                                  frequency: Math.max(100, parseInt(e.target.value) || 100)
-                                })}
-                                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-xs"
-                              />
-                            </label>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => previewSound(defaultPomodoroWorkAlarm)}
-                            className="w-full px-2 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white text-xs font-semibold rounded transition-all duration-200 shadow-sm hover:shadow-md flex items-center justify-center gap-1"
-                          >
-                            <Volume2 className="w-3 h-3" />
-                            音をテスト
-                          </button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h5 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">休憩アラーム</h5>
-                        <div className="space-y-2">
-                          <div className="grid grid-cols-2 gap-2">
-                            <label className="flex flex-col gap-1">
-                              <span className="text-xs text-gray-600 dark:text-gray-400">音量: {defaultPomodoroBreakAlarm.volume}</span>
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={defaultPomodoroBreakAlarm.volume}
-                                onChange={(e) => setDefaultPomodoroBreakAlarm({
-                                  ...defaultPomodoroBreakAlarm,
-                                  volume: parseInt(e.target.value)
-                                })}
-                                className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-orange-600"
-                              />
-                            </label>
-                            <label className="flex flex-col gap-1">
-                              <span className="text-xs text-gray-600 dark:text-gray-400">周波数: {defaultPomodoroBreakAlarm.frequency}Hz</span>
-                              <input
-                                type="number"
-                                min="100"
-                                max="1000"
-                                step="10"
-                                value={defaultPomodoroBreakAlarm.frequency}
-                                onChange={(e) => setDefaultPomodoroBreakAlarm({
-                                  ...defaultPomodoroBreakAlarm,
-                                  frequency: Math.max(100, parseInt(e.target.value) || 100)
-                                })}
-                                className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-xs"
-                              />
-                            </label>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => previewSound(defaultPomodoroBreakAlarm)}
-                            className="w-full px-2 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white text-xs font-semibold rounded transition-all duration-200 shadow-sm hover:shadow-md flex items-center justify-center gap-1"
-                          >
-                            <Volume2 className="w-3 h-3" />
-                            音をテスト
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* リセットボタン */}
-                  <button
-                    type="button"
-                    onClick={resetToDefaults}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
-                  >
-                    <Settings className="w-4 h-4" />
-                    現在の設定を初期値にリセット
-                  </button>
                 </div>
-              </div>
+
+                {/* 初期値設定 */}
+                <div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950 dark:to-red-950 rounded-xl p-4 border border-orange-200 dark:border-orange-800">
+                  <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                    <Settings className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                    初期値設定
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    アラームやタイマーのデフォルト値を設定できます。これらの値は、設定をリセットする際に使用されます。
+                  </p>
+
+                  <div className="space-y-4">
+                    {/* ミーティングアラーム初期値 */}
+                    <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
+                      <h4 className="text-sm font-bold mb-3 text-gray-700 dark:text-gray-300">
+                        ミーティングアラーム
+                      </h4>
+                      <div className="space-y-4">
+                        {/* アラームポイント設定 */}
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                            デフォルトアラームポイント (分)
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {defaultMeetingAlarmPoints.map((point, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center gap-1 bg-indigo-50 dark:bg-indigo-900 px-2 py-1 rounded"
+                              >
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="180"
+                                  value={point}
+                                  onChange={(e) => {
+                                    const newPoints = [
+                                      ...defaultMeetingAlarmPoints,
+                                    ];
+                                    newPoints[index] =
+                                      parseInt(e.target.value) || 1;
+                                    setDefaultMeetingAlarmPoints(newPoints);
+                                  }}
+                                  className="w-14 px-1 py-0.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-xs"
+                                />
+                                <span className="text-xs text-gray-600 dark:text-gray-400">
+                                  分
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDefaultMeetingAlarmPoints(
+                                      defaultMeetingAlarmPoints.filter(
+                                        (_, i) => i !== index
+                                      )
+                                    );
+                                  }}
+                                  className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDefaultMeetingAlarmPoints([
+                                  ...defaultMeetingAlarmPoints,
+                                  30,
+                                ])
+                              }
+                              className="px-2 py-1 bg-indigo-500 hover:bg-indigo-600 text-white text-xs rounded flex items-center gap-1"
+                            >
+                              <Plus className="w-3 h-3" />
+                              追加
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 音量設定 */}
+                        <label className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                              デフォルト音量
+                            </span>
+                            <span className="text-xs font-bold text-orange-600 dark:text-orange-400">
+                              {defaultMeetingAlarmSettings.volume}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={defaultMeetingAlarmSettings.volume}
+                            onChange={(e) =>
+                              setDefaultMeetingAlarmSettings({
+                                ...defaultMeetingAlarmSettings,
+                                volume: parseInt(e.target.value),
+                              })
+                            }
+                            className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-orange-600"
+                          />
+                        </label>
+
+                        {/* 周波数設定 */}
+                        <label className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                              デフォルト周波数 (Hz)
+                            </span>
+                            <span className="text-xs font-bold text-orange-600 dark:text-orange-400">
+                              {defaultMeetingAlarmSettings.frequency}
+                            </span>
+                          </div>
+                          <input
+                            type="number"
+                            min="100"
+                            max="1000"
+                            step="10"
+                            value={defaultMeetingAlarmSettings.frequency}
+                            onChange={(e) =>
+                              setDefaultMeetingAlarmSettings({
+                                ...defaultMeetingAlarmSettings,
+                                frequency: Math.max(
+                                  100,
+                                  parseInt(e.target.value) || 100
+                                ),
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg text-sm"
+                          />
+                        </label>
+
+                        {/* テストボタン */}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            previewSound(defaultMeetingAlarmSettings)
+                          }
+                          className="w-full px-3 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white text-xs font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                        >
+                          <Volume2 className="w-4 h-4" />
+                          音をテスト
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* ポモドーロ初期値 */}
+                    <div className="bg-white dark:bg-gray-700 rounded-lg p-4">
+                      <h4 className="text-sm font-bold mb-3 text-gray-700 dark:text-gray-300">
+                        ポモドーロタイマー
+                      </h4>
+                      <div className="grid grid-cols-3 gap-3 mb-3">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                            作業時間 (分)
+                          </span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="120"
+                            value={defaultPomodoroWorkDuration}
+                            onChange={(e) =>
+                              setDefaultPomodoroWorkDuration(
+                                Math.max(1, parseInt(e.target.value) || 1)
+                              )
+                            }
+                            className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-sm"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                            休憩時間 (分)
+                          </span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="60"
+                            value={defaultPomodoroBreakDuration}
+                            onChange={(e) =>
+                              setDefaultPomodoroBreakDuration(
+                                Math.max(1, parseInt(e.target.value) || 1)
+                              )
+                            }
+                            className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-sm"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                            サイクル数
+                          </span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="10"
+                            value={defaultPomodoroCycles}
+                            onChange={(e) =>
+                              setDefaultPomodoroCycles(
+                                Math.max(1, parseInt(e.target.value) || 1)
+                              )
+                            }
+                            className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-sm"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="space-y-3 mt-3">
+                        <div>
+                          <h5 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                            作業アラーム
+                          </h5>
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <label className="flex flex-col gap-1">
+                                <span className="text-xs text-gray-600 dark:text-gray-400">
+                                  音量: {defaultPomodoroWorkAlarm.volume}
+                                </span>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="100"
+                                  value={defaultPomodoroWorkAlarm.volume}
+                                  onChange={(e) =>
+                                    setDefaultPomodoroWorkAlarm({
+                                      ...defaultPomodoroWorkAlarm,
+                                      volume: parseInt(e.target.value),
+                                    })
+                                  }
+                                  className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-orange-600"
+                                />
+                              </label>
+                              <label className="flex flex-col gap-1">
+                                <span className="text-xs text-gray-600 dark:text-gray-400">
+                                  周波数: {defaultPomodoroWorkAlarm.frequency}Hz
+                                </span>
+                                <input
+                                  type="number"
+                                  min="100"
+                                  max="1000"
+                                  step="10"
+                                  value={defaultPomodoroWorkAlarm.frequency}
+                                  onChange={(e) =>
+                                    setDefaultPomodoroWorkAlarm({
+                                      ...defaultPomodoroWorkAlarm,
+                                      frequency: Math.max(
+                                        100,
+                                        parseInt(e.target.value) || 100
+                                      ),
+                                    })
+                                  }
+                                  className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-xs"
+                                />
+                              </label>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                previewSound(defaultPomodoroWorkAlarm)
+                              }
+                              className="w-full px-2 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white text-xs font-semibold rounded transition-all duration-200 shadow-sm hover:shadow-md flex items-center justify-center gap-1"
+                            >
+                              <Volume2 className="w-3 h-3" />
+                              音をテスト
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h5 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                            休憩アラーム
+                          </h5>
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <label className="flex flex-col gap-1">
+                                <span className="text-xs text-gray-600 dark:text-gray-400">
+                                  音量: {defaultPomodoroBreakAlarm.volume}
+                                </span>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="100"
+                                  value={defaultPomodoroBreakAlarm.volume}
+                                  onChange={(e) =>
+                                    setDefaultPomodoroBreakAlarm({
+                                      ...defaultPomodoroBreakAlarm,
+                                      volume: parseInt(e.target.value),
+                                    })
+                                  }
+                                  className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-orange-600"
+                                />
+                              </label>
+                              <label className="flex flex-col gap-1">
+                                <span className="text-xs text-gray-600 dark:text-gray-400">
+                                  周波数: {defaultPomodoroBreakAlarm.frequency}
+                                  Hz
+                                </span>
+                                <input
+                                  type="number"
+                                  min="100"
+                                  max="1000"
+                                  step="10"
+                                  value={defaultPomodoroBreakAlarm.frequency}
+                                  onChange={(e) =>
+                                    setDefaultPomodoroBreakAlarm({
+                                      ...defaultPomodoroBreakAlarm,
+                                      frequency: Math.max(
+                                        100,
+                                        parseInt(e.target.value) || 100
+                                      ),
+                                    })
+                                  }
+                                  className="w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded text-xs"
+                                />
+                              </label>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                previewSound(defaultPomodoroBreakAlarm)
+                              }
+                              className="w-full px-2 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white text-xs font-semibold rounded transition-all duration-200 shadow-sm hover:shadow-md flex items-center justify-center gap-1"
+                            >
+                              <Volume2 className="w-3 h-3" />
+                              音をテスト
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* リセットボタン */}
+                    <button
+                      type="button"
+                      onClick={resetToDefaults}
+                      className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                    >
+                      <Settings className="w-4 h-4" />
+                      現在の設定を初期値にリセット
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* 認証ダイアログ */}
+        <AuthDialog
+          open={authDialogOpen}
+          onOpenChange={setAuthDialogOpen}
+          onSuccess={() => {
+            // ログイン成功時にデータベース連携を有効化
+            setUseDatabase(true);
+          }}
+        />
       </div>
     </div>
   );

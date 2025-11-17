@@ -11,6 +11,7 @@ A simple and user-friendly time management application with Meeting Timer and Po
 ## 📋 Table of Contents
 
 - [Features](#features)
+- [📚 Documentation](#-documentation)
 - [User Guide](#user-guide)
   - [Getting Started](#getting-started)
   - [Meeting Timer](#meeting-timer)
@@ -47,6 +48,42 @@ A simple and user-friendly time management application with Meeting Timer and Po
 - ⚡ **Flash Alert**: Screen-wide white flashing for visual notification
 - 🔔 **Browser Notifications**: Alarm notifications even in background
 - 💾 **Auto-save**: Automatically save all settings and data (persists after closing browser)
+- ☁️ **Cloud Save (NEW!)**: Save TODO/Memo to cloud with user authentication
+  - Cross-device sync
+  - Supabase integration
+  - Secure data storage with Row Level Security
+  - REST API for third-party app integration
+
+---
+
+## 📚 Documentation
+
+Comprehensive guides for both users and developers:
+
+### For Users
+- **[User Guide](./docs/USER_GUIDE.md)** - Complete guide on how to use Comm Time
+  - Basic operations
+  - Meeting Timer usage
+  - Pomodoro Timer usage
+  - TODO and Memo features
+  - Cloud Save feature (NEW!)
+  - FAQ and troubleshooting
+
+### For Developers
+- **[Developer Guide](./docs/DEVELOPER_GUIDE.md)** - Technical documentation for developers
+  - Tech stack and project structure
+  - Development environment setup
+  - Supabase integration guide
+  - Implementation details
+  - Testing and deployment
+  - Troubleshooting
+
+### Supabase Setup
+- **[Supabase Setup Guide](./SUPABASE_SETUP.md)** - Step-by-step Supabase configuration
+  - Database schema
+  - Authentication setup
+  - Row Level Security (RLS)
+  - REST API usage
 
 ---
 
