@@ -6,6 +6,26 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CommTimeComponent } from '../components/comm-time';
 
+// Supabase hooks のモック
+jest.mock('../hooks/useSupabaseTodos', () => ({
+  useSupabaseTodos: () => ({
+    todos: [],
+    addTodo: jest.fn(),
+    removeTodo: jest.fn(),
+    toggleTodo: jest.fn(),
+    updateTodo: jest.fn(),
+    loading: false
+  })
+}));
+
+jest.mock('../hooks/useSupabaseMemos', () => ({
+  useSupabaseMemos: () => ({
+    memo: '',
+    updateMemo: jest.fn(),
+    loading: false
+  })
+}));
+
 // window.confirmのモック
 global.confirm = jest.fn(() => true);
 
@@ -36,9 +56,9 @@ describe('Bulk Delete Features', () => {
     localStorageMock.clear();
     (global.confirm as jest.Mock).mockClear();
     (global.confirm as jest.Mock).mockReturnValue(true);
-    // Supabase設定を無効にする（ローカルモードでテスト）
-    process.env.NEXT_PUBLIC_SUPABASE_URL = '';
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = '';
+    // Supabase設定をモック（テストのため）
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
   });
 
   describe('Clear All TODOs', () => {

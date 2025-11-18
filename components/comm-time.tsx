@@ -2721,6 +2721,7 @@ export function CommTimeComponent() {
                                           : "text-gray-400 hover:text-green-600 hover:bg-green-100"
                                       }`}
                                       title="完了/未完了"
+                                      aria-label="check"
                                     >
                                       <Check className="w-4 h-4" />
                                     </button>
@@ -2750,6 +2751,7 @@ export function CommTimeComponent() {
                                       }
                                       className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors duration-200"
                                       title="編集"
+                                      aria-label="edit"
                                     >
                                       <Edit className="w-4 h-4" />
                                     </button>
@@ -2763,6 +2765,7 @@ export function CommTimeComponent() {
                                       }
                                       className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors duration-200"
                                       title="削除"
+                                      aria-label="delete"
                                     >
                                       <X className="w-4 h-4" />
                                     </button>

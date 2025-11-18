@@ -6,6 +6,26 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CommTimeComponent } from '../components/comm-time';
 
+// Supabase hooks のモック
+jest.mock('../hooks/useSupabaseTodos', () => ({
+  useSupabaseTodos: () => ({
+    todos: [],
+    addTodo: jest.fn(),
+    removeTodo: jest.fn(),
+    toggleTodo: jest.fn(),
+    updateTodo: jest.fn(),
+    loading: false
+  })
+}));
+
+jest.mock('../hooks/useSupabaseMemos', () => ({
+  useSupabaseMemos: () => ({
+    memo: '',
+    updateMemo: jest.fn(),
+    loading: false
+  })
+}));
+
 // LocalStorageのモック
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -31,9 +51,9 @@ Object.defineProperty(window, 'localStorage', {
 describe('Database Sync Features', () => {
   beforeEach(() => {
     localStorageMock.clear();
-    // Supabase設定を無効にする（ローカルモードでテスト）
-    process.env.NEXT_PUBLIC_SUPABASE_URL = '';
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = '';
+    // Supabase設定をモック（テストのため）
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
   });
 
   describe('useDatabase persistence', () => {
@@ -73,7 +93,7 @@ describe('Database Sync Features', () => {
       });
 
       // ポモドーロタブに切り替え
-      const pomodoroTab = screen.getByText('Pomodoro Timer');
+      const pomodoroTab = screen.getByText(/ポモドーロ/);
       await act(async () => {
         await user.click(pomodoroTab);
       });
@@ -119,7 +139,7 @@ describe('Database Sync Features', () => {
       });
 
       // ポモドーロタブに切り替え
-      const pomodoroTab = screen.getByText('Pomodoro Timer');
+      const pomodoroTab = screen.getByText(/ポモドーロ/);
       await act(async () => {
         await user.click(pomodoroTab);
       });
@@ -152,7 +172,7 @@ describe('Database Sync Features', () => {
       });
 
       // ポモドーロタブに切り替え
-      const pomodoroTab = screen.getByText('Pomodoro Timer');
+      const pomodoroTab = screen.getByText(/ポモドーロ/);
       await act(async () => {
         await user.click(pomodoroTab);
       });
