@@ -181,7 +181,7 @@ export function CommTimeComponent() {
   const pomodoroMemo = sharedMemo;
   const setPomodoroMemo = setSharedMemo;
   const pomodoroTodos = sharedTodos;
-  const setPomodorTodos = setSharedTodos;
+  const setPomodoroTodos = setSharedTodos;
 
   // TODO関連の状態
   const [newMeetingTodo, setNewMeetingTodo] = useState("");
@@ -303,8 +303,8 @@ export function CommTimeComponent() {
       const oldMeetingTodos = getStorageValue("meetingTodos", []);
       const oldPomodoroTodos = getStorageValue("pomodoroTodos", []);
 
-      // より長いメモを優先
-      const migratedMemo = oldMeetingMemo.length > oldPomodoroMemo.length ? oldMeetingMemo : oldPomodoroMemo;
+      // 両方のメモを結合して保持（データを失わないため）
+      const migratedMemo = [oldMeetingMemo, oldPomodoroMemo].filter(Boolean).join("\n\n---\n\n");
 
       // TODOは両方を統合（重複を除く）
       const allTodos = [...oldMeetingTodos, ...oldPomodoroTodos];
@@ -1186,7 +1186,7 @@ export function CommTimeComponent() {
         };
 
         if (isPomodoro) {
-          setPomodorTodos((prev) => [...prev, newTodo]);
+          setPomodoroTodos((prev) => [...prev, newTodo]);
         } else {
           setMeetingTodos((prev) => [...prev, newTodo]);
         }
@@ -1212,7 +1212,7 @@ export function CommTimeComponent() {
           );
 
         if (isPomodoro) {
-          setPomodorTodos(updateTodos);
+          setPomodoroTodos(updateTodos);
         } else {
           setMeetingTodos(updateTodos);
         }
@@ -1233,7 +1233,7 @@ export function CommTimeComponent() {
       } else {
         // ローカルモード: LocalStorageを使用
         if (isPomodoro) {
-          setPomodorTodos((prev) => prev.filter((todo) => todo.id !== id));
+          setPomodoroTodos((prev) => prev.filter((todo) => todo.id !== id));
         } else {
           setMeetingTodos((prev) => prev.filter((todo) => todo.id !== id));
         }
@@ -1261,7 +1261,7 @@ export function CommTimeComponent() {
           );
 
         if (isPomodoro) {
-          setPomodorTodos(updateFunc);
+          setPomodoroTodos(updateFunc);
         } else {
           setMeetingTodos(updateFunc);
         }
@@ -1287,9 +1287,9 @@ export function CommTimeComponent() {
     if (useDatabase && user) {
       // データベースモード: すべてのTODOを削除
       const allTodos = sharedSupabaseTodos.todos;
-      for (const todo of allTodos) {
-        await sharedSupabaseTodos.removeTodo(todo.id);
-      }
+      // 複数の削除リクエストを並列で実行してパフォーマンスを向上させます
+      const removalPromises = allTodos.map(todo => sharedSupabaseTodos.removeTodo(todo.id));
+      await Promise.all(removalPromises);
     } else {
       // ローカルモード
       setSharedTodos([]);
@@ -1300,9 +1300,9 @@ export function CommTimeComponent() {
     if (useDatabase && user) {
       // データベースモード: 完了したTODOを削除
       const completedTodos = sharedSupabaseTodos.todos.filter(t => t.isCompleted);
-      for (const todo of completedTodos) {
-        await sharedSupabaseTodos.removeTodo(todo.id);
-      }
+      // 複数の削除リクエストを並列で実行してパフォーマンスを向上させます
+      const removalPromises = completedTodos.map(todo => sharedSupabaseTodos.removeTodo(todo.id));
+      await Promise.all(removalPromises);
     } else {
       // ローカルモード
       setSharedTodos(prev => prev.filter(todo => !todo.isCompleted));
@@ -1378,7 +1378,7 @@ export function CommTimeComponent() {
           );
 
         if (isPomodoro) {
-          setPomodorTodos(updateFunc);
+          setPomodoroTodos(updateFunc);
         } else {
           setMeetingTodos(updateFunc);
         }
@@ -1404,7 +1404,7 @@ export function CommTimeComponent() {
         });
 
       if (isPomodoro) {
-        setPomodorTodos(updateFunc);
+        setPomodoroTodos(updateFunc);
       } else {
         setMeetingTodos(updateFunc);
       }
@@ -1481,7 +1481,7 @@ export function CommTimeComponent() {
         if (sourceId === "meetingTodos") {
           setMeetingTodos(reorderedItems);
         } else {
-          setPomodorTodos(reorderedItems);
+          setPomodoroTodos(reorderedItems);
         }
       } else if (destId.startsWith("alarmPoint")) {
         // TODOをアラームポイントにリンク
