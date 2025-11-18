@@ -55,27 +55,51 @@ export type Profile = {
 export const auth = {
   // メールアドレスでサインアップ
   signUp: async (email: string, password: string) => {
+    if (!isConfigured) {
+      return {
+        data: { user: null, session: null },
+        error: new Error('Supabaseが設定されていません。環境変数を設定してください。\n\n詳細: https://supabase.com/dashboard でプロジェクトを作成し、NEXT_PUBLIC_SUPABASE_URLとNEXT_PUBLIC_SUPABASE_ANON_KEYを.env.local（開発環境）またはVercelの環境変数（本番環境）に設定してください。')
+      }
+    }
     return await supabase.auth.signUp({ email, password })
   },
 
   // メールアドレスでサインイン
   signIn: async (email: string, password: string) => {
+    if (!isConfigured) {
+      return {
+        data: { user: null, session: null },
+        error: new Error('Supabaseが設定されていません。環境変数を設定してください。\n\n詳細: https://supabase.com/dashboard でプロジェクトを作成し、NEXT_PUBLIC_SUPABASE_URLとNEXT_PUBLIC_SUPABASE_ANON_KEYを.env.local（開発環境）またはVercelの環境変数（本番環境）に設定してください。')
+      }
+    }
     return await supabase.auth.signInWithPassword({ email, password })
   },
 
   // サインアウト
   signOut: async () => {
+    if (!isConfigured) {
+      return { error: null }
+    }
     return await supabase.auth.signOut()
   },
 
   // 現在のユーザーを取得
   getCurrentUser: async () => {
+    if (!isConfigured) {
+      return null
+    }
     const { data: { user } } = await supabase.auth.getUser()
     return user
   },
 
   // 認証状態の変更を監視
   onAuthStateChange: (callback: (event: string, session: Session | null) => void) => {
+    if (!isConfigured) {
+      // 設定されていない場合は空のサブスクリプションを返す
+      return {
+        data: { subscription: { unsubscribe: () => {} } }
+      }
+    }
     return supabase.auth.onAuthStateChange(callback)
   },
 }
