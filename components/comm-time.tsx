@@ -1293,7 +1293,7 @@ export function CommTimeComponent() {
   }, [useDatabase, user, sharedSupabaseMemos]);
 
   // メモの更新機能
-  const handleMemoChange = useCallback((content: string, isPomodoro: boolean) => {
+  const handleMemoChange = useCallback(async (content: string, isPomodoro: boolean) => {
     // まずローカル状態を即座に更新（UX向上）
     if (isPomodoro) {
       setPomodoroMemo(content);
@@ -1304,7 +1304,7 @@ export function CommTimeComponent() {
     // データベースモードかつログイン済みの場合のみSupabaseに保存（共通メモ）
     if (useDatabase && user) {
       try {
-        sharedSupabaseMemos.saveMemo(content);
+        await sharedSupabaseMemos.saveMemo(content);
       } catch (error) {
         console.error("Error saving memo to Supabase:", error);
         // エラーが発生してもローカル状態は保持される
