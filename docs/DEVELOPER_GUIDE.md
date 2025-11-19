@@ -1,43 +1,46 @@
 # Comm Time - 開発者向けガイド
 
-Comm Timeアプリケーションの開発者向けドキュメントです。セットアップから実装の詳細、デプロイまでを網羅しています。
+Comm Time アプリケーションの開発者向けドキュメントです。セットアップから実装の詳細、デプロイまでを網羅しています。
 
 ## 目次
 
-- [技術スタック](#技術スタック)
-- [プロジェクト構造](#プロジェクト構造)
-- [環境構築](#環境構築)
-- [Supabaseセットアップ](#supabaseセットアップ)
-- [実装の詳細](#実装の詳細)
-- [開発ガイド](#開発ガイド)
-- [テスト](#テスト)
-- [デプロイ](#デプロイ)
-- [トラブルシューティング](#トラブルシューティング)
+-   [技術スタック](#技術スタック)
+-   [プロジェクト構造](#プロジェクト構造)
+-   [環境構築](#環境構築)
+-   [Supabase セットアップ](#supabaseセットアップ)
+-   [実装の詳細](#実装の詳細)
+-   [開発ガイド](#開発ガイド)
+-   [テスト](#テスト)
+-   [デプロイ](#デプロイ)
+-   [トラブルシューティング](#トラブルシューティング)
 
 ---
 
 ## 技術スタック
 
 ### フロントエンド
-- **フレームワーク**: Next.js 14.2.16 (App Router)
-- **言語**: TypeScript 5
-- **UIライブラリ**:
-  - React 18
-  - Radix UI (Dialog)
-  - Lucide React (Icons)
-- **スタイリング**: Tailwind CSS 3.4.1
-- **DnD**: react-beautiful-dnd 13.1.1
+
+-   **フレームワーク**: Next.js 14.2.16 (App Router)
+-   **言語**: TypeScript 5
+-   **UI ライブラリ**:
+    -   React 18
+    -   Radix UI (Dialog)
+    -   Lucide React (Icons)
+-   **スタイリング**: Tailwind CSS 3.4.1
+-   **DnD**: react-beautiful-dnd 13.1.1
 
 ### バックエンド/データベース
-- **BaaS**: Supabase
-- **データベース**: PostgreSQL (Supabase)
-- **認証**: Supabase Auth
-- **ストレージ**: LocalStorage + Supabase
+
+-   **BaaS**: Supabase
+-   **データベース**: PostgreSQL (Supabase)
+-   **認証**: Supabase Auth
+-   **ストレージ**: LocalStorage + Supabase
 
 ### 開発ツール
-- **パッケージマネージャー**: npm
-- **リンター**: ESLint
-- **テスト**: Jest + React Testing Library
+
+-   **パッケージマネージャー**: npm
+-   **リンター**: ESLint
+-   **テスト**: Jest + React Testing Library
 
 ---
 
@@ -92,9 +95,9 @@ comm-time/
 
 ### 1. 必要なソフトウェア
 
-- **Node.js**: v18.x 以上
-- **npm**: v8.x 以上
-- **Git**: v2.x 以上
+-   **Node.js**: v18.x 以上
+-   **npm**: v8.x 以上
+-   **Git**: v2.x 以上
 
 ### 2. リポジトリのクローン
 
@@ -134,19 +137,19 @@ npm run dev
 
 ---
 
-## Supabaseセットアップ
+## Supabase セットアップ
 
 詳細は [SUPABASE_SETUP.md](../SUPABASE_SETUP.md) を参照してください。
 
 ### クイックスタート
 
-#### 1. Supabaseプロジェクト作成
+#### 1. Supabase プロジェクト作成
 
 1. https://supabase.com でアカウント作成
 2. 新規プロジェクト作成
-   - **Name**: comm-time
-   - **Database Password**: 強力なパスワード
-   - **Region**: Northeast Asia (Tokyo)
+    - **Name**: comm-time
+    - **Database Password**: 強力なパスワード
+    - **Region**: Northeast Asia (Tokyo)
 
 #### 2. データベーススキーマ実行
 
@@ -158,8 +161,8 @@ npm run dev
 
 1. Supabase Dashboard → **Settings** → **API**
 2. 以下をコピー：
-   - **Project URL**
-   - **anon public key**
+    - **Project URL**
+    - **anon public key**
 
 #### 4. `.env.local` に設定
 
@@ -179,6 +182,7 @@ npm run dev
 #### テーブル構成
 
 **profiles** - ユーザープロフィール
+
 ```sql
 id          UUID PRIMARY KEY (auth.usersと連携)
 email       TEXT UNIQUE NOT NULL
@@ -187,6 +191,7 @@ updated_at  TIMESTAMP
 ```
 
 **memos** - メモデータ
+
 ```sql
 id          UUID PRIMARY KEY
 user_id     UUID REFERENCES profiles(id)
@@ -196,7 +201,8 @@ created_at  TIMESTAMP
 updated_at  TIMESTAMP
 ```
 
-**todos** - TODOリスト
+**todos** - TODO リスト
+
 ```sql
 id              UUID PRIMARY KEY
 user_id         UUID REFERENCES profiles(id)
@@ -213,7 +219,7 @@ updated_at      TIMESTAMP
 
 #### Row Level Security (RLS)
 
-すべてのテーブルでRLSが有効化されており、各ユーザーは自分のデータのみアクセス可能：
+すべてのテーブルで RLS が有効化されており、各ユーザーは自分のデータのみアクセス可能：
 
 ```sql
 -- 例: todos テーブルのポリシー
@@ -256,38 +262,42 @@ CREATE POLICY "Users can view own todos"
 
 #### 1. **CommTimeComponent** (`components/comm-time.tsx`)
 
-メインコンポーネント。すべてのタイマー機能とUIを管理。
+メインコンポーネント。すべてのタイマー機能と UI を管理。
 
 **主要機能**:
-- ミーティングタイマー
-- ポモドーロタイマー
-- カウントダウンモード
-- TODO管理
-- メモ管理
-- アラーム機能
-- ダークモード
+
+-   ミーティングタイマー
+-   ポモドーロタイマー
+-   カウントダウンモード
+-   TODO 管理
+-   メモ管理
+-   アラーム機能
+-   ダークモード
 
 **状態管理**:
-- React Hooks (useState, useEffect)
-- LocalStorageへの自動保存
-- Supabase連携準備済み
+
+-   React Hooks (useState, useEffect)
+-   LocalStorage への自動保存
+-   Supabase 連携準備済み
 
 #### 2. **AuthDialog** (`components/auth-dialog.tsx`)
 
 認証ダイアログコンポーネント。
 
 **機能**:
-- ログイン
-- サインアップ
-- エラーハンドリング
-- 成功時のコールバック
+
+-   ログイン
+-   サインアップ
+-   エラーハンドリング
+-   成功時のコールバック
 
 **使用例**:
+
 ```tsx
 <AuthDialog
-  open={authDialogOpen}
-  onOpenChange={setAuthDialogOpen}
-  onSuccess={() => setUseDatabase(true)}
+    open={authDialogOpen}
+    onOpenChange={setAuthDialogOpen}
+    onSuccess={() => setUseDatabase(true)}
 />
 ```
 
@@ -307,73 +317,69 @@ const { user, loading, isAuthenticated, signOut } = useAuth()
 ```
 
 **実装**:
-- 初回ロード時にユーザー情報取得
-- `onAuthStateChange` でリアルタイム監視
-- セッション管理
+
+-   初回ロード時にユーザー情報取得
+-   `onAuthStateChange` でリアルタイム監視
+-   セッション管理
 
 #### 2. **useSupabaseTodos** (`hooks/useSupabaseTodos.ts`)
 
-TODOのCRUD操作を行うフック。
+TODO の CRUD 操作を行うフック。
 
 ```typescript
 const {
-  todos,
-  loading,
-  error,
-  addTodo,
-  updateTodo,
-  removeTodo,
-  toggleTodo,
-  refreshTodos
+    todos,
+    loading,
+    error,
+    addTodo,
+    updateTodo,
+    removeTodo,
+    toggleTodo,
+    refreshTodos,
 } = useSupabaseTodos('meeting', user)
 ```
 
 **機能**:
-- TODOの取得（自動ソート）
-- TODOの追加
-- TODOの更新
-- TODOの削除
-- 完了状態の切り替え
-- リアルタイム同期
+
+-   TODO の取得（自動ソート）
+-   TODO の追加
+-   TODO の更新
+-   TODO の削除
+-   完了状態の切り替え
+-   リアルタイム同期
 
 **型変換**:
-- Supabase型 ↔ ローカル型の自動変換
-- 既存のcomm-time.tsxとの互換性維持
+
+-   Supabase 型 ↔ ローカル型の自動変換
+-   既存の comm-time.tsx との互換性維持
 
 #### 3. **useSupabaseMemos** (`hooks/useSupabaseMemos.ts`)
 
-メモのCRUD操作を行うフック。
+メモの CRUD 操作を行うフック。
 
 ```typescript
-const {
-  memo,
-  loading,
-  error,
-  saveMemo,
-  deleteMemo,
-  refreshMemo
-} = useSupabaseMemos('pomodoro', user)
+const { memo, loading, error, saveMemo, deleteMemo, refreshMemo } =
+    useSupabaseMemos('pomodoro', user)
 ```
 
 **機能**:
-- メモの取得
-- メモの保存（作成/更新を自動判定）
-- メモの削除
-- リアルタイム同期
 
-### Supabaseクライアント
+-   メモの取得
+-   メモの保存（作成/更新を自動判定）
+-   メモの削除
+-   リアルタイム同期
+
+### Supabase クライアント
 
 #### **lib/supabase.ts**
 
-Supabaseクライアントと認証ヘルパーを提供。
+Supabase クライアントと認証ヘルパーを提供。
 
 ```typescript
 import { supabase, auth } from '@/lib/supabase'
 
 // データベース操作
-const { data, error } = await supabase
-  .from('todos')
-  .select('*')
+const { data, error } = await supabase.from('todos').select('*')
 
 // 認証操作
 await auth.signUp(email, password)
@@ -383,9 +389,10 @@ const user = await auth.getCurrentUser()
 ```
 
 **提供する機能**:
-- Supabaseクライアントのシングルトン
-- 認証ヘルパー関数
-- 型定義
+
+-   Supabase クライアントのシングルトン
+-   認証ヘルパー関数
+-   型定義
 
 ---
 
@@ -393,14 +400,14 @@ const user = await auth.getCurrentUser()
 
 ### 新機能の追加
 
-#### TODO機能の拡張例
+#### TODO 機能の拡張例
 
 1. **型定義を更新** (`lib/supabase.ts`)
 
 ```typescript
 export type TodoItem = {
-  // ... 既存のフィールド
-  priority?: 'low' | 'medium' | 'high'  // 追加
+    // ... 既存のフィールド
+    priority?: 'low' | 'medium' | 'high' // 追加
 }
 ```
 
@@ -415,12 +422,12 @@ ALTER TABLE todos ADD COLUMN priority TEXT;
 
 ```typescript
 const convertToDb = (localTodo: Partial<LocalTodoItem>) => ({
-  // ... 既存のフィールド
-  priority: localTodo.priority,
+    // ... 既存のフィールド
+    priority: localTodo.priority,
 })
 ```
 
-4. **UIを更新** (`components/comm-time.tsx`)
+4. **UI を更新** (`components/comm-time.tsx`)
 
 ```tsx
 // priority選択UIを追加
@@ -429,21 +436,25 @@ const convertToDb = (localTodo: Partial<LocalTodoItem>) => ({
 ### コーディング規約
 
 #### TypeScript
-- strict モード有効
-- 明示的な型定義を推奨
-- `any` の使用を避ける
+
+-   strict モード有効
+-   明示的な型定義を推奨
+-   `any` の使用を避ける
 
 #### React
-- 関数コンポーネント使用
-- Hooks を活用
-- propsは型定義必須
+
+-   関数コンポーネント使用
+-   Hooks を活用
+-   props は型定義必須
 
 #### ファイル命名
-- コンポーネント: `PascalCase.tsx`
-- フック: `useHookName.ts`
-- ユーティリティ: `camelCase.ts`
+
+-   コンポーネント: `PascalCase.tsx`
+-   フック: `useHookName.ts`
+-   ユーティリティ: `camelCase.ts`
 
 #### コミットメッセージ
+
 ```
 feat: 新機能追加
 fix: バグ修正
@@ -486,10 +497,10 @@ import { render, screen } from '@testing-library/react'
 import { CommTimeComponent } from '@/components/comm-time'
 
 describe('CommTimeComponent', () => {
-  it('should render login button', () => {
-    render(<CommTimeComponent />)
-    expect(screen.getByText('ログイン')).toBeInTheDocument()
-  })
+    it('should render login button', () => {
+        render(<CommTimeComponent />)
+        expect(screen.getByText('ログイン')).toBeInTheDocument()
+    })
 })
 ```
 
@@ -497,9 +508,9 @@ describe('CommTimeComponent', () => {
 
 ## デプロイ
 
-### Vercelへのデプロイ
+### Vercel へのデプロイ
 
-#### 1. Vercelアカウント作成
+#### 1. Vercel アカウント作成
 
 https://vercel.com でアカウント作成
 
@@ -534,12 +545,14 @@ vercel --prod
 ### その他のプラットフォーム
 
 #### Netlify
+
 ```bash
 npm run build
 # outディレクトリをデプロイ
 ```
 
 #### 自前サーバー
+
 ```bash
 npm run build
 npm start
@@ -556,6 +569,7 @@ npm start
 **原因**: `.env.local` が設定されていない
 
 **解決方法**:
+
 ```bash
 cp .env.local.example .env.local
 # .env.local を編集して正しい値を設定
@@ -566,24 +580,27 @@ cp .env.local.example .env.local
 **原因**: メール確認が完了していない
 
 **解決方法**:
+
 1. メールボックスを確認
 2. 確認リンクをクリック
 3. 再度ログイン
 
 #### 3. データが同期されない
 
-**原因**: データベース連携がOFFになっている
+**原因**: データベース連携が OFF になっている
 
 **解決方法**:
+
 1. ログイン
 2. ヘッダーの「データベース」アイコンをクリック
 3. 緑色（ON）になっていることを確認
 
-#### 4. RLSエラー: "new row violates row-level security policy"
+#### 4. RLS エラー: "new row violates row-level security policy"
 
-**原因**: RLSポリシーが正しく設定されていない
+**原因**: RLS ポリシーが正しく設定されていない
 
 **解決方法**:
+
 ```sql
 -- Supabase SQL Editorで再実行
 -- supabase/migrations/001_init_schema.sql の内容
@@ -591,11 +608,12 @@ cp .env.local.example .env.local
 
 #### 5. リアルタイム同期が動作しない
 
-**原因**: Supabaseのリアルタイム機能が有効化されていない
+**原因**: Supabase のリアルタイム機能が有効化されていない
 
 **解決方法**:
+
 1. Supabase Dashboard → Database → Replication
-2. `todos` と `memos` テーブルのReplicationを有効化
+2. `todos` と `memos` テーブルの Replication を有効化
 
 ### デバッグ方法
 
@@ -625,16 +643,18 @@ console.log(data)
 ### 推奨事項
 
 1. **データベースインデックス**
-   - `(user_id, type)` の複合インデックス（実装済み）
-   - `order_index` のインデックス（実装済み）
+
+    - `(user_id, type)` の複合インデックス（実装済み）
+    - `order_index` のインデックス（実装済み）
 
 2. **キャッシング**
-   - LocalStorageでのオフラインキャッシュ
-   - Reactのメモ化（useMemo, useCallback）
+
+    - LocalStorage でのオフラインキャッシュ
+    - React のメモ化（useMemo, useCallback）
 
 3. **バンドルサイズ削減**
-   - 動的インポート
-   - Tree Shaking
+    - 動的インポート
+    - Tree Shaking
 
 ---
 
@@ -643,22 +663,24 @@ console.log(data)
 ### 実装済みのセキュリティ対策
 
 1. **Row Level Security (RLS)**
-   - ユーザーごとのデータ分離
-   - SQLインジェクション対策
+
+    - ユーザーごとのデータ分離
+    - SQL インジェクション対策
 
 2. **認証**
-   - Supabase Authによる安全な認証
-   - パスワードハッシュ化
+
+    - Supabase Auth による安全な認証
+    - パスワードハッシュ化
 
 3. **環境変数**
-   - `.env.local` はGit管理外
-   - `anon key` のみをクライアント公開
+    - `.env.local` は Git 管理外
+    - `anon key` のみをクライアント公開
 
 ### 注意事項
 
-- `service_role` キーは絶対に公開しない
-- CORS設定を適切に管理
-- XSS対策（Reactが自動処理）
+-   `service_role` キーは絶対に公開しない
+-   CORS 設定を適切に管理
+-   XSS 対策（React が自動処理）
 
 ---
 
@@ -666,14 +688,14 @@ console.log(data)
 
 ### 公式リソース
 
-- [Next.js ドキュメント](https://nextjs.org/docs)
-- [Supabase ドキュメント](https://supabase.com/docs)
-- [Tailwind CSS](https://tailwindcss.com/docs)
+-   [Next.js ドキュメント](https://nextjs.org/docs)
+-   [Supabase ドキュメント](https://supabase.com/docs)
+-   [Tailwind CSS](https://tailwindcss.com/docs)
 
 ### コミュニティ
 
-- GitHub Issues: https://github.com/BoxPistols/comm-time/issues
-- Discussions: https://github.com/BoxPistols/comm-time/discussions
+-   GitHub Issues: https://github.com/BoxPistols/comm-time/issues
+-   Discussions: https://github.com/BoxPistols/comm-time/discussions
 
 ---
 

@@ -84,6 +84,10 @@ Comprehensive guides for both users and developers:
   - Authentication setup
   - Row Level Security (RLS)
   - REST API usage
+- **[Vercel Environment Setup](./VERCEL_SETUP.md)** - Configure Supabase on Vercel
+  - Environment variables configuration
+  - Deployment setup
+  - Troubleshooting
 
 ---
 

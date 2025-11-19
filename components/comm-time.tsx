@@ -103,7 +103,18 @@ export function CommTimeComponent() {
   // 認証関連
   const { user, isAuthenticated, signOut } = useAuth();
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
-  const [useDatabase, setUseDatabase] = useState(false);
+  const [useDatabase, setUseDatabase] = useState(() => {
+    // ログイン状態かつSupabase設定済みの場合はデフォルトでON
+    if (typeof window !== "undefined" && isSupabaseConfigured) {
+      const saved = localStorage.getItem("useDatabase");
+      if (saved !== null) {
+        return JSON.parse(saved);
+      }
+      // 初期値: ログイン済みならtrue、未ログインならfalse
+      return isAuthenticated;
+    }
+    return false;
+  });
   // クライアントサイドのマウント状態
   const [showLoginButton, setShowLoginButton] = useState(false);
 
@@ -124,7 +135,16 @@ export function CommTimeComponent() {
 
   // 状態変数の定義
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>("meeting");
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    // ローカルストレージからアクティブタブを復元
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("activeTab");
+      if (saved && (saved === "meeting" || saved === "pomodoro")) {
+        return saved as TabType;
+      }
+    }
+    return "meeting";
+  });
 
   // ミーティングタイマー関連の状態
   const [isMeetingRunning, setIsMeetingRunning] = useState(false);
@@ -135,8 +155,16 @@ export function CommTimeComponent() {
   );
   const [meetingAlarmSettings, setMeetingAlarmSettings] =
     useState<AlarmSettings>(initialMeetingAlarmSettings);
-  const [meetingMemo, setMeetingMemo] = useState("");
-  const [meetingTodos, setMeetingTodos] = useState<TodoItem[]>([]);
+
+  // 共通のメモ/TODO（meeting/pomodoro共有）
+  const [sharedMemo, setSharedMemo] = useState("");
+  const [sharedTodos, setSharedTodos] = useState<TodoItem[]>([]);
+
+  // 後方互換性のため、共通データを参照するエイリアス
+  const meetingMemo = sharedMemo;
+  const setMeetingMemo = setSharedMemo;
+  const meetingTodos = sharedTodos;
+  const setMeetingTodos = setSharedTodos;
 
   // ポモドーロタイマー関連の状態
   const [isPomodoroRunning, setIsPomodoroRunning] = useState(false);
@@ -146,9 +174,14 @@ export function CommTimeComponent() {
   const [pomodoroSettings, setPomodoroSettings] = useState(
     initialPomodoroSettings
   );
-  const [pomodoroMemo, setPomodoroMemo] = useState("");
+
   const [pomodoroCycles, setPomodoroCycles] = useState(0);
-  const [pomodoroTodos, setPomodorTodos] = useState<TodoItem[]>([]);
+
+  // ポモドーロもShared Memo/TODOを参照
+  const pomodoroMemo = sharedMemo;
+  const setPomodoroMemo = setSharedMemo;
+  const pomodoroTodos = sharedTodos;
+  const setPomodoroTodos = setSharedTodos;
 
   // TODO関連の状態
   const [newMeetingTodo, setNewMeetingTodo] = useState("");
@@ -157,22 +190,21 @@ export function CommTimeComponent() {
   const [editingTodoText, setEditingTodoText] = useState("");
 
   // Supabaseフック（データベースモード有効時に使用）
-  const meetingSupabaseTodos = useSupabaseTodos(
+  // 共通データとして"meeting"タイプを使用（meeting/pomodoroで共有）
+  const sharedSupabaseTodos = useSupabaseTodos(
     "meeting",
     useDatabase ? user : null
   );
-  const pomodoroSupabaseTodos = useSupabaseTodos(
-    "pomodoro",
-    useDatabase ? user : null
-  );
-  const meetingSupabaseMemos = useSupabaseMemos(
+  const sharedSupabaseMemos = useSupabaseMemos(
     "meeting",
     useDatabase ? user : null
   );
-  const pomodoroSupabaseMemos = useSupabaseMemos(
-    "pomodoro",
-    useDatabase ? user : null
-  );
+
+  // 後方互換性のためのエイリアス
+  const meetingSupabaseTodos = sharedSupabaseTodos;
+  const pomodoroSupabaseTodos = sharedSupabaseTodos;
+  const meetingSupabaseMemos = sharedSupabaseMemos;
+  const pomodoroSupabaseMemos = sharedSupabaseMemos;
 
   // その他の状態
   const [forceFocus, setForceFocus] = useState(false);
@@ -252,13 +284,43 @@ export function CommTimeComponent() {
     setMeetingAlarmSettings(
       getStorageValue("meetingAlarmSettings", initialMeetingAlarmSettings)
     );
-    setMeetingMemo(getStorageValue("meetingMemo", ""));
-    setMeetingTodos(getStorageValue("meetingTodos", []));
     setPomodoroSettings(
       getStorageValue("pomodoroSettings", initialPomodoroSettings)
     );
-    setPomodoroMemo(getStorageValue("pomodoroMemo", ""));
-    setPomodorTodos(getStorageValue("pomodoroTodos", []));
+
+    // メモ/TODOのマイグレーション: 既存の分離データを共通データに統合
+    const savedSharedMemo = getStorageValue("sharedMemo", "");
+    const savedSharedTodos = getStorageValue("sharedTodos", []);
+
+    if (savedSharedMemo || savedSharedTodos.length > 0) {
+      // すでに共通データが存在する場合はそれを使用
+      setSharedMemo(savedSharedMemo);
+      setSharedTodos(savedSharedTodos);
+    } else {
+      // 既存のmeeting/pomodoroデータをマイグレーション
+      const oldMeetingMemo = getStorageValue("meetingMemo", "");
+      const oldPomodoroMemo = getStorageValue("pomodoroMemo", "");
+      const oldMeetingTodos = getStorageValue("meetingTodos", []);
+      const oldPomodoroTodos = getStorageValue("pomodoroTodos", []);
+
+      // 両方のメモを結合して保持（データを失わないため）
+      const migratedMemo = [oldMeetingMemo, oldPomodoroMemo].filter(Boolean).join("\n\n---\n\n");
+
+      // TODOは両方を統合（重複を除く）
+      const allTodos = [...oldMeetingTodos, ...oldPomodoroTodos];
+      const uniqueTodos = allTodos.filter((todo, index, self) =>
+        index === self.findIndex((t) => t.id === todo.id)
+      );
+
+      setSharedMemo(migratedMemo);
+      setSharedTodos(uniqueTodos);
+
+      // マイグレーション完了後、共通データとして保存
+      if (typeof window !== "undefined") {
+        localStorage.setItem("sharedMemo", migratedMemo);
+        localStorage.setItem("sharedTodos", JSON.stringify(uniqueTodos));
+      }
+    }
     setNotificationsEnabled(getStorageValue("notificationsEnabled", false));
     setVibrationEnabled(getStorageValue("vibrationEnabled", true));
     setCountdownMode(getStorageValue("countdownMode", false));
@@ -327,10 +389,9 @@ export function CommTimeComponent() {
         "pomodoroSettings",
         JSON.stringify(pomodoroSettings)
       );
-      localStorage.setItem("meetingMemo", meetingMemo);
-      localStorage.setItem("pomodoroMemo", pomodoroMemo);
-      localStorage.setItem("meetingTodos", JSON.stringify(meetingTodos));
-      localStorage.setItem("pomodoroTodos", JSON.stringify(pomodoroTodos));
+      // 共通のメモ/TODOとして保存
+      localStorage.setItem("sharedMemo", sharedMemo);
+      localStorage.setItem("sharedTodos", JSON.stringify(sharedTodos));
       localStorage.setItem(
         "notificationsEnabled",
         JSON.stringify(notificationsEnabled)
@@ -348,6 +409,8 @@ export function CommTimeComponent() {
       localStorage.setItem("tickSoundVolume", JSON.stringify(tickSoundVolume));
       localStorage.setItem("flashEnabled", JSON.stringify(flashEnabled));
       localStorage.setItem("darkMode", JSON.stringify(darkMode));
+      localStorage.setItem("useDatabase", JSON.stringify(useDatabase));
+      localStorage.setItem("activeTab", activeTab);
 
       // 初期値設定の保存
       localStorage.setItem(
@@ -384,10 +447,8 @@ export function CommTimeComponent() {
     alarmPoints,
     meetingAlarmSettings,
     pomodoroSettings,
-    meetingMemo,
-    pomodoroMemo,
-    meetingTodos,
-    pomodoroTodos,
+    sharedMemo,
+    sharedTodos,
     notificationsEnabled,
     vibrationEnabled,
     countdownMode,
@@ -396,6 +457,8 @@ export function CommTimeComponent() {
     tickSoundVolume,
     flashEnabled,
     darkMode,
+    useDatabase,
+    activeTab,
     defaultMeetingAlarmSettings,
     defaultMeetingAlarmPoints,
     defaultPomodoroWorkDuration,
@@ -406,66 +469,36 @@ export function CommTimeComponent() {
   ]);
 
   // Supabaseデータの同期（データベースモード有効時）
+  // 共通データとして1つのuseEffectで同期
   useEffect(() => {
     if (useDatabase && user) {
-      // ミーティングTODOsをSupabaseから同期
+      // TODOsをSupabaseから同期
       if (
-        meetingSupabaseTodos.todos.length > 0 ||
-        !meetingSupabaseTodos.loading
+        sharedSupabaseTodos.todos.length > 0 ||
+        !sharedSupabaseTodos.loading
       ) {
-        setMeetingTodos(meetingSupabaseTodos.todos);
+        setSharedTodos(sharedSupabaseTodos.todos);
       }
     }
   }, [
     useDatabase,
     user,
-    meetingSupabaseTodos.todos,
-    meetingSupabaseTodos.loading,
+    sharedSupabaseTodos.todos,
+    sharedSupabaseTodos.loading,
   ]);
 
   useEffect(() => {
     if (useDatabase && user) {
-      // ポモドーロTODOsをSupabaseから同期
-      if (
-        pomodoroSupabaseTodos.todos.length > 0 ||
-        !pomodoroSupabaseTodos.loading
-      ) {
-        setPomodorTodos(pomodoroSupabaseTodos.todos);
+      // メモをSupabaseから同期
+      if (!sharedSupabaseMemos.loading) {
+        setSharedMemo(sharedSupabaseMemos.memo);
       }
     }
   }, [
     useDatabase,
     user,
-    pomodoroSupabaseTodos.todos,
-    pomodoroSupabaseTodos.loading,
-  ]);
-
-  useEffect(() => {
-    if (useDatabase && user) {
-      // ミーティングメモをSupabaseから同期
-      if (!meetingSupabaseMemos.loading) {
-        setMeetingMemo(meetingSupabaseMemos.memo);
-      }
-    }
-  }, [
-    useDatabase,
-    user,
-    meetingSupabaseMemos.memo,
-    meetingSupabaseMemos.loading,
-  ]);
-
-  useEffect(() => {
-    if (useDatabase && user) {
-      // ポモドーロメモをSupabaseから同期
-      if (!pomodoroSupabaseMemos.loading) {
-        setPomodoroMemo(pomodoroSupabaseMemos.memo);
-      }
-    }
-  }, [
-    useDatabase,
-    user,
-    pomodoroSupabaseMemos.memo,
-    pomodoroSupabaseMemos.loading,
+    sharedSupabaseMemos.memo,
+    sharedSupabaseMemos.loading,
   ]);
 
   // ダークモード適用
@@ -1153,7 +1186,7 @@ export function CommTimeComponent() {
         };
 
         if (isPomodoro) {
-          setPomodorTodos((prev) => [...prev, newTodo]);
+          setPomodoroTodos((prev) => [...prev, newTodo]);
         } else {
           setMeetingTodos((prev) => [...prev, newTodo]);
         }
@@ -1179,7 +1212,7 @@ export function CommTimeComponent() {
           );
 
         if (isPomodoro) {
-          setPomodorTodos(updateTodos);
+          setPomodoroTodos(updateTodos);
         } else {
           setMeetingTodos(updateTodos);
         }
@@ -1200,7 +1233,7 @@ export function CommTimeComponent() {
       } else {
         // ローカルモード: LocalStorageを使用
         if (isPomodoro) {
-          setPomodorTodos((prev) => prev.filter((todo) => todo.id !== id));
+          setPomodoroTodos((prev) => prev.filter((todo) => todo.id !== id));
         } else {
           setMeetingTodos((prev) => prev.filter((todo) => todo.id !== id));
         }
@@ -1228,7 +1261,7 @@ export function CommTimeComponent() {
           );
 
         if (isPomodoro) {
-          setPomodorTodos(updateFunc);
+          setPomodoroTodos(updateFunc);
         } else {
           setMeetingTodos(updateFunc);
         }
@@ -1248,6 +1281,43 @@ export function CommTimeComponent() {
     setEditingTodoId(null);
     setEditingTodoText("");
   }, []);
+
+  // 一括削除機能
+  const clearAllTodos = useCallback(async () => {
+    if (useDatabase && user) {
+      // データベースモード: すべてのTODOを削除
+      const allTodos = sharedSupabaseTodos.todos;
+      // 複数の削除リクエストを並列で実行してパフォーマンスを向上させます
+      const removalPromises = allTodos.map(todo => sharedSupabaseTodos.removeTodo(todo.id));
+      await Promise.all(removalPromises);
+    } else {
+      // ローカルモード
+      setSharedTodos([]);
+    }
+  }, [useDatabase, user, sharedSupabaseTodos]);
+
+  const clearCompletedTodos = useCallback(async () => {
+    if (useDatabase && user) {
+      // データベースモード: 完了したTODOを削除
+      const completedTodos = sharedSupabaseTodos.todos.filter(t => t.isCompleted);
+      // 複数の削除リクエストを並列で実行してパフォーマンスを向上させます
+      const removalPromises = completedTodos.map(todo => sharedSupabaseTodos.removeTodo(todo.id));
+      await Promise.all(removalPromises);
+    } else {
+      // ローカルモード
+      setSharedTodos(prev => prev.filter(todo => !todo.isCompleted));
+    }
+  }, [useDatabase, user, sharedSupabaseTodos]);
+
+  const clearMemo = useCallback(async () => {
+    if (useDatabase && user) {
+      // データベースモード
+      await sharedSupabaseMemos.saveMemo("");
+    } else {
+      // ローカルモード
+      setSharedMemo("");
+    }
+  }, [useDatabase, user, sharedSupabaseMemos]);
 
   // メモの更新機能
   const handleMemoChange = useCallback((content: string, isPomodoro: boolean) => {
@@ -1308,7 +1378,7 @@ export function CommTimeComponent() {
           );
 
         if (isPomodoro) {
-          setPomodorTodos(updateFunc);
+          setPomodoroTodos(updateFunc);
         } else {
           setMeetingTodos(updateFunc);
         }
@@ -1334,7 +1404,7 @@ export function CommTimeComponent() {
         });
 
       if (isPomodoro) {
-        setPomodorTodos(updateFunc);
+        setPomodoroTodos(updateFunc);
       } else {
         setMeetingTodos(updateFunc);
       }
@@ -1411,7 +1481,7 @@ export function CommTimeComponent() {
         if (sourceId === "meetingTodos") {
           setMeetingTodos(reorderedItems);
         } else {
-          setPomodorTodos(reorderedItems);
+          setPomodoroTodos(reorderedItems);
         }
       } else if (destId.startsWith("alarmPoint")) {
         // TODOをアラームポイントにリンク
@@ -2342,9 +2412,23 @@ export function CommTimeComponent() {
           <div className="w-full lg:w-1/3">
             {/* メモセクション */}
             <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 mb-4 border border-white/20 dark:border-gray-700/20">
-              <h3 className="text-base sm:text-lg font-bold mb-3 sm:mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
-                📝 メモ
-              </h3>
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <h3 className="text-base sm:text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
+                  📝 メモ
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm("メモをクリアしますか？")) {
+                      clearMemo();
+                    }
+                  }}
+                  className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50"
+                  title="メモをクリア"
+                >
+                  クリア
+                </button>
+              </div>
               <textarea
                 value={activeTab === "meeting" ? meetingMemo : pomodoroMemo}
                 onChange={(e) =>
@@ -2361,19 +2445,45 @@ export function CommTimeComponent() {
                 <h3 className="text-base sm:text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
                   ✅ TODOリスト
                 </h3>
-                <button
-                  type="button"
-                  onClick={() => setSortByDeadline(!sortByDeadline)}
-                  className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1 ${
-                    sortByDeadline
-                      ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md"
-                      : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-                  }`}
-                  title="期限順にソート"
-                >
-                  <Calendar className="w-3 h-3" />
-                  期限順
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSortByDeadline(!sortByDeadline)}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1 ${
+                      sortByDeadline
+                        ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md"
+                        : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                    }`}
+                    title="期限順にソート"
+                  >
+                    <Calendar className="w-3 h-3" />
+                    期限順
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm("完了したTODOを削除しますか？")) {
+                        clearCompletedTodos();
+                      }
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50"
+                    title="完了済みを削除"
+                  >
+                    完了削除
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm("すべてのTODOを削除しますか？この操作は取り消せません。")) {
+                        clearAllTodos();
+                      }
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50"
+                    title="すべて削除"
+                  >
+                    全削除
+                  </button>
+                </div>
               </div>
 
               <DragDropContext onDragEnd={onDragEnd}>
@@ -2611,6 +2721,7 @@ export function CommTimeComponent() {
                                           : "text-gray-400 hover:text-green-600 hover:bg-green-100"
                                       }`}
                                       title="完了/未完了"
+                                      aria-label="check"
                                     >
                                       <Check className="w-4 h-4" />
                                     </button>
@@ -2640,6 +2751,7 @@ export function CommTimeComponent() {
                                       }
                                       className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors duration-200"
                                       title="編集"
+                                      aria-label="edit"
                                     >
                                       <Edit className="w-4 h-4" />
                                     </button>
@@ -2653,6 +2765,7 @@ export function CommTimeComponent() {
                                       }
                                       className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors duration-200"
                                       title="削除"
+                                      aria-label="delete"
                                     >
                                       <X className="w-4 h-4" />
                                     </button>
