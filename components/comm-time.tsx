@@ -190,21 +190,9 @@ export function CommTimeComponent() {
   const [editingTodoText, setEditingTodoText] = useState("");
 
   // Supabaseフック（データベースモード有効時に使用）
-  // 共通データとして"meeting"タイプを使用（meeting/pomodoroで共有）
-  const sharedSupabaseTodos = useSupabaseTodos(
-    "meeting",
-    useDatabase ? user : null
-  );
-  const sharedSupabaseMemos = useSupabaseMemos(
-    "meeting",
-    useDatabase ? user : null
-  );
-
-  // 後方互換性のためのエイリアス
-  const meetingSupabaseTodos = sharedSupabaseTodos;
-  const pomodoroSupabaseTodos = sharedSupabaseTodos;
-  const meetingSupabaseMemos = sharedSupabaseMemos;
-  const pomodoroSupabaseMemos = sharedSupabaseMemos;
+  // メモ・TODOは共通化されているため、meeting/pomodoroの区別なし
+  const sharedSupabaseTodos = useSupabaseTodos(useDatabase ? user : null);
+  const sharedSupabaseMemos = useSupabaseMemos(useDatabase ? user : null);
 
   // その他の状態
   const [forceFocus, setForceFocus] = useState(false);
@@ -1171,12 +1159,8 @@ export function CommTimeComponent() {
       if (!text.trim()) return; // 空のTODOは追加しない
 
       if (useDatabase && user) {
-        // データベースモード: Supabaseを使用
-        if (isPomodoro) {
-          pomodoroSupabaseTodos.addTodo(text.trim());
-        } else {
-          meetingSupabaseTodos.addTodo(text.trim());
-        }
+        // データベースモード: Supabaseを使用（共通TODO）
+        sharedSupabaseTodos.addTodo(text.trim());
       } else {
         // ローカルモード: LocalStorageを使用
         const newTodo = {
@@ -1185,6 +1169,7 @@ export function CommTimeComponent() {
           isCompleted: false,
         };
 
+        // LocalStorageモードでは個別に保存（後方互換性のため）
         if (isPomodoro) {
           setPomodoroTodos((prev) => [...prev, newTodo]);
         } else {
@@ -1192,20 +1177,16 @@ export function CommTimeComponent() {
         }
       }
     },
-    [useDatabase, user, pomodoroSupabaseTodos, meetingSupabaseTodos]
+    [useDatabase, user, sharedSupabaseTodos]
   );
 
   const toggleTodo = useCallback(
     (id: string, isPomodoro: boolean) => {
       if (useDatabase && user) {
-        // データベースモード: Supabaseを使用
-        if (isPomodoro) {
-          pomodoroSupabaseTodos.toggleTodo(id);
-        } else {
-          meetingSupabaseTodos.toggleTodo(id);
-        }
+        // データベースモード: Supabaseを使用（共通TODO）
+        sharedSupabaseTodos.toggleTodo(id);
       } else {
-        // ローカルモード: LocalStorageを使用
+        // ローカルモード: LocalStorageを使用（個別に保存）
         const updateTodos = (prev: TodoItem[]) =>
           prev.map((todo) =>
             todo.id === id ? { ...todo, isCompleted: !todo.isCompleted } : todo
@@ -1218,20 +1199,16 @@ export function CommTimeComponent() {
         }
       }
     },
-    [useDatabase, user, pomodoroSupabaseTodos, meetingSupabaseTodos]
+    [useDatabase, user, sharedSupabaseTodos]
   );
 
   const removeTodo = useCallback(
     (id: string, isPomodoro: boolean) => {
       if (useDatabase && user) {
-        // データベースモード: Supabaseを使用
-        if (isPomodoro) {
-          pomodoroSupabaseTodos.removeTodo(id);
-        } else {
-          meetingSupabaseTodos.removeTodo(id);
-        }
+        // データベースモード: Supabaseを使用（共通TODO）
+        sharedSupabaseTodos.removeTodo(id);
       } else {
-        // ローカルモード: LocalStorageを使用
+        // ローカルモード: LocalStorageを使用（個別に保存）
         if (isPomodoro) {
           setPomodoroTodos((prev) => prev.filter((todo) => todo.id !== id));
         } else {
@@ -1239,7 +1216,7 @@ export function CommTimeComponent() {
         }
       }
     },
-    [useDatabase, user, pomodoroSupabaseTodos, meetingSupabaseTodos]
+    [useDatabase, user, sharedSupabaseTodos]
   );
 
   const updateTodo = useCallback(
@@ -1247,14 +1224,10 @@ export function CommTimeComponent() {
       if (!newText.trim()) return; // 空のテキストの場合は更新しない
 
       if (useDatabase && user) {
-        // データベースモード: Supabaseを使用
-        if (isPomodoro) {
-          pomodoroSupabaseTodos.updateTodo(id, { text: newText.trim() });
-        } else {
-          meetingSupabaseTodos.updateTodo(id, { text: newText.trim() });
-        }
+        // データベースモード: Supabaseを使用（共通TODO）
+        sharedSupabaseTodos.updateTodo(id, { text: newText.trim() });
       } else {
-        // ローカルモード: LocalStorageを使用
+        // ローカルモード: LocalStorageを使用（個別に保存）
         const updateFunc = (prev: TodoItem[]) =>
           prev.map((todo) =>
             todo.id === id ? { ...todo, text: newText.trim() } : todo
@@ -1269,7 +1242,7 @@ export function CommTimeComponent() {
       setEditingTodoId(null);
       setEditingTodoText("");
     },
-    [useDatabase, user, pomodoroSupabaseTodos, meetingSupabaseTodos]
+    [useDatabase, user, sharedSupabaseTodos]
   );
 
   const startEditingTodo = useCallback((id: string, text: string) => {
@@ -1328,20 +1301,16 @@ export function CommTimeComponent() {
       setMeetingMemo(content);
     }
 
-    // データベースモードかつログイン済みの場合のみSupabaseに保存
+    // データベースモードかつログイン済みの場合のみSupabaseに保存（共通メモ）
     if (useDatabase && user) {
       try {
-        if (isPomodoro) {
-          pomodoroSupabaseMemos.saveMemo(content);
-        } else {
-          meetingSupabaseMemos.saveMemo(content);
-        }
+        sharedSupabaseMemos.saveMemo(content);
       } catch (error) {
         console.error("Error saving memo to Supabase:", error);
         // エラーが発生してもローカル状態は保持される
       }
     }
-  }, [useDatabase, user, pomodoroSupabaseMemos, meetingSupabaseMemos]);
+  }, [useDatabase, user, sharedSupabaseMemos]);
 
   // TODOとアラームポイントのリンク機能
   const linkTodoToAlarmPoint = useCallback(
@@ -1364,14 +1333,10 @@ export function CommTimeComponent() {
       isPomodoro: boolean
     ) => {
       if (useDatabase && user) {
-        // データベースモード: Supabaseを使用
-        if (isPomodoro) {
-          pomodoroSupabaseTodos.updateTodo(id, { dueDate, dueTime });
-        } else {
-          meetingSupabaseTodos.updateTodo(id, { dueDate, dueTime });
-        }
+        // データベースモード: Supabaseを使用（共通TODO）
+        sharedSupabaseTodos.updateTodo(id, { dueDate, dueTime });
       } else {
-        // ローカルモード: LocalStorageを使用
+        // ローカルモード: LocalStorageを使用（個別に保存）
         const updateFunc = (prev: TodoItem[]) =>
           prev.map((todo) =>
             todo.id === id ? { ...todo, dueDate, dueTime } : todo
@@ -1384,7 +1349,7 @@ export function CommTimeComponent() {
         }
       }
     },
-    [useDatabase, user, pomodoroSupabaseTodos, meetingSupabaseTodos]
+    [useDatabase, user, sharedSupabaseTodos]
   );
 
   // 期限延長機能
