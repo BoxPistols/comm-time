@@ -40,8 +40,20 @@ const mockUser: User = {
 };
 
 describe('Supabase Integration Tests', () => {
+  // 共通のチャンネルモック
+  let mockOn: jest.Mock;
+  let mockSubscribe: jest.Mock;
+
   beforeEach(() => {
     jest.clearAllMocks();
+
+    // チャンネルモックを共通設定
+    mockOn = jest.fn().mockReturnThis();
+    mockSubscribe = jest.fn().mockReturnValue({});
+    mockSupabaseClient.channel.mockReturnValue({
+      on: mockOn,
+      subscribe: mockSubscribe,
+    });
   });
 
   describe('useSupabaseMemos', () => {
@@ -74,14 +86,6 @@ describe('Supabase Integration Tests', () => {
           data: null,
           error: null,
         }),
-      });
-
-      // チャンネルのモック
-      const mockOn = jest.fn().mockReturnThis();
-      const mockSubscribe = jest.fn().mockReturnValue({});
-      mockSupabaseClient.channel.mockReturnValue({
-        on: mockOn,
-        subscribe: mockSubscribe,
       });
 
       // テスト用のコンポーネント
@@ -145,14 +149,6 @@ describe('Supabase Integration Tests', () => {
         maybeSingle: mockMaybeSingle,
       });
 
-      // チャンネルのモック
-      const mockOn = jest.fn().mockReturnThis();
-      const mockSubscribe = jest.fn().mockReturnValue({});
-      mockSupabaseClient.channel.mockReturnValue({
-        on: mockOn,
-        subscribe: mockSubscribe,
-      });
-
       // テスト用のコンポーネント
       const TestComponent = () => {
         const { memo, loading } = useSupabaseMemos(mockUser);
@@ -199,14 +195,6 @@ describe('Supabase Integration Tests', () => {
           data: null,
           error: null,
         }),
-      });
-
-      // チャンネルのモック
-      const mockOn = jest.fn().mockReturnThis();
-      const mockSubscribe = jest.fn().mockReturnValue({});
-      mockSupabaseClient.channel.mockReturnValue({
-        on: mockOn,
-        subscribe: mockSubscribe,
       });
 
       // コンソールエラーのモック
@@ -274,14 +262,6 @@ describe('Supabase Integration Tests', () => {
         order: jest.fn().mockReturnThis(),
       });
 
-      // チャンネルのモック
-      const mockOn = jest.fn().mockReturnThis();
-      const mockSubscribe = jest.fn().mockReturnValue({});
-      mockSupabaseClient.channel.mockReturnValue({
-        on: mockOn,
-        subscribe: mockSubscribe,
-      });
-
       const TestComponent = () => {
         const { todos, addTodo } = useSupabaseTodos(mockUser);
 
@@ -326,7 +306,12 @@ describe('Supabase Integration Tests', () => {
         updated_at: new Date().toISOString(),
       };
 
-      // モックの設定 - 初期取得用
+      // 更新用モックを事前に定義
+      const mockUpdate = jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnThis(),
+      });
+
+      // モックの設定 - updateを含めて初期設定
       mockSupabaseClient.from.mockReturnValue({
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
@@ -334,17 +319,7 @@ describe('Supabase Integration Tests', () => {
           data: [mockTodoData],
           error: null,
         }),
-        update: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnThis(),
-        }),
-      });
-
-      // チャンネルのモック
-      const mockOn = jest.fn().mockReturnThis();
-      const mockSubscribe = jest.fn().mockReturnValue({});
-      mockSupabaseClient.channel.mockReturnValue({
-        on: mockOn,
-        subscribe: mockSubscribe,
+        update: mockUpdate,
       });
 
       const TestComponent = () => {
@@ -368,14 +343,6 @@ describe('Supabase Integration Tests', () => {
       await waitFor(() => {
         const todoCount = screen.getByTestId('todo-count');
         expect(todoCount).toHaveTextContent('1');
-      });
-
-      // 更新用のモックを再設定
-      const mockUpdate = jest.fn().mockReturnValue({
-        eq: jest.fn().mockReturnThis(),
-      });
-      mockSupabaseClient.from.mockReturnValue({
-        update: mockUpdate,
       });
 
       const completeButton = screen.getByText('Complete Todo');
@@ -405,7 +372,12 @@ describe('Supabase Integration Tests', () => {
         updated_at: new Date().toISOString(),
       };
 
-      // モックの設定 - 初期取得用
+      // 削除用モックを事前に定義
+      const mockDelete = jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnThis(),
+      });
+
+      // モックの設定 - deleteを含めて初期設定
       mockSupabaseClient.from.mockReturnValue({
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
@@ -413,17 +385,7 @@ describe('Supabase Integration Tests', () => {
           data: [mockTodoData],
           error: null,
         }),
-        delete: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnThis(),
-        }),
-      });
-
-      // チャンネルのモック
-      const mockOn = jest.fn().mockReturnThis();
-      const mockSubscribe = jest.fn().mockReturnValue({});
-      mockSupabaseClient.channel.mockReturnValue({
-        on: mockOn,
-        subscribe: mockSubscribe,
+        delete: mockDelete,
       });
 
       const TestComponent = () => {
@@ -447,14 +409,6 @@ describe('Supabase Integration Tests', () => {
       await waitFor(() => {
         const todoCount = screen.getByTestId('todo-count');
         expect(todoCount).toHaveTextContent('1');
-      });
-
-      // 削除用のモックを再設定
-      const mockDelete = jest.fn().mockReturnValue({
-        eq: jest.fn().mockReturnThis(),
-      });
-      mockSupabaseClient.from.mockReturnValue({
-        delete: mockDelete,
       });
 
       const deleteButton = screen.getByText('Delete Todo');
@@ -514,14 +468,6 @@ describe('Supabase Integration Tests', () => {
           };
         }
         return {};
-      });
-
-      // チャンネルのモック
-      const mockOn = jest.fn().mockReturnThis();
-      const mockSubscribe = jest.fn().mockReturnValue({});
-      mockSupabaseClient.channel.mockReturnValue({
-        on: mockOn,
-        subscribe: mockSubscribe,
       });
 
       const TestComponent = () => {
