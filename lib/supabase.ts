@@ -24,7 +24,6 @@ export { isConfigured as isSupabaseConfigured }
 export type TodoItem = {
   id: string
   user_id: string
-  type: 'meeting' | 'pomodoro'
   text: string
   is_completed: boolean
   due_date?: string
@@ -38,7 +37,6 @@ export type TodoItem = {
 export type Memo = {
   id: string
   user_id: string
-  type: 'meeting' | 'pomodoro'
   content: string
   created_at: string
   updated_at: string
