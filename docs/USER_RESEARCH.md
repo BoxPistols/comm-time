@@ -733,6 +733,7 @@
 | | ビジュアルリグレッション | ✅ 完了 | 12テスト |
 | **パフォーマンス** | 初回ロード時間 | ✅ 確認 | 目標: 3秒以内 |
 | | LCP (Largest Contentful Paint) | ⬜ 要確認 | 目標: 2.5秒以内 |
+| | INP (Interaction to Next Paint) | ⬜ 要確認 | 目標: 200ms以内 |
 | | CLS (Cumulative Layout Shift) | ⬜ 要確認 | 目標: 0.1以下 |
 | **ブラウザ対応** | Chrome | ✅ 確認 | 最新版 |
 | | Safari | ⬜ 要確認 | 最新版 |
