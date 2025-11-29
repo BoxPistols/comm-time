@@ -23,7 +23,6 @@ import {
   Sun,
   LogIn,
   LogOut,
-  User,
   Database,
 } from "lucide-react";
 import {
@@ -161,8 +160,6 @@ export function CommTimeComponent() {
   const [sharedTodos, setSharedTodos] = useState<TodoItem[]>([]);
 
   // 後方互換性のため、共通データを参照するエイリアス
-  const meetingMemo = sharedMemo;
-  const setMeetingMemo = setSharedMemo;
   const meetingTodos = sharedTodos;
   const setMeetingTodos = setSharedTodos;
 
@@ -177,17 +174,12 @@ export function CommTimeComponent() {
 
   const [pomodoroCycles, setPomodoroCycles] = useState(0);
 
-  // ポモドーロもShared Memo/TODOを参照
-  const pomodoroMemo = sharedMemo;
-  const setPomodoroMemo = setSharedMemo;
+  // ポモドーロもShared TODOを参照
   const pomodoroTodos = sharedTodos;
   const setPomodoroTodos = setSharedTodos;
 
   // TODO関連の状態
-  const [newMeetingTodo, setNewMeetingTodo] = useState("");
-  const [newPomodoroTodo, setNewPomodoroTodo] = useState("");
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
-  const [editingTodoText, setEditingTodoText] = useState("");
 
   // Supabaseフック（データベースモード有効時に使用）
   // メモ・TODOは共通化されているため、meeting/pomodoroの区別なし
@@ -254,6 +246,9 @@ export function CommTimeComponent() {
 
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
+  const editingInputRef = useRef<HTMLInputElement>(null);
+  const memoTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const isComposingRef = useRef(false); // 日本語入力（IME）変換中フラグ
 
   // クライアントサイドの初期化（Hydration error回避）
   useEffect(() => {
@@ -480,6 +475,14 @@ export function CommTimeComponent() {
       // メモをSupabaseから同期
       if (!sharedSupabaseMemos.loading) {
         setSharedMemo(sharedSupabaseMemos.memo);
+        // textareaにフォーカスがなく、composing中でない場合のみ更新
+        if (
+          memoTextareaRef.current &&
+          document.activeElement !== memoTextareaRef.current &&
+          !isComposingRef.current
+        ) {
+          memoTextareaRef.current.value = sharedSupabaseMemos.memo;
+        }
       }
     }
   }, [
@@ -1240,19 +1243,16 @@ export function CommTimeComponent() {
         }
       }
       setEditingTodoId(null);
-      setEditingTodoText("");
     },
     [useDatabase, user, sharedSupabaseTodos]
   );
 
-  const startEditingTodo = useCallback((id: string, text: string) => {
+  const startEditingTodo = useCallback((id: string) => {
     setEditingTodoId(id);
-    setEditingTodoText(text);
   }, []);
 
   const cancelEditingTodo = useCallback(() => {
     setEditingTodoId(null);
-    setEditingTodoText("");
   }, []);
 
   // 一括削除機能
@@ -1283,31 +1283,34 @@ export function CommTimeComponent() {
   }, [useDatabase, user, sharedSupabaseTodos]);
 
   const clearMemo = useCallback(async () => {
+    // textareaをクリア
+    if (memoTextareaRef.current) {
+      memoTextareaRef.current.value = "";
+    }
+    setSharedMemo("");
+
     if (useDatabase && user) {
       // データベースモード
       await sharedSupabaseMemos.saveMemo("");
-    } else {
-      // ローカルモード
-      setSharedMemo("");
     }
   }, [useDatabase, user, sharedSupabaseMemos]);
 
-  // メモの更新機能
-  const handleMemoChange = useCallback(async (content: string, isPomodoro: boolean) => {
-    // まずローカル状態を即座に更新（UX向上）
-    if (isPomodoro) {
-      setPomodoroMemo(content);
-    } else {
-      setMeetingMemo(content);
-    }
+  // メモの保存（blur時）- ローカルstateとSupabaseに保存
+  const handleMemoBlur = useCallback(async () => {
+    // 日本語入力中はスキップ
+    if (isComposingRef.current) return;
 
-    // データベースモードかつログイン済みの場合のみSupabaseに保存（共通メモ）
+    const content = memoTextareaRef.current?.value || "";
+
+    // ローカルstateを更新（localStorage保存用）
+    setSharedMemo(content);
+
+    // データベースモードかつログイン済みの場合のみSupabaseに保存
     if (useDatabase && user) {
       try {
         await sharedSupabaseMemos.saveMemo(content);
       } catch (error) {
         console.error("Error saving memo to Supabase:", error);
-        // エラーが発生してもローカル状態は保持される
       }
     }
   }, [useDatabase, user, sharedSupabaseMemos]);
@@ -1515,11 +1518,11 @@ export function CommTimeComponent() {
                 <>
                   {isAuthenticated && user ? (
                     <div className="flex items-center gap-2">
-                      <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg">
-                        <User className="w-4 h-4" />
-                        <span className="text-xs font-medium">
-                          {user.email}
-                        </span>
+                      <div
+                        className="hidden sm:flex items-center justify-center w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-full font-bold text-sm uppercase"
+                        title={user.email}
+                      >
+                        {user.email?.slice(0, 2) || "U"}
                       </div>
                       <button
                         type="button"
@@ -2395,10 +2398,15 @@ export function CommTimeComponent() {
                 </button>
               </div>
               <textarea
-                value={activeTab === "meeting" ? meetingMemo : pomodoroMemo}
-                onChange={(e) =>
-                  handleMemoChange(e.target.value, activeTab === "pomodoro")
-                }
+                defaultValue={sharedMemo}
+                onBlur={handleMemoBlur}
+                onCompositionStart={() => {
+                  isComposingRef.current = true;
+                }}
+                onCompositionEnd={() => {
+                  isComposingRef.current = false;
+                }}
+                ref={memoTextareaRef}
                 className="w-full h-32 sm:h-40 p-3 sm:p-4 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-xl text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                 placeholder="メモを入力してください..."
               />
@@ -2498,22 +2506,36 @@ export function CommTimeComponent() {
                                 <>
                                   <input
                                     type="text"
-                                    value={editingTodoText}
-                                    onChange={(e) =>
-                                      setEditingTodoText(e.target.value)
-                                    }
+                                    defaultValue={todo.text}
+                                    ref={editingInputRef}
+                                    onCompositionStart={() => {
+                                      isComposingRef.current = true;
+                                    }}
+                                    onCompositionEnd={() => {
+                                      isComposingRef.current = false;
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (isComposingRef.current || e.nativeEvent.isComposing || e.key === "Process") return;
+                                      if (e.key === "Enter") {
+                                        const value = editingInputRef.current?.value.trim() || "";
+                                        if (value) {
+                                          updateTodo(todo.id, value, activeTab === "pomodoro");
+                                        }
+                                      } else if (e.key === "Escape") {
+                                        cancelEditingTodo();
+                                      }
+                                    }}
                                     className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                                   />
                                   <div className="flex gap-1">
                                     <button
                                       type="button"
-                                      onClick={() =>
-                                        updateTodo(
-                                          todo.id,
-                                          editingTodoText,
-                                          activeTab === "pomodoro"
-                                        )
-                                      }
+                                      onClick={() => {
+                                        const value = editingInputRef.current?.value.trim() || "";
+                                        if (value) {
+                                          updateTodo(todo.id, value, activeTab === "pomodoro");
+                                        }
+                                      }}
                                       className="p-1.5 text-green-600 hover:bg-green-100 rounded-lg transition-colors duration-200"
                                     >
                                       <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -2712,7 +2734,7 @@ export function CommTimeComponent() {
                                     <button
                                       type="button"
                                       onClick={() =>
-                                        startEditingTodo(todo.id, todo.text)
+                                        startEditingTodo(todo.id)
                                       }
                                       className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors duration-200"
                                       title="編集"
@@ -2751,25 +2773,24 @@ export function CommTimeComponent() {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={
-                    activeTab === "meeting" ? newMeetingTodo : newPomodoroTodo
-                  }
-                  onChange={(e) =>
-                    activeTab === "meeting"
-                      ? setNewMeetingTodo(e.target.value)
-                      : setNewPomodoroTodo(e.target.value)
-                  }
+                  defaultValue=""
+                  onCompositionStart={() => {
+                    isComposingRef.current = true;
+                  }}
+                  onCompositionEnd={() => {
+                    isComposingRef.current = false;
+                  }}
                   onKeyDown={(e) => {
+                    // 日本語入力（IME）の変換中はスキップ
+                    if (isComposingRef.current || e.nativeEvent.isComposing || e.key === "Process") return;
                     if (e.key === "Enter") {
-                      if (activeTab === "meeting") {
-                        addTodo(newMeetingTodo, false);
-                        setNewMeetingTodo("");
-                      } else {
-                        addTodo(newPomodoroTodo, true);
-                        setNewPomodoroTodo("");
-                      }
-                      if (todoInputRef.current) {
-                        todoInputRef.current.focus();
+                      const value = todoInputRef.current?.value.trim() || "";
+                      if (value) {
+                        addTodo(value, activeTab === "pomodoro");
+                        if (todoInputRef.current) {
+                          todoInputRef.current.value = "";
+                          todoInputRef.current.focus();
+                        }
                       }
                     }
                   }}
@@ -2780,15 +2801,13 @@ export function CommTimeComponent() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (activeTab === "meeting") {
-                      addTodo(newMeetingTodo, false);
-                      setNewMeetingTodo("");
-                    } else {
-                      addTodo(newPomodoroTodo, true);
-                      setNewPomodoroTodo("");
-                    }
-                    if (todoInputRef.current) {
-                      todoInputRef.current.focus();
+                    const value = todoInputRef.current?.value.trim() || "";
+                    if (value) {
+                      addTodo(value, activeTab === "pomodoro");
+                      if (todoInputRef.current) {
+                        todoInputRef.current.value = "";
+                        todoInputRef.current.focus();
+                      }
                     }
                   }}
                   className="px-4 sm:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg text-sm sm:text-base whitespace-nowrap flex items-center gap-2"
