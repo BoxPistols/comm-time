@@ -16,10 +16,13 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: "Comm Time - タイマー & ポモドーロ",
   description: "ミーティングタイマーとポモドーロタイマーを備えた時間管理アプリ",
-  icons: {
-    icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
-    ],
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Comm Time",
+  },
+  formatDetection: {
+    telephone: false,
   },
 };
 
