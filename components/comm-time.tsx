@@ -3362,6 +3362,85 @@ export function CommTimeComponent() {
                       </div>
                     </div>
 
+                    {/* アカウント設定 */}
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                      <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                        <Database className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        アカウント・データ同期
+                      </h3>
+
+                      {isAuthenticated && user ? (
+                        <div className="space-y-4">
+                          {/* ログイン中のユーザー情報 */}
+                          <div className="bg-white dark:bg-gray-700 rounded-lg p-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                                  {user.email?.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                                    {user.email}
+                                  </p>
+                                  <p className="text-xs text-green-600 dark:text-green-400">
+                                    ログイン中
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => signOut()}
+                                className="px-3 py-1.5 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 text-sm rounded-lg transition-colors flex items-center gap-1"
+                              >
+                                <LogOut className="w-4 h-4" />
+                                ログアウト
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* データベース同期設定 */}
+                          <div className="flex items-center justify-between bg-white dark:bg-gray-700 rounded-lg p-3">
+                            <div>
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                クラウド同期
+                              </span>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                メモ・TODOをデータベースに保存
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setUseDatabase(!useDatabase)}
+                              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                                useDatabase
+                                  ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md"
+                                  : "bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500"
+                              }`}
+                            >
+                              {useDatabase ? "ON" : "OFF"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            ログインすると、メモやTODOをクラウドに保存して複数デバイスで同期できます。
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSettingsOpen(false);
+                              setAuthDialogOpen(true);
+                            }}
+                            className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                          >
+                            <LogIn className="w-5 h-5" />
+                            ログイン / 新規登録
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     {/* リセットボタン */}
                     <button
                       type="button"
