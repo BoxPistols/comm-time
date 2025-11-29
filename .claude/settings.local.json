@@ -10,7 +10,12 @@
       "WebFetch(domain:qiita.com)",
       "WebFetch(domain:note.com)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(pnpm test:all:*)",
+      "Bash(pnpm test:*)",
+      "Bash(npx jest:*)",
+      "Bash(git stash:*)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []
