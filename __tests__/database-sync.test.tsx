@@ -92,10 +92,10 @@ describe('Database Sync Features', () => {
         expect(activeTab).toBe('meeting');
       });
 
-      // ポモドーロタブに切り替え
-      const pomodoroTab = screen.getByText(/ポモドーロ/);
+      // ポモドーロタブに切り替え（複数要素があるため getAllByText を使用）
+      const pomodoroTabs = screen.getAllByText(/ポモドーロ/);
       await act(async () => {
-        await user.click(pomodoroTab);
+        await user.click(pomodoroTabs[0]);
       });
 
       // activeTabがlocalStorageに保存されることを確認
@@ -138,10 +138,10 @@ describe('Database Sync Features', () => {
         expect(sharedMemo).toBe('テスト用メモ');
       });
 
-      // ポモドーロタブに切り替え
-      const pomodoroTab = screen.getByText(/ポモドーロ/);
+      // ポモドーロタブに切り替え（複数要素があるため getAllByText を使用）
+      const pomodoroTabs = screen.getAllByText(/ポモドーロ/);
       await act(async () => {
-        await user.click(pomodoroTab);
+        await user.click(pomodoroTabs[0]);
       });
 
       // 同じメモが表示されることを確認
@@ -171,10 +171,10 @@ describe('Database Sync Features', () => {
         expect(sharedTodos[0].text).toBe('テスト用TODO');
       });
 
-      // ポモドーロタブに切り替え
-      const pomodoroTab = screen.getByText(/ポモドーロ/);
+      // ポモドーロタブに切り替え（複数要素があるため getAllByText を使用）
+      const pomodoroTabs = screen.getAllByText(/ポモドーロ/);
       await act(async () => {
-        await user.click(pomodoroTab);
+        await user.click(pomodoroTabs[0]);
       });
 
       // 同じTODOが表示されることを確認
