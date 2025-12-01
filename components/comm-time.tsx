@@ -1505,26 +1505,35 @@ export function CommTimeComponent() {
   // 期限延長機能
   const extendDeadline = useCallback(
     (id: string, days: number, isPomodoro: boolean) => {
-      const updateFunc = (prev: TodoItem[]) =>
-        prev.map((todo) => {
-          if (todo.id === id) {
-            const currentDate = todo.dueDate
-              ? new Date(todo.dueDate)
-              : new Date();
-            currentDate.setDate(currentDate.getDate() + days);
-            const newDueDate = currentDate.toISOString().split("T")[0];
-            return { ...todo, dueDate: newDueDate };
-          }
-          return todo;
-        });
+      // 現在のTODOを取得して新しい期限を計算
+      const todos = isPomodoro ? pomodoroTodos : meetingTodos;
+      const todo = todos.find((t) => t.id === id);
+      if (!todo) return;
 
-      if (isPomodoro) {
-        setPomodoroTodos(updateFunc);
+      const currentDate = todo.dueDate
+        ? new Date(todo.dueDate)
+        : new Date();
+      currentDate.setDate(currentDate.getDate() + days);
+      const newDueDate = currentDate.toISOString().split("T")[0];
+
+      if (useDatabase && user) {
+        // データベースモード: Supabaseを使用
+        sharedSupabaseTodos.updateTodo(id, { dueDate: newDueDate, dueTime: todo.dueTime });
       } else {
-        setMeetingTodos(updateFunc);
+        // ローカルモード: LocalStorageを使用
+        const updateFunc = (prev: TodoItem[]) =>
+          prev.map((t) =>
+            t.id === id ? { ...t, dueDate: newDueDate } : t
+          );
+
+        if (isPomodoro) {
+          setPomodoroTodos(updateFunc);
+        } else {
+          setMeetingTodos(updateFunc);
+        }
       }
     },
-    []
+    [useDatabase, user, sharedSupabaseTodos, pomodoroTodos, meetingTodos]
   );
 
   // 期限までの残り時間を取得
