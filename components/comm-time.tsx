@@ -25,6 +25,8 @@ import {
   LogOut,
   Database,
   ChevronDown,
+  Trash2,
+  RotateCcw,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -67,6 +69,20 @@ type TodoItem = {
   isCompleted: boolean;
   dueDate?: string; // YYYY-MM-DD
   dueTime?: string; // HH:MM
+};
+
+// ゴミ箱に入ったTODOの型
+type TrashedTodoItem = TodoItem & {
+  deletedAt: string; // ISO形式の日時
+};
+
+// TODOのバージョン履歴の型
+type TodoVersion = {
+  id: string;
+  todoId: string;
+  text: string;
+  timestamp: string; // ISO形式の日時
+  changeType: "create" | "update" | "delete";
 };
 
 // 初期値の設定
@@ -214,6 +230,56 @@ export function CommTimeComponent() {
   const [expandedDeadlineTodoId, setExpandedDeadlineTodoId] = useState<
     string | null
   >(null);
+
+  // TODO内容を展開中のTodoのID（3行以上の場合に使用）
+  const [expandedTodoContentId, setExpandedTodoContentId] = useState<
+    string | null
+  >(null);
+
+  // ゴミ箱の状態（30日間保存）
+  const [trashedTodos, setTrashedTodos] = useState<TrashedTodoItem[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("trashedTodos");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          // 30日経過したアイテムを除外
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          return parsed.filter((item: TrashedTodoItem) =>
+            new Date(item.deletedAt) > thirtyDaysAgo
+          );
+        } catch {
+          return [];
+        }
+      }
+    }
+    return [];
+  });
+
+  // ゴミ箱UIの表示状態
+  const [showTrash, setShowTrash] = useState(false);
+
+  // バージョン履歴（削除・10文字以上の変更のみ保存）
+  const [todoVersions, setTodoVersions] = useState<TodoVersion[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("todoVersions");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          // 30日経過したバージョンを除外
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          return parsed.filter((item: TodoVersion) =>
+            new Date(item.timestamp) > thirtyDaysAgo
+          );
+        } catch {
+          return [];
+        }
+      }
+    }
+    return [];
+  });
 
   // フラッシュの状態
   const [isFlashing, setIsFlashing] = useState(false);
@@ -425,6 +491,10 @@ export function CommTimeComponent() {
         "defaultPomodoroBreakAlarm",
         JSON.stringify(defaultPomodoroBreakAlarm)
       );
+
+      // ゴミ箱とバージョン履歴の保存
+      localStorage.setItem("trashedTodos", JSON.stringify(trashedTodos));
+      localStorage.setItem("todoVersions", JSON.stringify(todoVersions));
     }
   }, [
     mounted, // mountedを依存配列に追加
@@ -450,6 +520,8 @@ export function CommTimeComponent() {
     defaultPomodoroCycles,
     defaultPomodoroWorkAlarm,
     defaultPomodoroBreakAlarm,
+    trashedTodos,
+    todoVersions,
   ]);
 
   // Supabaseデータの同期（データベースモード有効時）
@@ -1206,8 +1278,39 @@ export function CommTimeComponent() {
     [useDatabase, user, sharedSupabaseTodos]
   );
 
+  // バージョン履歴を追加するヘルパー関数
+  const addTodoVersion = useCallback(
+    (todoId: string, text: string, changeType: "create" | "update" | "delete") => {
+      const newVersion: TodoVersion = {
+        id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        todoId,
+        text,
+        timestamp: new Date().toISOString(),
+        changeType,
+      };
+      setTodoVersions((prev) => [...prev, newVersion]);
+    },
+    []
+  );
+
   const removeTodo = useCallback(
     (id: string, isPomodoro: boolean) => {
+      // 削除前にTODOを取得してゴミ箱に移動
+      const todos = isPomodoro ? pomodoroTodos : meetingTodos;
+      const todoToRemove = todos.find((todo) => todo.id === id);
+
+      if (todoToRemove) {
+        // ゴミ箱に追加
+        const trashedTodo: TrashedTodoItem = {
+          ...todoToRemove,
+          deletedAt: new Date().toISOString(),
+        };
+        setTrashedTodos((prev) => [...prev, trashedTodo]);
+
+        // バージョン履歴に追加
+        addTodoVersion(id, todoToRemove.text, "delete");
+      }
+
       if (useDatabase && user) {
         // データベースモード: Supabaseを使用（共通TODO）
         sharedSupabaseTodos.removeTodo(id);
@@ -1220,12 +1323,55 @@ export function CommTimeComponent() {
         }
       }
     },
+    [useDatabase, user, sharedSupabaseTodos, pomodoroTodos, meetingTodos, addTodoVersion]
+  );
+
+  // ゴミ箱からTODOを復元
+  const restoreTodo = useCallback(
+    (trashedTodo: TrashedTodoItem) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { deletedAt, ...todoItem } = trashedTodo;
+
+      if (useDatabase && user) {
+        // データベースモード: Supabaseを使用
+        sharedSupabaseTodos.addTodo(todoItem.text);
+      } else {
+        // ローカルモード: 共有TODOリストに追加
+        setMeetingTodos((prev) => [...prev, todoItem]);
+      }
+
+      // ゴミ箱から削除
+      setTrashedTodos((prev) => prev.filter((t) => t.id !== trashedTodo.id));
+    },
     [useDatabase, user, sharedSupabaseTodos]
   );
+
+  // ゴミ箱からTODOを完全削除
+  const permanentlyDeleteTodo = useCallback((id: string) => {
+    setTrashedTodos((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  // ゴミ箱を空にする
+  const emptyTrash = useCallback(() => {
+    setTrashedTodos([]);
+  }, []);
 
   const updateTodo = useCallback(
     (id: string, newText: string, isPomodoro: boolean) => {
       if (!newText.trim()) return; // 空のテキストの場合は更新しない
+
+      // 10文字以上の変更の場合、バージョン履歴に追加
+      const todos = isPomodoro ? pomodoroTodos : meetingTodos;
+      const currentTodo = todos.find((todo) => todo.id === id);
+      if (currentTodo) {
+        const oldText = currentTodo.text;
+        const newTextTrimmed = newText.trim();
+        // 文字列の差分が10文字以上の場合のみバージョン保存
+        if (Math.abs(oldText.length - newTextTrimmed.length) >= 10 ||
+            oldText !== newTextTrimmed && newTextTrimmed.length >= 10) {
+          addTodoVersion(id, oldText, "update");
+        }
+      }
 
       if (useDatabase && user) {
         // データベースモード: Supabaseを使用（共通TODO）
@@ -1245,7 +1391,7 @@ export function CommTimeComponent() {
       }
       setEditingTodoId(null);
     },
-    [useDatabase, user, sharedSupabaseTodos]
+    [useDatabase, user, sharedSupabaseTodos, pomodoroTodos, meetingTodos, addTodoVersion]
   );
 
   const startEditingTodo = useCallback((id: string) => {
@@ -2457,8 +2603,101 @@ export function CommTimeComponent() {
                   >
                     全削除
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowTrash(!showTrash)}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1 ${
+                      showTrash
+                        ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md"
+                        : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                    }`}
+                    title={`ゴミ箱 (${trashedTodos.length}件)`}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    {trashedTodos.length > 0 && (
+                      <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                        {trashedTodos.length}
+                      </span>
+                    )}
+                  </button>
                 </div>
               </div>
+
+              {/* ゴミ箱UI */}
+              {showTrash && (
+                <div className="mb-4 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-semibold text-orange-700 dark:text-orange-300 flex items-center gap-1">
+                      <Trash2 className="w-4 h-4" />
+                      ゴミ箱 ({trashedTodos.length}件)
+                    </h4>
+                    {trashedTodos.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm("ゴミ箱を空にしますか？この操作は取り消せません。")) {
+                            emptyTrash();
+                          }
+                        }}
+                        className="text-xs px-2 py-1 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 rounded transition-colors"
+                      >
+                        ゴミ箱を空にする
+                      </button>
+                    )}
+                  </div>
+                  {trashedTodos.length === 0 ? (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">ゴミ箱は空です</p>
+                  ) : (
+                    <ul className="space-y-2 max-h-[200px] overflow-y-auto">
+                      {trashedTodos.map((todo) => {
+                        const deletedDate = new Date(todo.deletedAt);
+                        const daysAgo = Math.floor((Date.now() - deletedDate.getTime()) / (1000 * 60 * 60 * 24));
+                        const expiresIn = 30 - daysAgo;
+                        return (
+                          <li
+                            key={todo.id}
+                            className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-700 dark:text-gray-300 truncate" title={todo.text}>
+                                {todo.text}
+                              </p>
+                              <p className="text-xs text-gray-400 dark:text-gray-500">
+                                削除: {deletedDate.toLocaleDateString("ja-JP")} (残り{expiresIn}日で完全削除)
+                              </p>
+                            </div>
+                            <div className="flex gap-1 flex-shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => restoreTodo(todo)}
+                                className="p-1.5 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-lg transition-colors"
+                                title="復元"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (window.confirm("このTODOを完全に削除しますか？")) {
+                                    permanentlyDeleteTodo(todo.id);
+                                  }
+                                }}
+                                className="p-1.5 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg transition-colors"
+                                title="完全に削除"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                    ※ 削除から30日経過したアイテムは自動的に完全削除されます
+                  </p>
+                </div>
+              )}
 
               <DragDropContext onDragEnd={onDragEnd}>
                 <Droppable
@@ -2552,16 +2791,47 @@ export function CommTimeComponent() {
                                 </>
                               ) : (
                                 <>
-                                  <div className="flex-1 space-y-2">
-                                    <span
-                                      className={`text-xs sm:text-sm block ${
+                                  <div className="flex-1 space-y-2 min-w-0">
+                                    {/* TODO内容 - 3行省略+クリック展開 */}
+                                    <div
+                                      className={`text-xs sm:text-sm ${
                                         todo.isCompleted
                                           ? "line-through text-gray-500 dark:text-gray-400"
                                           : "text-gray-800 dark:text-gray-200"
                                       }`}
                                     >
-                                      {todo.text}
-                                    </span>
+                                      {expandedTodoContentId === todo.id ? (
+                                        // 展開表示
+                                        <div>
+                                          <span className="whitespace-pre-wrap break-words">{todo.text}</span>
+                                          {todo.text.length > 100 && (
+                                            <button
+                                              type="button"
+                                              onClick={() => setExpandedTodoContentId(null)}
+                                              className="ml-1 text-indigo-500 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 text-xs"
+                                            >
+                                              [閉じる]
+                                            </button>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        // 省略表示（3行まで）
+                                        <div
+                                          className="cursor-pointer"
+                                          onClick={() => {
+                                            if (todo.text.length > 100) {
+                                              setExpandedTodoContentId(todo.id);
+                                            }
+                                          }}
+                                          title={todo.text}
+                                        >
+                                          <span className="line-clamp-3 whitespace-pre-wrap break-words">{todo.text}</span>
+                                          {todo.text.length > 100 && (
+                                            <span className="text-indigo-500 dark:text-indigo-400 text-xs ml-1">[続きを見る]</span>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
 
                                     {/* 期限表示 - コンパクト版（クリックで詳細展開） */}
                                     {(() => {
@@ -2577,28 +2847,24 @@ export function CommTimeComponent() {
                                                   : todo.id
                                               )
                                             }
-                                            className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity ${
+                                            className={`text-xs px-2 py-1 rounded-full inline-flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity whitespace-nowrap max-w-full ${
                                               status.isOverdue
                                                 ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 font-semibold"
                                                 : status.isSoon
                                                 ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300 font-semibold"
                                                 : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
                                             }`}
-                                            title="クリックして期限設定を開く"
+                                            title={`${todo.dueDate}${todo.dueTime ? ` ${todo.dueTime}` : ""}${status.isOverdue ? " (期限切れ)" : status.isSoon ? ` (残り${status.diffHours}時間)` : ` (残り${status.diffDays}日)`} - クリックして期限設定を開く`}
                                           >
-                                            <Calendar className="w-3 h-3" />
-                                            {todo.dueDate}
-                                            {todo.dueTime &&
-                                              ` ${todo.dueTime}`}
-                                            {status.isOverdue &&
-                                              " (期限切れ)"}
-                                            {!status.isOverdue &&
-                                              status.isSoon &&
-                                              ` (残り${status.diffHours}時間)`}
-                                            {!status.isOverdue &&
-                                              !status.isSoon &&
-                                              ` (残り${status.diffDays}日)`}
-                                            <ChevronDown className={`w-3 h-3 transition-transform ${expandedDeadlineTodoId === todo.id ? "rotate-180" : ""}`} />
+                                            <Calendar className="w-3 h-3 flex-shrink-0" />
+                                            <span className="truncate">
+                                              {todo.dueDate}
+                                              {todo.dueTime && ` ${todo.dueTime}`}
+                                              {status.isOverdue && " (期限切れ)"}
+                                              {!status.isOverdue && status.isSoon && ` (残り${status.diffHours}時間)`}
+                                              {!status.isOverdue && !status.isSoon && ` (残り${status.diffDays}日)`}
+                                            </span>
+                                            <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform ${expandedDeadlineTodoId === todo.id ? "rotate-180" : ""}`} />
                                           </button>
                                         );
                                       }
