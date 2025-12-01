@@ -24,6 +24,7 @@ import {
   LogIn,
   LogOut,
   Database,
+  ChevronDown,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -2562,81 +2563,43 @@ export function CommTimeComponent() {
                                       {todo.text}
                                     </span>
 
-                                    {/* 期限表示 */}
+                                    {/* 期限表示 - コンパクト版（クリックで詳細展開） */}
                                     {(() => {
                                       const status = getDeadlineStatus(todo);
                                       if (status) {
                                         return (
-                                          <div className="flex items-center gap-2 flex-wrap">
-                                            <div
-                                              className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${
-                                                status.isOverdue
-                                                  ? "bg-red-100 text-red-700 font-semibold"
-                                                  : status.isSoon
-                                                  ? "bg-yellow-100 text-yellow-700 font-semibold"
-                                                  : "bg-blue-100 text-blue-700"
-                                              }`}
-                                            >
-                                              <Calendar className="w-3 h-3" />
-                                              {todo.dueDate}
-                                              {todo.dueTime &&
-                                                ` ${todo.dueTime}`}
-                                              {status.isOverdue &&
-                                                " (期限切れ)"}
-                                              {!status.isOverdue &&
-                                                status.isSoon &&
-                                                ` (残り${status.diffHours}時間)`}
-                                              {!status.isOverdue &&
-                                                !status.isSoon &&
-                                                ` (残り${status.diffDays}日)`}
-                                            </div>
-
-                                            {/* 延長ボタン */}
-                                            <div className="flex gap-1">
-                                              <button
-                                                type="button"
-                                                onClick={() =>
-                                                  extendDeadline(
-                                                    todo.id,
-                                                    1,
-                                                    activeTab === "pomodoro"
-                                                  )
-                                                }
-                                                className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
-                                                title="1日延長"
-                                              >
-                                                +1日
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() =>
-                                                  extendDeadline(
-                                                    todo.id,
-                                                    3,
-                                                    activeTab === "pomodoro"
-                                                  )
-                                                }
-                                                className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
-                                                title="3日延長"
-                                              >
-                                                +3日
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() =>
-                                                  extendDeadline(
-                                                    todo.id,
-                                                    7,
-                                                    activeTab === "pomodoro"
-                                                  )
-                                                }
-                                                className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 rounded transition-colors"
-                                                title="1週間延長"
-                                              >
-                                                +7日
-                                              </button>
-                                            </div>
-                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setExpandedDeadlineTodoId(
+                                                expandedDeadlineTodoId === todo.id
+                                                  ? null
+                                                  : todo.id
+                                              )
+                                            }
+                                            className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity ${
+                                              status.isOverdue
+                                                ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 font-semibold"
+                                                : status.isSoon
+                                                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300 font-semibold"
+                                                : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
+                                            }`}
+                                            title="クリックして期限設定を開く"
+                                          >
+                                            <Calendar className="w-3 h-3" />
+                                            {todo.dueDate}
+                                            {todo.dueTime &&
+                                              ` ${todo.dueTime}`}
+                                            {status.isOverdue &&
+                                              " (期限切れ)"}
+                                            {!status.isOverdue &&
+                                              status.isSoon &&
+                                              ` (残り${status.diffHours}時間)`}
+                                            {!status.isOverdue &&
+                                              !status.isSoon &&
+                                              ` (残り${status.diffDays}日)`}
+                                            <ChevronDown className={`w-3 h-3 transition-transform ${expandedDeadlineTodoId === todo.id ? "rotate-180" : ""}`} />
+                                          </button>
                                         );
                                       }
                                       return null;
@@ -2644,51 +2607,102 @@ export function CommTimeComponent() {
 
                                     {/* 期限設定フォーム - 折りたたみ式 */}
                                     {expandedDeadlineTodoId === todo.id && (
-                                      <div className="flex gap-1 items-center flex-wrap bg-gray-50 dark:bg-gray-700 p-2 rounded-lg">
-                                        <input
-                                          type="date"
-                                          value={todo.dueDate || ""}
-                                          onChange={(e) =>
-                                            updateTodoDeadline(
-                                              todo.id,
-                                              e.target.value || undefined,
-                                              todo.dueTime,
-                                              activeTab === "pomodoro"
-                                            )
-                                          }
-                                          className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                          placeholder="期限日"
-                                        />
-                                        <input
-                                          type="time"
-                                          value={todo.dueTime || ""}
-                                          onChange={(e) =>
-                                            updateTodoDeadline(
-                                              todo.id,
-                                              todo.dueDate,
-                                              e.target.value || undefined,
-                                              activeTab === "pomodoro"
-                                            )
-                                          }
-                                          className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                          placeholder="時刻"
-                                        />
-                                        {(todo.dueDate || todo.dueTime) && (
-                                          <button
-                                            type="button"
-                                            onClick={() =>
+                                      <div className="flex flex-col gap-2 bg-gray-50 dark:bg-gray-700 p-2 rounded-lg mt-1">
+                                        {/* 日付・時刻入力行 */}
+                                        <div className="flex gap-1 items-center flex-wrap">
+                                          <input
+                                            type="date"
+                                            value={todo.dueDate || ""}
+                                            onChange={(e) =>
                                               updateTodoDeadline(
                                                 todo.id,
-                                                undefined,
-                                                undefined,
+                                                e.target.value || undefined,
+                                                todo.dueTime,
                                                 activeTab === "pomodoro"
                                               )
                                             }
-                                            className="text-xs px-2 py-1 bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 rounded transition-colors"
-                                            title="期限をクリア"
-                                          >
-                                            解除
-                                          </button>
+                                            className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                            placeholder="期限日"
+                                          />
+                                          <input
+                                            type="time"
+                                            value={todo.dueTime || ""}
+                                            onChange={(e) =>
+                                              updateTodoDeadline(
+                                                todo.id,
+                                                todo.dueDate,
+                                                e.target.value || undefined,
+                                                activeTab === "pomodoro"
+                                              )
+                                            }
+                                            className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                            placeholder="時刻"
+                                          />
+                                          {(todo.dueDate || todo.dueTime) && (
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                updateTodoDeadline(
+                                                  todo.id,
+                                                  undefined,
+                                                  undefined,
+                                                  activeTab === "pomodoro"
+                                                )
+                                              }
+                                              className="text-xs px-2 py-1 bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 rounded transition-colors"
+                                              title="期限をクリア"
+                                            >
+                                              解除
+                                            </button>
+                                          )}
+                                        </div>
+                                        {/* 延長ボタン行 - 期限が設定されている場合のみ */}
+                                        {todo.dueDate && (
+                                          <div className="flex gap-1 items-center">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">延長:</span>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                extendDeadline(
+                                                  todo.id,
+                                                  1,
+                                                  activeTab === "pomodoro"
+                                                )
+                                              }
+                                              className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 rounded transition-colors"
+                                              title="1日延長"
+                                            >
+                                              +1日
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                extendDeadline(
+                                                  todo.id,
+                                                  3,
+                                                  activeTab === "pomodoro"
+                                                )
+                                              }
+                                              className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 rounded transition-colors"
+                                              title="3日延長"
+                                            >
+                                              +3日
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                extendDeadline(
+                                                  todo.id,
+                                                  7,
+                                                  activeTab === "pomodoro"
+                                                )
+                                              }
+                                              className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 rounded transition-colors"
+                                              title="1週間延長"
+                                            >
+                                              +7日
+                                            </button>
+                                          </div>
                                         )}
                                       </div>
                                     )}
