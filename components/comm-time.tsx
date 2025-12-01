@@ -1607,6 +1607,11 @@ export function CommTimeComponent() {
         } else {
           setPomodoroTodos(reorderedItems);
         }
+
+        // Supabaseの順序も更新（データベースモード時のみ）
+        if (useDatabase && user) {
+          sharedSupabaseTodos.reorderTodos(reorderedItems);
+        }
       } else if (destId.startsWith("alarmPoint")) {
         // TODOをアラームポイントにリンク
         const todoId = result.draggableId;
@@ -1614,7 +1619,7 @@ export function CommTimeComponent() {
         linkTodoToAlarmPoint(todoId, alarmPointId);
       }
     },
-    [meetingTodos, pomodoroTodos, linkTodoToAlarmPoint]
+    [meetingTodos, pomodoroTodos, linkTodoToAlarmPoint, useDatabase, user, sharedSupabaseTodos]
   );
 
   // SSR時はローディング表示（Hydration error回避）

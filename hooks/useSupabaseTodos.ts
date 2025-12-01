@@ -144,6 +144,46 @@ export function useSupabaseTodos(user: User | null) {
     await updateTodo(id, { isCompleted: !todo.isCompleted })
   }
 
+  // TODOの並び順を更新（ドラッグ＆ドロップ用）
+  const reorderTodos = async (reorderedTodos: LocalTodoItem[]) => {
+    if (!user) return
+
+    try {
+      // ローカル状態を即座に更新
+      setTodos(reorderedTodos)
+
+      // 各TODOのorder_indexを一括更新
+      const updates = reorderedTodos.map((todo, index) => ({
+        id: todo.id,
+        order_index: index,
+      }))
+
+      // 並列でSupabaseを更新
+      const updatePromises = updates.map(({ id, order_index }) =>
+        supabase
+          .from("todos")
+          .update({ order_index })
+          .eq("id", id)
+          .eq("user_id", user.id)
+      )
+
+      const results = await Promise.all(updatePromises)
+
+      // エラーチェック
+      const errors = results.filter((r) => r.error)
+      if (errors.length > 0) {
+        console.error("Error reordering todos:", errors)
+        // エラー時はリフレッシュして正しい順序を復元
+        await fetchTodos()
+      }
+    } catch (err: any) {
+      setError(err.message)
+      console.error("Error reordering todos:", err)
+      // エラー時はリフレッシュして正しい順序を復元
+      await fetchTodos()
+    }
+  }
+
   // 初回ロード
   useEffect(() => {
     fetchTodos()
@@ -209,6 +249,7 @@ export function useSupabaseTodos(user: User | null) {
     updateTodo,
     removeTodo,
     toggleTodo,
+    reorderTodos,
     refreshTodos: fetchTodos,
   }
 }
