@@ -2529,7 +2529,7 @@ export function CommTimeComponent() {
             <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 mb-4 border border-white/20 dark:border-gray-700/20">
               <div className="flex items-center justify-between mb-3 sm:mb-4">
                 <h3 className="text-base sm:text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
-                  📝 メモ
+                  メモ
                 </h3>
                 <button
                   type="button"
@@ -2561,15 +2561,15 @@ export function CommTimeComponent() {
 
             {/* TODOリストセクション */}
             <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 border border-white/20 dark:border-gray-700/20">
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <div className="flex flex-col gap-2 mb-3 sm:mb-4">
                 <h3 className="text-base sm:text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
-                  ✅ TODOリスト
+                  TODOリスト
                 </h3>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setSortByDeadline(!sortByDeadline)}
-                    className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1 ${
+                    className={`text-xs px-2 py-1 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1 ${
                       sortByDeadline
                         ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md"
                         : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
@@ -2586,7 +2586,7 @@ export function CommTimeComponent() {
                         clearCompletedTodos();
                       }
                     }}
-                    className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50"
+                    className="text-xs px-2 py-1 rounded-lg font-semibold transition-all duration-200 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50"
                     title="完了済みを削除"
                   >
                     完了削除
@@ -2598,7 +2598,7 @@ export function CommTimeComponent() {
                         clearAllTodos();
                       }
                     }}
-                    className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50"
+                    className="text-xs px-2 py-1 rounded-lg font-semibold transition-all duration-200 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50"
                     title="すべて削除"
                   >
                     全削除
@@ -2606,7 +2606,7 @@ export function CommTimeComponent() {
                   <button
                     type="button"
                     onClick={() => setShowTrash(!showTrash)}
-                    className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1 ${
+                    className={`text-xs px-2 py-1 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1 ${
                       showTrash
                         ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-md"
                         : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
