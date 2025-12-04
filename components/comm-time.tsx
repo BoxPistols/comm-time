@@ -45,6 +45,8 @@ import { AuthDialog } from "@/components/auth-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useSupabaseTodos } from "@/hooks/useSupabaseTodos";
 import { useSupabaseMemos } from "@/hooks/useSupabaseMemos";
+import { useMultipleMemos } from "@/hooks/useMultipleMemos";
+import { MemoSwiper } from "@/components/memo-swiper";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
 // 型定義
@@ -202,6 +204,9 @@ export function CommTimeComponent() {
   // メモ・TODOは共通化されているため、meeting/pomodoroの区別なし
   const sharedSupabaseTodos = useSupabaseTodos(useDatabase ? user : null);
   const sharedSupabaseMemos = useSupabaseMemos(useDatabase ? user : null);
+
+  // 複数メモ管理フック
+  const multipleMemos = useMultipleMemos(user, useDatabase);
 
   // その他の状態
   const [forceFocus, setForceFocus] = useState(false);
@@ -1429,39 +1434,6 @@ export function CommTimeComponent() {
     }
   }, [useDatabase, user, sharedSupabaseTodos]);
 
-  const clearMemo = useCallback(async () => {
-    // textareaをクリア
-    if (memoTextareaRef.current) {
-      memoTextareaRef.current.value = "";
-    }
-    setSharedMemo("");
-
-    if (useDatabase && user) {
-      // データベースモード
-      await sharedSupabaseMemos.saveMemo("");
-    }
-  }, [useDatabase, user, sharedSupabaseMemos]);
-
-  // メモの保存（blur時）- ローカルstateとSupabaseに保存
-  const handleMemoBlur = useCallback(async () => {
-    // 日本語入力中はスキップ
-    if (isComposingRef.current) return;
-
-    const content = memoTextareaRef.current?.value || "";
-
-    // ローカルstateを更新（localStorage保存用）
-    setSharedMemo(content);
-
-    // データベースモードかつログイン済みの場合のみSupabaseに保存
-    if (useDatabase && user) {
-      try {
-        await sharedSupabaseMemos.saveMemo(content);
-      } catch (error) {
-        console.error("Error saving memo to Supabase:", error);
-      }
-    }
-  }, [useDatabase, user, sharedSupabaseMemos]);
-
   // TODOとアラームポイントのリンク機能
   const linkTodoToAlarmPoint = useCallback(
     (todoId: string, alarmPointId: string) => {
@@ -2539,37 +2511,14 @@ export function CommTimeComponent() {
           </div>
 
           <div className="w-full lg:w-1/3">
-            {/* メモセクション */}
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 mb-4 border border-white/20 dark:border-gray-700/20">
-              <div className="flex items-center justify-between mb-3 sm:mb-4">
-                <h3 className="text-base sm:text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
-                  メモ
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm("メモをクリアしますか？")) {
-                      clearMemo();
-                    }
-                  }}
-                  className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50"
-                  title="メモをクリア"
-                >
-                  クリア
-                </button>
-              </div>
-              <textarea
-                defaultValue={sharedMemo}
-                onBlur={handleMemoBlur}
-                onCompositionStart={() => {
-                  isComposingRef.current = true;
-                }}
-                onCompositionEnd={() => {
-                  isComposingRef.current = false;
-                }}
-                ref={memoTextareaRef}
-                className="w-full h-32 sm:h-40 p-3 sm:p-4 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-xl text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                placeholder="メモを入力してください..."
+            {/* メモセクション（Markdownプレビュー対応） */}
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl mb-4 border border-white/20 dark:border-gray-700/20 h-[400px] overflow-hidden">
+              <MemoSwiper
+                memos={multipleMemos.memos}
+                onCreateMemo={multipleMemos.createMemo}
+                onUpdateMemo={multipleMemos.updateMemo}
+                onDeleteMemo={multipleMemos.deleteMemo}
+                darkMode={darkMode}
               />
             </div>
 
