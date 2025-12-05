@@ -21,22 +21,33 @@ function createNewMemo(): MemoData {
 
 // ローカルストレージからメモを取得
 function getLocalMemos(): MemoData[] {
-  if (typeof window === "undefined") return []
+  if (typeof window === "undefined") {
+    console.log("[useMultipleMemos] getLocalMemos: window is undefined (SSR)")
+    return []
+  }
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY)
-    return saved ? JSON.parse(saved) : []
-  } catch {
+    const memos = saved ? JSON.parse(saved) : []
+    console.log("[useMultipleMemos] getLocalMemos: retrieved", memos.length, "memos")
+    return memos
+  } catch (error) {
+    console.error("[useMultipleMemos] getLocalMemos error:", error)
     return []
   }
 }
 
 // ローカルストレージにメモを保存
 function saveLocalMemos(memos: MemoData[]) {
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined") {
+    console.log("[useMultipleMemos] saveLocalMemos: window is undefined (SSR)")
+    return
+  }
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(memos))
+    const data = JSON.stringify(memos)
+    localStorage.setItem(LOCAL_STORAGE_KEY, data)
+    console.log("[useMultipleMemos] saveLocalMemos: saved", memos.length, "memos, size:", data.length, "bytes")
   } catch (error) {
-    console.error("Error saving memos to localStorage:", error)
+    console.error("[useMultipleMemos] saveLocalMemos error:", error)
   }
 }
 
@@ -47,19 +58,24 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
 
   // メモを取得
   const fetchMemos = useCallback(async () => {
+    console.log("[useMultipleMemos] fetchMemos called:", { useDatabase, hasUser: !!user })
     setLoading(true)
     setError(null)
 
     try {
       if (useDatabase && user) {
         // Supabaseから取得
+        console.log("[useMultipleMemos] Fetching from Supabase...")
         const { data, error: fetchError } = await supabase
           .from("memos")
           .select("*")
           .eq("user_id", user.id)
           .order("updated_at", { ascending: false })
 
-        if (fetchError) throw fetchError
+        if (fetchError) {
+          console.error("[useMultipleMemos] Supabase fetch error:", fetchError)
+          throw fetchError
+        }
 
         const formattedMemos: MemoData[] = (data || []).map((item) => ({
           id: item.id,
@@ -69,17 +85,22 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
           updated_at: item.updated_at,
         }))
 
+        console.log("[useMultipleMemos] Fetched from Supabase, memos count:", formattedMemos.length)
         setMemos(formattedMemos)
+        // バックアップとしてローカルストレージにも保存
+        saveLocalMemos(formattedMemos)
       } else {
         // ローカルストレージから取得
         const localMemos = getLocalMemos()
+        console.log("[useMultipleMemos] Fetched from localStorage, memos count:", localMemos.length)
         setMemos(localMemos)
       }
     } catch (err: any) {
       setError(err.message)
-      console.error("Error fetching memos:", err)
+      console.error("[useMultipleMemos] Error fetching memos:", err)
       // フォールバック: ローカルストレージ
       const localMemos = getLocalMemos()
+      console.log("[useMultipleMemos] Fallback: using localStorage, memos count:", localMemos.length)
       setMemos(localMemos)
     } finally {
       setLoading(false)
@@ -89,10 +110,12 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
   // メモを作成
   const createMemo = useCallback(async (): Promise<MemoData | null> => {
     const newMemo = createNewMemo()
+    console.log("[useMultipleMemos] createMemo called:", { useDatabase, hasUser: !!user, memoId: newMemo.id })
 
     try {
       if (useDatabase && user) {
         // Supabaseに保存
+        console.log("[useMultipleMemos] Creating in Supabase...")
         const { data, error: insertError } = await supabase
           .from("memos")
           .insert({
@@ -106,7 +129,10 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
           .select()
           .single()
 
-        if (insertError) throw insertError
+        if (insertError) {
+          console.error("[useMultipleMemos] Supabase insert error:", insertError)
+          throw insertError
+        }
 
         const createdMemo: MemoData = {
           id: data.id,
@@ -116,22 +142,36 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
           updated_at: data.updated_at,
         }
 
-        setMemos((prev) => [...prev, createdMemo])
+        setMemos((prev) => {
+          const updatedMemos = [...prev, createdMemo]
+          // バックアップとしてローカルストレージにも保存
+          saveLocalMemos(updatedMemos)
+          console.log("[useMultipleMemos] Created in Supabase and saved to localStorage, memos count:", updatedMemos.length)
+          return updatedMemos
+        })
         return createdMemo
       } else {
         // ローカルストレージに保存
-        // setMemosの関数形式を使用して、常に最新の状態を参照する
+        console.log("[useMultipleMemos] Creating in localStorage...")
         setMemos((prev) => {
           const updatedMemos = [...prev, newMemo]
           saveLocalMemos(updatedMemos)
+          console.log("[useMultipleMemos] Saved to localStorage, memos count:", updatedMemos.length)
           return updatedMemos
         })
         return newMemo
       }
     } catch (err: any) {
       setError(err.message)
-      console.error("Error creating memo:", err)
-      return null
+      console.error("[useMultipleMemos] Error creating memo:", err)
+      // エラー時でもローカルストレージには保存する（フォールバック）
+      setMemos((prev) => {
+        const updatedMemos = [...prev, newMemo]
+        saveLocalMemos(updatedMemos)
+        console.log("[useMultipleMemos] Fallback: saved to localStorage after error")
+        return updatedMemos
+      })
+      return newMemo
     }
   }, [user, useDatabase])
 
@@ -139,10 +179,12 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
   const updateMemo = useCallback(
     async (id: string, title: string, content: string) => {
       const now = new Date().toISOString()
+      console.log("[useMultipleMemos] updateMemo called:", { id, title, content: content.substring(0, 50), useDatabase, hasUser: !!user })
 
       try {
         if (useDatabase && user) {
           // Supabaseを更新
+          console.log("[useMultipleMemos] Updating in Supabase...")
           const { error: updateError } = await supabase
             .from("memos")
             .update({
@@ -153,7 +195,11 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
             .eq("id", id)
             .eq("user_id", user.id)
 
-          if (updateError) throw updateError
+          if (updateError) {
+            console.error("[useMultipleMemos] Supabase update error:", updateError)
+            throw updateError
+          }
+          console.log("[useMultipleMemos] Supabase update successful")
         }
 
         // ローカル状態を更新（ローカルストレージも同時に更新）
@@ -164,16 +210,27 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
               : memo
           )
 
-          // ローカルストレージも更新（最新のstateを使用）
-          if (!useDatabase || !user) {
-            saveLocalMemos(updatedMemos)
-          }
+          // ローカルストレージも更新
+          // データベースモードでない場合、または常にバックアップとして保存
+          saveLocalMemos(updatedMemos)
+          console.log("[useMultipleMemos] Saved to localStorage, memos count:", updatedMemos.length)
 
           return updatedMemos
         })
       } catch (err: any) {
         setError(err.message)
-        console.error("Error updating memo:", err)
+        console.error("[useMultipleMemos] Error updating memo:", err)
+        // エラー時でもローカル状態とストレージは更新する（フォールバック）
+        setMemos((prev) => {
+          const updatedMemos = prev.map((memo) =>
+            memo.id === id
+              ? { ...memo, title, content, updated_at: now }
+              : memo
+          )
+          saveLocalMemos(updatedMemos)
+          console.log("[useMultipleMemos] Fallback: saved to localStorage after error")
+          return updatedMemos
+        })
       }
     },
     [user, useDatabase]
@@ -182,32 +239,43 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
   // メモを削除
   const deleteMemo = useCallback(
     async (id: string) => {
+      console.log("[useMultipleMemos] deleteMemo called:", { id, useDatabase, hasUser: !!user })
+
       try {
         if (useDatabase && user) {
           // Supabaseから削除
+          console.log("[useMultipleMemos] Deleting from Supabase...")
           const { error: deleteError } = await supabase
             .from("memos")
             .delete()
             .eq("id", id)
             .eq("user_id", user.id)
 
-          if (deleteError) throw deleteError
+          if (deleteError) {
+            console.error("[useMultipleMemos] Supabase delete error:", deleteError)
+            throw deleteError
+          }
+          console.log("[useMultipleMemos] Supabase delete successful")
         }
 
         // ローカル状態を更新（ローカルストレージも同時に更新）
         setMemos((prev) => {
           const updatedMemos = prev.filter((memo) => memo.id !== id)
-
-          // ローカルストレージも更新（最新のstateを使用）
-          if (!useDatabase || !user) {
-            saveLocalMemos(updatedMemos)
-          }
-
+          // 常にローカルストレージも更新
+          saveLocalMemos(updatedMemos)
+          console.log("[useMultipleMemos] Deleted and saved to localStorage, memos count:", updatedMemos.length)
           return updatedMemos
         })
       } catch (err: any) {
         setError(err.message)
-        console.error("Error deleting memo:", err)
+        console.error("[useMultipleMemos] Error deleting memo:", err)
+        // エラー時でもローカル状態とストレージは更新する（フォールバック）
+        setMemos((prev) => {
+          const updatedMemos = prev.filter((memo) => memo.id !== id)
+          saveLocalMemos(updatedMemos)
+          console.log("[useMultipleMemos] Fallback: deleted from localStorage after error")
+          return updatedMemos
+        })
       }
     },
     [user, useDatabase]
