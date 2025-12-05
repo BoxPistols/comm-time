@@ -120,9 +120,12 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
         return createdMemo
       } else {
         // ローカルストレージに保存
-        const updatedMemos = [...memos, newMemo]
-        setMemos(updatedMemos)
-        saveLocalMemos(updatedMemos)
+        // setMemosの関数形式を使用して、常に最新の状態を参照する
+        setMemos((prev) => {
+          const updatedMemos = [...prev, newMemo]
+          saveLocalMemos(updatedMemos)
+          return updatedMemos
+        })
         return newMemo
       }
     } catch (err: any) {
@@ -130,7 +133,7 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
       console.error("Error creating memo:", err)
       return null
     }
-  }, [user, useDatabase, memos])
+  }, [user, useDatabase])
 
   // メモを更新
   const updateMemo = useCallback(

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { Edit, Eye, Trash2, Save } from "lucide-react"
+import { Edit, Eye, Trash2, Save, Maximize2, Minimize2 } from "lucide-react"
 
 export interface MemoData {
   id: string
@@ -25,6 +25,7 @@ export function MarkdownMemo({ memo, onUpdate, onDelete, darkMode }: MarkdownMem
   const [title, setTitle] = useState(memo.title)
   const [content, setContent] = useState(memo.content)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
 
@@ -63,13 +64,22 @@ export function MarkdownMemo({ memo, onUpdate, onDelete, darkMode }: MarkdownMem
   // キーボードショートカット
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
-      handleCancel()
+      if (isFullscreen) {
+        setIsFullscreen(false)
+      } else {
+        handleCancel()
+      }
     }
     if ((e.ctrlKey || e.metaKey) && e.key === "s") {
       e.preventDefault()
       handleSave()
     }
-  }, [handleCancel, handleSave])
+  }, [handleCancel, handleSave, isFullscreen])
+
+  // 全画面モードの切り替え
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen((prev) => !prev)
+  }, [])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -82,9 +92,14 @@ export function MarkdownMemo({ memo, onUpdate, onDelete, darkMode }: MarkdownMem
     })
   }
 
-  return (
+  // 全画面モード用のコンテンツ
+  const memoContent = (
     <div
-      className={`h-full flex flex-col rounded-lg border ${
+      className={`flex flex-col rounded-lg border ${
+        isFullscreen
+          ? "h-full"
+          : "h-full"
+      } ${
         darkMode
           ? "bg-gray-800 border-gray-700"
           : "bg-white border-gray-200"
@@ -151,6 +166,17 @@ export function MarkdownMemo({ memo, onUpdate, onDelete, darkMode }: MarkdownMem
                 title="編集"
               >
                 <Edit size={18} />
+              </button>
+              <button
+                onClick={toggleFullscreen}
+                className={`p-1.5 rounded transition-colors ${
+                  darkMode
+                    ? "hover:bg-gray-700 text-purple-400"
+                    : "hover:bg-gray-100 text-purple-600"
+                }`}
+                title={isFullscreen ? "縮小 (Esc)" : "全画面表示"}
+              >
+                {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
@@ -258,4 +284,19 @@ export function MarkdownMemo({ memo, onUpdate, onDelete, darkMode }: MarkdownMem
       )}
     </div>
   )
+
+  // 全画面モードの場合はモーダルオーバーレイとして表示
+  if (isFullscreen) {
+    return (
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
+        <div className={`w-full h-full max-w-6xl max-h-[95vh] flex flex-col rounded-xl shadow-2xl ${
+          darkMode ? "bg-gray-900" : "bg-gray-50"
+        }`}>
+          {memoContent}
+        </div>
+      </div>
+    )
+  }
+
+  return memoContent
 }
