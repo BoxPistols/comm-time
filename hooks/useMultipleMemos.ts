@@ -153,30 +153,27 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
           if (updateError) throw updateError
         }
 
-        // ローカル状態を更新
-        setMemos((prev) =>
-          prev.map((memo) =>
+        // ローカル状態を更新（ローカルストレージも同時に更新）
+        setMemos((prev) => {
+          const updatedMemos = prev.map((memo) =>
             memo.id === id
               ? { ...memo, title, content, updated_at: now }
               : memo
           )
-        )
 
-        // ローカルストレージも更新
-        if (!useDatabase || !user) {
-          const updatedMemos = memos.map((memo) =>
-            memo.id === id
-              ? { ...memo, title, content, updated_at: now }
-              : memo
-          )
-          saveLocalMemos(updatedMemos)
-        }
+          // ローカルストレージも更新（最新のstateを使用）
+          if (!useDatabase || !user) {
+            saveLocalMemos(updatedMemos)
+          }
+
+          return updatedMemos
+        })
       } catch (err: any) {
         setError(err.message)
         console.error("Error updating memo:", err)
       }
     },
-    [user, useDatabase, memos]
+    [user, useDatabase]
   )
 
   // メモを削除
@@ -194,20 +191,23 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
           if (deleteError) throw deleteError
         }
 
-        // ローカル状態を更新
-        const updatedMemos = memos.filter((memo) => memo.id !== id)
-        setMemos(updatedMemos)
+        // ローカル状態を更新（ローカルストレージも同時に更新）
+        setMemos((prev) => {
+          const updatedMemos = prev.filter((memo) => memo.id !== id)
 
-        // ローカルストレージも更新
-        if (!useDatabase || !user) {
-          saveLocalMemos(updatedMemos)
-        }
+          // ローカルストレージも更新（最新のstateを使用）
+          if (!useDatabase || !user) {
+            saveLocalMemos(updatedMemos)
+          }
+
+          return updatedMemos
+        })
       } catch (err: any) {
         setError(err.message)
         console.error("Error deleting memo:", err)
       }
     },
-    [user, useDatabase, memos]
+    [user, useDatabase]
   )
 
   // 初回ロード

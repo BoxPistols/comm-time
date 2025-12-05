@@ -28,11 +28,14 @@ export function MarkdownMemo({ memo, onUpdate, onDelete, darkMode }: MarkdownMem
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
 
-  // メモが更新されたら状態を同期
+  // メモが更新されたら状態を同期（編集中でない場合のみ）
   useEffect(() => {
-    setTitle(memo.title)
-    setContent(memo.content)
-  }, [memo.title, memo.content])
+    // 編集中でない場合のみ、外部からの変更を同期する
+    if (!isEditing) {
+      setTitle(memo.title)
+      setContent(memo.content)
+    }
+  }, [memo.title, memo.content, isEditing])
 
   // 編集モードに入ったらテキストエリアにフォーカス
   useEffect(() => {

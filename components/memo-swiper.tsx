@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { Swiper, SwiperSlide } from "swiper/react"
 import { Navigation, Pagination, Keyboard } from "swiper/modules"
 import type { Swiper as SwiperType } from "swiper"
@@ -31,17 +31,17 @@ export function MemoSwiper({
   const [activeIndex, setActiveIndex] = useState(0)
   const [isBeginning, setIsBeginning] = useState(true)
   const [isEnd, setIsEnd] = useState(false)
+  const prevMemosLengthRef = useRef(memos.length)
 
   // メモが追加されたら最後のスライドに移動
   useEffect(() => {
-    if (swiperInstance && memos.length > 0) {
-      // 新しいメモが追加された場合、最後に移動
-      const lastIndex = memos.length - 1
-      if (activeIndex !== lastIndex && memos.length > activeIndex + 1) {
-        swiperInstance.slideTo(lastIndex)
-      }
+    // 新しいメモが追加された場合（配列長が増加した場合）のみ、最後に移動
+    if (swiperInstance && memos.length > prevMemosLengthRef.current) {
+      swiperInstance.slideTo(memos.length - 1)
     }
-  }, [memos.length])
+    // 現在の長さを保存
+    prevMemosLengthRef.current = memos.length
+  }, [memos.length, swiperInstance])
 
   const handleSlideChange = useCallback((swiper: SwiperType) => {
     setActiveIndex(swiper.activeIndex)
@@ -171,26 +171,6 @@ export function MemoSwiper({
               </SwiperSlide>
             ))}
           </Swiper>
-        </div>
-      )}
-
-      {/* ページインジケーター（ドット表示はSwiperのpagination使用） */}
-      {memos.length > 1 && (
-        <div className={`flex justify-center gap-1 py-2 ${
-          darkMode ? "text-gray-500" : "text-gray-400"
-        }`}>
-          {memos.map((memo, index) => (
-            <button
-              key={memo.id}
-              onClick={() => swiperInstance?.slideTo(index)}
-              className={`w-2 h-2 rounded-full transition-all ${
-                index === activeIndex
-                  ? darkMode ? "bg-blue-500 w-4" : "bg-blue-600 w-4"
-                  : darkMode ? "bg-gray-600 hover:bg-gray-500" : "bg-gray-300 hover:bg-gray-400"
-              }`}
-              aria-label={`メモ ${index + 1}: ${memo.title || "無題"}`}
-            />
-          ))}
         </div>
       )}
     </div>
