@@ -288,8 +288,8 @@ export function MarkdownMemo({ memo, onUpdate, onDelete, darkMode }: MarkdownMem
   // 全画面モードの場合はモーダルオーバーレイとして表示
   if (isFullscreen) {
     return (
-      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4">
-        <div className={`w-full h-full max-w-6xl max-h-[95vh] flex flex-col rounded-xl shadow-2xl ${
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70">
+        <div className={`w-[80vw] h-[80vh] flex flex-col rounded-xl shadow-2xl ${
           darkMode ? "bg-gray-900" : "bg-gray-50"
         }`}>
           {memoContent}

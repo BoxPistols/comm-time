@@ -570,6 +570,19 @@ export function CommTimeComponent() {
     sharedSupabaseMemos.loading,
   ]);
 
+  // 認証状態が変化した時にuseDatabaseを自動的に有効化
+  useEffect(() => {
+    if (isAuthenticated && isSupabaseConfigured) {
+      // ログイン状態になった場合、useDatabaseを有効にする
+      // (localStorageにfalseが明示的に保存されている場合を除く)
+      const saved = localStorage.getItem("useDatabase");
+      if (saved === null) {
+        // 未設定の場合はログイン時に自動でON
+        setUseDatabase(true);
+      }
+    }
+  }, [isAuthenticated]);
+
   // ダークモード適用
   useEffect(() => {
     if (typeof window !== "undefined") {
