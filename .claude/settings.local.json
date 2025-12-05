@@ -15,7 +15,9 @@
       "Bash(pnpm test:*)",
       "Bash(npx jest:*)",
       "Bash(git stash:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(xxd:*)",
+      "Bash(pnpm exec tsc:*)"
     ],
     "deny": [],
     "ask": []
