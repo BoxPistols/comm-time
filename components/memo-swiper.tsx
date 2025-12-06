@@ -467,13 +467,13 @@ export function MemoSwiper({
                 </div>
             ) : (
                 // スワイパービュー
-                <div className='flex-1 flex items-center justify-between gap-2 px-2 overflow-hidden'>
+                <div className='flex-1 flex items-center justify-between gap-1 overflow-hidden'>
                     {/* 前のメモボタン */}
                     {memos.length > 1 && (
                         <button
                             onClick={handlePrev}
                             disabled={isBeginning}
-                            className={`flex-shrink-0 p-2 rounded-full transition-all ${
+                            className={`flex-shrink-0 p-1.5 rounded-full transition-all ${
                                 isBeginning
                                     ? 'opacity-30 cursor-not-allowed'
                                     : darkMode
@@ -482,7 +482,7 @@ export function MemoSwiper({
                             }`}
                             aria-label='前のメモ'
                         >
-                            <ChevronLeft size={24} />
+                            <ChevronLeft size={20} />
                         </button>
                     )}
 
@@ -499,7 +499,7 @@ export function MemoSwiper({
                             }}
                             onSwiper={setSwiperInstance}
                             onSlideChange={handleSlideChange}
-                            className='h-full px-4 py-4'
+                            className='h-full px-2 py-4'
                             style={
                                 {
                                     '--swiper-pagination-color': darkMode
@@ -542,7 +542,7 @@ export function MemoSwiper({
                         <button
                             onClick={handleNext}
                             disabled={isEnd}
-                            className={`flex-shrink-0 p-2 rounded-full transition-all ${
+                            className={`flex-shrink-0 p-1.5 rounded-full transition-all ${
                                 isEnd
                                     ? 'opacity-30 cursor-not-allowed'
                                     : darkMode
@@ -551,7 +551,7 @@ export function MemoSwiper({
                             }`}
                             aria-label='次のメモ'
                         >
-                            <ChevronRight size={24} />
+                            <ChevronRight size={20} />
                         </button>
                     )}
                 </div>
