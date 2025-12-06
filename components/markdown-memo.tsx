@@ -171,8 +171,14 @@ export function MarkdownMemo({
                 toggleFullscreen()
                 return
             }
+            // Ctrl+Esc で編集キャンセル
+            if (e.ctrlKey && e.key === 'Escape') {
+                e.preventDefault()
+                handleCancel()
+                return
+            }
         },
-        [handleSave, isEditing, startEditing, toggleFullscreen]
+        [handleSave, handleCancel, isEditing, startEditing, toggleFullscreen]
     )
 
     const formatDate = (dateString: string) => {
