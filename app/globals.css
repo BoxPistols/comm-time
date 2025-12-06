@@ -76,3 +76,16 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Swiperの高さ制約を確保 */
+.swiper {
+  max-height: 100%;
+}
+
+.swiper-wrapper {
+  max-height: 100%;
+}
+
+.swiper-slide {
+  max-height: 100%;
+}
