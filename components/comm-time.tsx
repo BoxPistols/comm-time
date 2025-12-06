@@ -30,10 +30,10 @@ import {
 } from 'lucide-react'
 import {
     DragDropContext,
-    Droppable,
     Draggable,
     type DropResult,
 } from 'react-beautiful-dnd'
+import { StrictModeDroppable } from '@/components/strict-mode-droppable'
 import {
     Dialog,
     DialogContent,
@@ -47,6 +47,7 @@ import { useSupabaseTodos } from '@/hooks/useSupabaseTodos'
 // import { useSupabaseMemos } from "@/hooks/useSupabaseMemos";
 import { useMultipleMemos } from '@/hooks/useMultipleMemos'
 import { MemoSwiper } from '@/components/memo-swiper'
+import { type MemoData } from '@/components/markdown-memo'
 import { isSupabaseConfigured } from '@/lib/supabase'
 
 // 型定義
@@ -268,6 +269,40 @@ export function CommTimeComponent() {
     // ゴミ箱UIの表示状態
     const [showTrash, setShowTrash] = useState(false)
 
+    // メモのゴミ箱（30日間保存）
+    type TrashedMemoItem = {
+        id: string
+        title: string
+        content: string
+        created_at: string
+        updated_at: string
+        deletedAt: string
+    }
+
+    const [trashedMemos, setTrashedMemos] = useState<TrashedMemoItem[]>(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('trashedMemos')
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved)
+                    // 30日経過したアイテムを除外
+                    const thirtyDaysAgo = new Date()
+                    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+                    return parsed.filter(
+                        (item: TrashedMemoItem) =>
+                            new Date(item.deletedAt) > thirtyDaysAgo
+                    )
+                } catch {
+                    return []
+                }
+            }
+        }
+        return []
+    })
+
+    // メモゴミ箱UIの表示状態
+    const [showMemoTrash, setShowMemoTrash] = useState(false)
+
     // バージョン履歴（削除・10文字以上の変更のみ保存）
     const [todoVersions, setTodoVersions] = useState<TodoVersion[]>(() => {
         if (typeof window !== 'undefined') {
@@ -288,6 +323,21 @@ export function CommTimeComponent() {
             }
         }
         return []
+    })
+
+    // キーボードショートカット設定
+    const [keyboardShortcuts, setKeyboardShortcuts] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('keyboardShortcuts')
+            if (saved) {
+                try {
+                    return JSON.parse(saved)
+                } catch {
+                    return { fullscreen: 'f' }
+                }
+            }
+        }
+        return { fullscreen: 'f' }
     })
 
     // フラッシュの状態
@@ -514,6 +564,11 @@ export function CommTimeComponent() {
             // ゴミ箱とバージョン履歴の保存
             localStorage.setItem('trashedTodos', JSON.stringify(trashedTodos))
             localStorage.setItem('todoVersions', JSON.stringify(todoVersions))
+            localStorage.setItem('trashedMemos', JSON.stringify(trashedMemos))
+            localStorage.setItem(
+                'keyboardShortcuts',
+                JSON.stringify(keyboardShortcuts)
+            )
         }
     }, [
         mounted, // mountedを依存配列に追加
@@ -541,6 +596,8 @@ export function CommTimeComponent() {
         defaultPomodoroBreakAlarm,
         trashedTodos,
         todoVersions,
+        trashedMemos,
+        keyboardShortcuts,
     ])
 
     // Supabaseデータの同期（データベースモード有効時）
@@ -1303,6 +1360,8 @@ export function CommTimeComponent() {
                 }
             }
         },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Note: setMeetingTodos and setPomodoroTodos are aliases of setSharedTodos
         [useDatabase, user, sharedSupabaseTodos]
     )
 
@@ -1327,6 +1386,8 @@ export function CommTimeComponent() {
                 }
             }
         },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Note: setMeetingTodos and setPomodoroTodos are aliases of setSharedTodos
         [useDatabase, user, sharedSupabaseTodos]
     )
 
@@ -1420,6 +1481,43 @@ export function CommTimeComponent() {
     // ゴミ箱からTODOを完全削除
     const permanentlyDeleteTodo = useCallback((id: string) => {
         setTrashedTodos((prev) => prev.filter((t) => t.id !== id))
+    }, [])
+
+    // メモをゴミ箱に移動
+    const moveMemotoTrash = useCallback((memo: MemoData) => {
+        const trashedMemo = {
+            ...memo,
+            deletedAt: new Date().toISOString(),
+        }
+        setTrashedMemos((prev) => [...prev, trashedMemo])
+    }, [])
+
+    // メモを削除（ゴミ箱に移動）
+    const handleDeleteMemo = useCallback(
+        (id: string) => {
+            multipleMemos.deleteMemo(id, moveMemotoTrash)
+        },
+        [multipleMemos, moveMemotoTrash]
+    )
+
+    // ゴミ箱からメモを復元
+    const restoreMemo = useCallback(
+        (trashedMemo: TrashedMemoItem) => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { deletedAt, ...memoData } = trashedMemo
+            multipleMemos.restoreMemo(memoData)
+
+            // ゴミ箱から削除
+            setTrashedMemos((prev) =>
+                prev.filter((m) => m.id !== trashedMemo.id)
+            )
+        },
+        [multipleMemos]
+    )
+
+    // ゴミ箱からメモを完全削除
+    const permanentlyDeleteMemo = useCallback((id: string) => {
+        setTrashedMemos((prev) => prev.filter((m) => m.id !== id))
     }, [])
 
     // ゴミ箱を空にする
@@ -1687,6 +1785,8 @@ export function CommTimeComponent() {
                 linkTodoToAlarmPoint(todoId, alarmPointId)
             }
         },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Note: setMeetingTodos and setPomodoroTodos are aliases of setSharedTodos
         [
             meetingTodos,
             pomodoroTodos,
@@ -1694,8 +1794,6 @@ export function CommTimeComponent() {
             useDatabase,
             user,
             sharedSupabaseTodos,
-            setMeetingTodos,
-            setPomodoroTodos,
         ]
     )
 
@@ -2793,7 +2891,7 @@ export function CommTimeComponent() {
                                 memos={multipleMemos.memos}
                                 onCreateMemo={multipleMemos.createMemo}
                                 onUpdateMemo={multipleMemos.updateMemo}
-                                onDeleteMemo={multipleMemos.deleteMemo}
+                                onDeleteMemo={handleDeleteMemo}
                                 darkMode={darkMode}
                             />
                         </div>
@@ -2982,7 +3080,7 @@ export function CommTimeComponent() {
                             )}
 
                             <DragDropContext onDragEnd={onDragEnd}>
-                                <Droppable
+                                <StrictModeDroppable
                                     droppableId={
                                         activeTab === 'meeting'
                                             ? 'meetingTodos'
@@ -3473,7 +3571,7 @@ export function CommTimeComponent() {
                                             {provided.placeholder}
                                         </ul>
                                     )}
-                                </Droppable>
+                                </StrictModeDroppable>
                             </DragDropContext>
 
                             {/* TODO追加フォーム */}

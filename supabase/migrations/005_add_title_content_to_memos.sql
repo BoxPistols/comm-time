@@ -1,0 +1,4 @@
+-- 005_add_title_content_to_memos.sql
+ALTER TABLE memos
+ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT '',
+ADD COLUMN IF NOT EXISTS content TEXT NOT NULL DEFAULT '';

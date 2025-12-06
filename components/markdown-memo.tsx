@@ -15,13 +15,18 @@ export interface MemoData {
 }
 
 interface MarkdownMemoProps {
-  memo: MemoData
-  onUpdate: (id: string, title: string, content: string) => void
-  onDelete: (id: string) => void
-  darkMode: boolean
+    memo: MemoData
+    onUpdate: (id: string, title: string, content: string) => void
+    onDelete: (id: string) => void
+    darkMode: boolean
 }
 
-export function MarkdownMemo({ memo, onUpdate, onDelete, darkMode }: MarkdownMemoProps) {
+export function MarkdownMemo({
+    memo,
+    onUpdate,
+    onDelete,
+    darkMode,
+}: MarkdownMemoProps) {
     const [isEditing, setIsEditing] = useState(false)
     const [title, setTitle] = useState(memo.title)
     const [content, setContent] = useState(memo.content)
@@ -29,6 +34,7 @@ export function MarkdownMemo({ memo, onUpdate, onDelete, darkMode }: MarkdownMem
     const [isFullscreen, setIsFullscreen] = useState(false)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const titleInputRef = useRef<HTMLInputElement>(null)
+    const isComposingRef = useRef(false) // IME変換中フラグ
 
     // メモが更新されたら状態を同期（編集中でない場合のみ）
     useEffect(() => {
@@ -45,6 +51,28 @@ export function MarkdownMemo({ memo, onUpdate, onDelete, darkMode }: MarkdownMem
             textareaRef.current.focus()
         }
     }, [isEditing])
+
+    // IME変換状態の監視
+    useEffect(() => {
+        const handleCompositionStart = () => {
+            isComposingRef.current = true
+        }
+
+        const handleCompositionEnd = () => {
+            isComposingRef.current = false
+        }
+
+        window.addEventListener('compositionstart', handleCompositionStart)
+        window.addEventListener('compositionend', handleCompositionEnd)
+
+        return () => {
+            window.removeEventListener(
+                'compositionstart',
+                handleCompositionStart
+            )
+            window.removeEventListener('compositionend', handleCompositionEnd)
+        }
+    }, [])
 
     const handleSave = useCallback(() => {
         onUpdate(memo.id, title, content)
@@ -65,20 +93,89 @@ export function MarkdownMemo({ memo, onUpdate, onDelete, darkMode }: MarkdownMem
     // キーボードショートカット
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                if (isFullscreen) {
-                    setIsFullscreen(false)
-                } else {
-                    handleCancel()
-                }
-            }
+            // Cmd+S または Ctrl+S で保存
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                 e.preventDefault()
                 handleSave()
+                return
+            }
+
+            // Ctrl+F または Cmd+F で全画面表示を切り替え（編集中でも動作）
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault()
+                setIsFullscreen((prev) => !prev)
+                return
+            }
+
+            // Ctrl+E または Cmd+E で編集モードに入る（全画面表示中でも動作）
+            if ((e.ctrlKey || e.metaKey) && e.key === 'e' && !isEditing) {
+                e.preventDefault()
+                setIsEditing(true)
+                return
+            }
+
+            // Ctrl+Esc または Cmd+Esc で全画面表示を解除 / 編集をキャンセル
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Escape') {
+                e.preventDefault()
+                if (isFullscreen) {
+                    setIsFullscreen(false)
+                } else if (isEditing) {
+                    handleCancel()
+                }
             }
         },
-        [handleCancel, handleSave, isFullscreen]
+        [handleCancel, handleSave, isFullscreen, isEditing]
     )
+
+    // グローバルキーボードショートカット（全画面表示・編集用）
+    useEffect(() => {
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            // IME変換中は無視（2つの方法でチェック）
+            if (isComposingRef.current || e.isComposing) {
+                return
+            }
+
+            // input/textareaにフォーカスがある場合
+            const target = e.target as HTMLElement
+            const isInputFocused =
+                target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
+
+            // Ctrl+Esc または Cmd+Esc で全画面表示を解除
+            if (
+                (e.ctrlKey || e.metaKey) &&
+                e.key === 'Escape' &&
+                isFullscreen
+            ) {
+                e.preventDefault()
+                setIsFullscreen(false)
+                return
+            }
+
+            // Ctrl+F または Cmd+F で全画面表示を切り替え（常に動作）
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault()
+                setIsFullscreen((prev) => !prev)
+                return
+            }
+
+            // Ctrl+E または Cmd+E で編集モードに入る（常に動作）
+            if ((e.ctrlKey || e.metaKey) && e.key === 'e' && !isEditing) {
+                e.preventDefault()
+                setIsEditing(true)
+                return
+            }
+
+            // 編集中のテキストエリアでは、上記以外のショートカットを無視
+            if (isEditing && isInputFocused) {
+                return
+            }
+        }
+
+        window.addEventListener('keydown', handleGlobalKeyDown)
+        return () => {
+            window.removeEventListener('keydown', handleGlobalKeyDown)
+        }
+    }, [isEditing, isFullscreen])
 
     // 全画面モードの切り替え
     const toggleFullscreen = useCallback(() => {
@@ -171,7 +268,7 @@ export function MarkdownMemo({ memo, onUpdate, onDelete, darkMode }: MarkdownMem
                                         ? 'hover:bg-gray-700 text-blue-400'
                                         : 'hover:bg-gray-100 text-blue-600'
                                 }`}
-                                title='編集'
+                                title='編集 (Ctrl+E)'
                             >
                                 <Edit size={18} />
                             </button>
@@ -183,7 +280,9 @@ export function MarkdownMemo({ memo, onUpdate, onDelete, darkMode }: MarkdownMem
                                         : 'hover:bg-gray-100 text-purple-600'
                                 }`}
                                 title={
-                                    isFullscreen ? '縮小 (Esc)' : '全画面表示'
+                                    isFullscreen
+                                        ? '縮小 (Ctrl+Esc)'
+                                        : '全画面表示 (Ctrl+F)'
                                 }
                             >
                                 {isFullscreen ? (
