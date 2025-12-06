@@ -300,9 +300,6 @@ export function CommTimeComponent() {
         return []
     })
 
-    // メモゴミ箱UIの表示状態
-    const [showMemoTrash, setShowMemoTrash] = useState(false)
-
     // バージョン履歴（削除・10文字以上の変更のみ保存）
     const [todoVersions, setTodoVersions] = useState<TodoVersion[]>(() => {
         if (typeof window !== 'undefined') {
@@ -323,21 +320,6 @@ export function CommTimeComponent() {
             }
         }
         return []
-    })
-
-    // キーボードショートカット設定
-    const [keyboardShortcuts, setKeyboardShortcuts] = useState(() => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('keyboardShortcuts')
-            if (saved) {
-                try {
-                    return JSON.parse(saved)
-                } catch {
-                    return { fullscreen: 'f' }
-                }
-            }
-        }
-        return { fullscreen: 'f' }
     })
 
     // フラッシュの状態
@@ -565,10 +547,6 @@ export function CommTimeComponent() {
             localStorage.setItem('trashedTodos', JSON.stringify(trashedTodos))
             localStorage.setItem('todoVersions', JSON.stringify(todoVersions))
             localStorage.setItem('trashedMemos', JSON.stringify(trashedMemos))
-            localStorage.setItem(
-                'keyboardShortcuts',
-                JSON.stringify(keyboardShortcuts)
-            )
         }
     }, [
         mounted, // mountedを依存配列に追加
@@ -597,7 +575,6 @@ export function CommTimeComponent() {
         trashedTodos,
         todoVersions,
         trashedMemos,
-        keyboardShortcuts,
     ])
 
     // Supabaseデータの同期（データベースモード有効時）
@@ -1499,26 +1476,6 @@ export function CommTimeComponent() {
         },
         [multipleMemos, moveMemotoTrash]
     )
-
-    // ゴミ箱からメモを復元
-    const restoreMemo = useCallback(
-        (trashedMemo: TrashedMemoItem) => {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { deletedAt, ...memoData } = trashedMemo
-            multipleMemos.restoreMemo(memoData)
-
-            // ゴミ箱から削除
-            setTrashedMemos((prev) =>
-                prev.filter((m) => m.id !== trashedMemo.id)
-            )
-        },
-        [multipleMemos]
-    )
-
-    // ゴミ箱からメモを完全削除
-    const permanentlyDeleteMemo = useCallback((id: string) => {
-        setTrashedMemos((prev) => prev.filter((m) => m.id !== id))
-    }, [])
 
     // ゴミ箱を空にする
     const emptyTrash = useCallback(() => {

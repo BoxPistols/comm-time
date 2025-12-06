@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react"
 import { Swiper, SwiperSlide } from "swiper/react"
 import { Navigation, Pagination, Keyboard } from "swiper/modules"
+import 'swiper/css/mousewheel'
 import type { Swiper as SwiperType } from "swiper"
 import {
     Plus,
@@ -463,6 +464,14 @@ export function MemoSwiper({
                         spaceBetween={16}
                         slidesPerView={1}
                         keyboard={{ enabled: true }}
+                        mousewheel={{
+                            enabled: true,
+                            invert: false,
+                            forceToAxis: true,
+                            sensitivity: 1,
+                            thresholdDelta: 40,
+                            thresholdTime: 395,
+                        }}
                         pagination={{
                             clickable: true,
                             dynamicBullets: true,
