@@ -90,6 +90,32 @@ export function MemoSwiper({
         }
     }, [])
 
+    // トラックパッド/マウスホイールスワイプ対応
+    useEffect(() => {
+        const handleWheel = (e: WheelEvent) => {
+            if (!swiperInstance || memos.length === 0) return
+            if (isFullscreen) return // 全画面モード中は無視（モーダルで処理）
+
+            // 横方向スクロール（トラックパッド）を検出
+            if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+                e.preventDefault()
+                if (e.deltaX > 0) {
+                    swiperInstance.slideNext()
+                } else {
+                    swiperInstance.slidePrev()
+                }
+            }
+        }
+
+        const container = containerRef.current
+        if (container) {
+            container.addEventListener('wheel', handleWheel, { passive: false })
+            return () => {
+                container.removeEventListener('wheel', handleWheel)
+            }
+        }
+    }, [swiperInstance, memos.length, isFullscreen])
+
     // グローバルキーボードショートカット
     useEffect(() => {
         const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -111,13 +137,24 @@ export function MemoSwiper({
                 setIsFullscreen((prev) => !prev)
                 return
             }
+
+            // 矢印キーでメモを移動
+            if (isFullscreen && memos.length > 1) {
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    e.preventDefault()
+                    swiperInstance?.slideNext()
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    e.preventDefault()
+                    swiperInstance?.slidePrev()
+                }
+            }
         }
 
         window.addEventListener('keydown', handleGlobalKeyDown)
         return () => {
             window.removeEventListener('keydown', handleGlobalKeyDown)
         }
-    }, [memos.length, isFullscreen])
+    }, [memos.length, isFullscreen, swiperInstance])
 
     const handleSlideChange = useCallback((swiper: SwiperType) => {
         setActiveIndex(swiper.activeIndex)
@@ -430,14 +467,18 @@ export function MemoSwiper({
                 </div>
             ) : (
                 // スワイパービュー
-                <div className='flex-1 relative overflow-hidden'>
-                    {memos.length > 1 && !isBeginning && (
+                <div className='flex-1 flex items-center justify-between gap-2 px-2 overflow-hidden'>
+                    {/* 前のメモボタン */}
+                    {memos.length > 1 && (
                         <button
                             onClick={handlePrev}
-                            className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full shadow-lg transition-all ${
-                                darkMode
-                                    ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                                    : 'bg-white hover:bg-gray-100 text-gray-700'
+                            disabled={isBeginning}
+                            className={`flex-shrink-0 p-2 rounded-full transition-all ${
+                                isBeginning
+                                    ? 'opacity-30 cursor-not-allowed'
+                                    : darkMode
+                                    ? 'bg-gray-700 hover:bg-gray-600 text-white shadow-lg'
+                                    : 'bg-white hover:bg-gray-100 text-gray-700 shadow-lg'
                             }`}
                             aria-label='前のメモ'
                         >
@@ -445,75 +486,74 @@ export function MemoSwiper({
                         </button>
                     )}
 
-                    {memos.length > 1 && !isEnd && (
+                    {/* メモコンテンツエリア */}
+                    <div className='flex-1 overflow-hidden'>
+                        <Swiper
+                            modules={[Navigation, Pagination, Keyboard]}
+                            spaceBetween={16}
+                            slidesPerView={1}
+                            keyboard={{ enabled: true }}
+                            pagination={{
+                                clickable: true,
+                                dynamicBullets: true,
+                            }}
+                            onSwiper={setSwiperInstance}
+                            onSlideChange={handleSlideChange}
+                            className='h-full px-4 py-4'
+                            style={
+                                {
+                                    '--swiper-pagination-color': darkMode
+                                        ? '#3b82f6'
+                                        : '#2563eb',
+                                    '--swiper-pagination-bullet-inactive-color':
+                                        darkMode ? '#4b5563' : '#d1d5db',
+                                    '--swiper-pagination-bullet-inactive-opacity':
+                                        '1',
+                                } as React.CSSProperties
+                            }
+                        >
+                            {memos.map((memo, index) => (
+                                <SwiperSlide key={memo.id} className='pb-8'>
+                                    <div className='h-full'>
+                                        <MarkdownMemo
+                                            memo={memo}
+                                            onUpdate={onUpdateMemo}
+                                            onDelete={onDeleteMemo}
+                                            darkMode={darkMode}
+                                            isFullscreenMode={
+                                                index === activeIndex
+                                                    ? isFullscreen
+                                                    : false
+                                            }
+                                            onToggleFullscreen={
+                                                index === activeIndex
+                                                    ? toggleFullscreen
+                                                    : undefined
+                                            }
+                                        />
+                                    </div>
+                                </SwiperSlide>
+                            ))}
+                        </Swiper>
+                    </div>
+
+                    {/* 次のメモボタン */}
+                    {memos.length > 1 && (
                         <button
                             onClick={handleNext}
-                            className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full shadow-lg transition-all ${
-                                darkMode
-                                    ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                                    : 'bg-white hover:bg-gray-100 text-gray-700'
+                            disabled={isEnd}
+                            className={`flex-shrink-0 p-2 rounded-full transition-all ${
+                                isEnd
+                                    ? 'opacity-30 cursor-not-allowed'
+                                    : darkMode
+                                    ? 'bg-gray-700 hover:bg-gray-600 text-white shadow-lg'
+                                    : 'bg-white hover:bg-gray-100 text-gray-700 shadow-lg'
                             }`}
                             aria-label='次のメモ'
                         >
                             <ChevronRight size={24} />
                         </button>
                     )}
-
-                    <Swiper
-                        modules={[Navigation, Pagination, Keyboard]}
-                        spaceBetween={16}
-                        slidesPerView={1}
-                        keyboard={{ enabled: true }}
-                        mousewheel={{
-                            enabled: true,
-                            invert: false,
-                            forceToAxis: true,
-                            sensitivity: 1,
-                            thresholdDelta: 40,
-                            thresholdTime: 395,
-                        }}
-                        pagination={{
-                            clickable: true,
-                            dynamicBullets: true,
-                        }}
-                        onSwiper={setSwiperInstance}
-                        onSlideChange={handleSlideChange}
-                        className='h-full px-4 py-4'
-                        style={
-                            {
-                                '--swiper-pagination-color': darkMode
-                                    ? '#3b82f6'
-                                    : '#2563eb',
-                                '--swiper-pagination-bullet-inactive-color':
-                                    darkMode ? '#4b5563' : '#d1d5db',
-                                '--swiper-pagination-bullet-inactive-opacity':
-                                    '1',
-                            } as React.CSSProperties
-                        }
-                    >
-                        {memos.map((memo, index) => (
-                            <SwiperSlide key={memo.id} className='pb-8'>
-                                <div className='h-full'>
-                                    <MarkdownMemo
-                                        memo={memo}
-                                        onUpdate={onUpdateMemo}
-                                        onDelete={onDeleteMemo}
-                                        darkMode={darkMode}
-                                        isFullscreenMode={
-                                            index === activeIndex
-                                                ? isFullscreen
-                                                : false
-                                        }
-                                        onToggleFullscreen={
-                                            index === activeIndex
-                                                ? toggleFullscreen
-                                                : undefined
-                                        }
-                                    />
-                                </div>
-                            </SwiperSlide>
-                        ))}
-                    </Swiper>
                 </div>
             )}
         </div>

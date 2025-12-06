@@ -257,7 +257,26 @@ export function MarkdownMemo({
                         onClick={startEditing}
                     >
                         {content ? (
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                    input: (props) => {
+                                        if (props.type === 'checkbox') {
+                                            return (
+                                                <input
+                                                    {...props}
+                                                    className={`w-5 h-5 rounded border-2 cursor-pointer mx-1 transition-colors ${
+                                                        darkMode
+                                                            ? 'border-gray-500 checked:bg-blue-600 checked:border-blue-600 hover:border-gray-400'
+                                                            : 'border-gray-300 checked:bg-blue-500 checked:border-blue-500 hover:border-gray-400'
+                                                    }`}
+                                                />
+                                            )
+                                        }
+                                        return <input {...props} />
+                                    }
+                                }}
+                            >
                                 {content}
                             </ReactMarkdown>
                         ) : (
@@ -350,13 +369,32 @@ export function MarkdownMemo({
                         onToggleFullscreen?.()
                     }
                 }}
+                onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                        e.preventDefault()
+                        onToggleFullscreen?.()
+                    } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                        e.preventDefault()
+                        // Swiperに右矢印を送る
+                        document.dispatchEvent(new KeyboardEvent('keydown', {
+                            key: 'ArrowRight',
+                            bubbles: true
+                        }))
+                    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                        e.preventDefault()
+                        document.dispatchEvent(new KeyboardEvent('keydown', {
+                            key: 'ArrowLeft',
+                            bubbles: true
+                        }))
+                    }
+                }}
+                tabIndex={0}
             >
                 <div
                     className={`w-[90vw] h-[90vh] flex flex-col rounded-xl shadow-2xl overflow-hidden ${
                         darkMode ? 'bg-gray-900' : 'bg-gray-50'
                     }`}
                     onClick={(e) => e.stopPropagation()}
-                    onWheel={(e) => e.stopPropagation()}
                 >
                     {memoContent}
                 </div>
