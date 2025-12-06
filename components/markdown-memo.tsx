@@ -245,6 +245,33 @@ export function MarkdownMemo({
     });
   };
 
+  // チェックボックスをトグルする関数
+  const toggleCheckbox = useCallback(
+    (checkboxIndex: number) => {
+      // Markdownのチェックボックスパターン: - [ ] または - [x] (*, + も対応)
+      const checkboxPattern = /^(\s*[-*+]\s*)\[([ xX])\]/gm;
+      let currentIndex = 0;
+      const newContent = content.replace(
+        checkboxPattern,
+        (match: string, prefix: string, checked: string) => {
+          if (currentIndex === checkboxIndex) {
+            currentIndex++;
+            // トグル: 空白なら x に、x/X なら空白に
+            const newChecked = checked === " " ? "x" : " ";
+            return `${prefix}[${newChecked}]`;
+          }
+          currentIndex++;
+          return match;
+        }
+      );
+
+      // コンテンツを更新して保存
+      setContent(newContent);
+      onUpdate(memo.id, title, newContent);
+    },
+    [content, memo.id, title, onUpdate]
+  );
+
   // 全画面モード用のコンテンツ
   const memoContent = (
     <div
@@ -367,45 +394,63 @@ export function MarkdownMemo({
             onKeyDown={handleKeyDown}
           />
         ) : (
-          <div
-            className={`prose prose-sm max-w-none ${
-              darkMode ? "prose-invert" : ""
-            }`}
-            onClick={startEditing}
-          >
-            {content ? (
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  input: (props) => {
-                    if (props.type === "checkbox") {
-                      return (
-                        <input
-                          {...props}
-                          className={`w-5 h-5 rounded border-2 cursor-pointer mx-1 transition-colors ${
-                            darkMode
-                              ? "border-gray-500 checked:bg-blue-600 checked:border-blue-600 hover:border-gray-400"
-                              : "border-gray-300 checked:bg-blue-500 checked:border-blue-500 hover:border-gray-400"
-                          }`}
-                        />
-                      );
-                    }
-                    return <input {...props} />;
-                  },
+          (() => {
+            // チェックボックスのインデックスを追跡するカウンター
+            let checkboxCounter = 0;
+            return (
+              <div
+                className={`prose prose-sm max-w-none ${
+                  darkMode ? "prose-invert" : ""
+                }`}
+                onClick={(e) => {
+                  // チェックボックスがクリックされた場合は編集モードに入らない
+                  if ((e.target as HTMLElement).tagName === "INPUT") {
+                    return;
+                  }
+                  startEditing();
                 }}
               >
-                {content}
-              </ReactMarkdown>
-            ) : (
-              <p
-                className={`italic ${
-                  darkMode ? "text-gray-500" : "text-gray-400"
-                }`}
-              >
-                クリックして編集を開始...
-              </p>
-            )}
-          </div>
+                {content ? (
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      input: (props) => {
+                        if (props.type === "checkbox") {
+                          const currentIndex = checkboxCounter++;
+                          return (
+                            <input
+                              {...props}
+                              className={`w-5 h-5 rounded border-2 cursor-pointer mx-1 transition-colors ${
+                                darkMode
+                                  ? "border-gray-500 checked:bg-blue-600 checked:border-blue-600 hover:border-gray-400"
+                                  : "border-gray-300 checked:bg-blue-500 checked:border-blue-500 hover:border-gray-400"
+                              }`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleCheckbox(currentIndex);
+                              }}
+                              onChange={() => {}} // コントロールドコンポーネントの警告を回避
+                            />
+                          );
+                        }
+                        return <input {...props} />;
+                      },
+                    }}
+                  >
+                    {content}
+                  </ReactMarkdown>
+                ) : (
+                  <p
+                    className={`italic ${
+                      darkMode ? "text-gray-500" : "text-gray-400"
+                    }`}
+                  >
+                    クリックして編集を開始...
+                  </p>
+                )}
+              </div>
+            );
+          })()
         )}
       </div>
 
@@ -550,13 +595,13 @@ export function MarkdownMemo({
         tabIndex={0}
       >
         <div
-          className="w-[90vw] h-[90vh] flex items-center justify-center gap-2"
+          className="w-[98vw] sm:w-[95vw] md:w-[90vw] h-[95vh] sm:h-[90vh] flex flex-col md:flex-row items-center justify-center gap-2"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* 左矢印 */}
+          {/* 左矢印（デスクトップのみ表示） */}
           <button
             onClick={onNavigatePrev}
-            className={`flex-shrink-0 p-2 rounded-full transition-colors ${
+            className={`hidden md:flex flex-shrink-0 p-2 rounded-full transition-colors ${
               darkMode
                 ? "hover:bg-gray-700 text-gray-400 hover:text-gray-200"
                 : "hover:bg-gray-200 text-gray-600 hover:text-gray-800"
@@ -568,17 +613,43 @@ export function MarkdownMemo({
 
           {/* メモコンテンツ */}
           <div
-            className={`flex-1 flex flex-col rounded-xl shadow-2xl overflow-hidden h-full ${
+            className={`flex-1 w-full md:w-auto flex flex-col rounded-xl shadow-2xl overflow-hidden min-h-0 ${
               darkMode ? "bg-gray-900" : "bg-gray-50"
             }`}
           >
             {memoContent}
           </div>
 
-          {/* 右矢印 */}
+          {/* ナビゲーションボタン（モバイルは下部に横並び、デスクトップは右矢印のみ） */}
+          <div className="flex md:hidden items-center justify-center gap-4 py-2 flex-shrink-0">
+            <button
+              onClick={onNavigatePrev}
+              className={`p-3 rounded-full transition-colors ${
+                darkMode
+                  ? "bg-gray-800 hover:bg-gray-700 text-gray-300"
+                  : "bg-white hover:bg-gray-100 text-gray-600"
+              }`}
+              title="前のメモ"
+            >
+              <ChevronLeft size={28} />
+            </button>
+            <button
+              onClick={onNavigateNext}
+              className={`p-3 rounded-full transition-colors ${
+                darkMode
+                  ? "bg-gray-800 hover:bg-gray-700 text-gray-300"
+                  : "bg-white hover:bg-gray-100 text-gray-600"
+              }`}
+              title="次のメモ"
+            >
+              <ChevronRight size={28} />
+            </button>
+          </div>
+
+          {/* 右矢印（デスクトップのみ表示） */}
           <button
             onClick={onNavigateNext}
-            className={`flex-shrink-0 p-2 rounded-full transition-colors ${
+            className={`hidden md:flex flex-shrink-0 p-2 rounded-full transition-colors ${
               darkMode
                 ? "hover:bg-gray-700 text-gray-400 hover:text-gray-200"
                 : "hover:bg-gray-200 text-gray-600 hover:text-gray-800"
