@@ -43,6 +43,19 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE memos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE todos ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist to avoid duplicate errors
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can view own memos" ON memos;
+DROP POLICY IF EXISTS "Users can insert own memos" ON memos;
+DROP POLICY IF EXISTS "Users can update own memos" ON memos;
+DROP POLICY IF EXISTS "Users can delete own memos" ON memos;
+DROP POLICY IF EXISTS "Users can view own todos" ON todos;
+DROP POLICY IF EXISTS "Users can insert own todos" ON todos;
+DROP POLICY IF EXISTS "Users can update own todos" ON todos;
+DROP POLICY IF EXISTS "Users can delete own todos" ON todos;
+
 -- RLSポリシー: Profiles（自分のプロフィールのみアクセス可能）
 CREATE POLICY "Users can view own profile"
   ON profiles FOR SELECT
