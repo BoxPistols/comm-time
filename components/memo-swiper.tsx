@@ -530,6 +530,8 @@ export function MemoSwiper({
                                                     ? toggleFullscreen
                                                     : undefined
                                             }
+                                            onNavigatePrev={handlePrev}
+                                            onNavigateNext={handleNext}
                                         />
                                     </div>
                                 </SwiperSlide>

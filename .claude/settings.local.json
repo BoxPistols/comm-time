@@ -26,7 +26,8 @@
       "Bash(lsof:*)",
       "Bash(kill:*)",
       "Bash(npm run dev:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(pnpm run dev:*)"
     ],
     "deny": [],
     "ask": []

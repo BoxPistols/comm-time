@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { createPortal } from 'react-dom'
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { Edit, Eye, Trash2, Save, Maximize2, Minimize2 } from "lucide-react"
+import { Edit, Eye, Trash2, Save, Maximize2, Minimize2, ChevronLeft, ChevronRight } from "lucide-react"
 
 export interface MemoData {
   id: string
@@ -23,6 +23,8 @@ interface MarkdownMemoProps {
     onToggleFullscreen?: () => void // 親から全画面切り替えをコールバック
     onStartEditing?: () => void // 親から編集モード開始をコールバック
     isFullscreenMode?: boolean // 親から制御される全画面状態
+    onNavigatePrev?: () => void // 全画面モードで前のメモへ
+    onNavigateNext?: () => void // 全画面モードで次のメモへ
 }
 
 export function MarkdownMemo({
@@ -33,6 +35,8 @@ export function MarkdownMemo({
     onToggleFullscreen,
     onStartEditing,
     isFullscreenMode,
+    onNavigatePrev,
+    onNavigateNext,
 }: MarkdownMemoProps) {
     const [isEditing, setIsEditing] = useState(false)
     const [title, setTitle] = useState(memo.title)
@@ -42,6 +46,8 @@ export function MarkdownMemo({
     const [internalFullscreen, setInternalFullscreen] = useState(false)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const titleInputRef = useRef<HTMLInputElement>(null)
+    const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    const isComposingRef = useRef(false)
 
     // 全画面状態（親から制御される場合はそちらを優先）
     const isFullscreen =
@@ -56,12 +62,56 @@ export function MarkdownMemo({
         }
     }, [memo.title, memo.content, isEditing])
 
+    // IME変換状態の監視
+    useEffect(() => {
+        const handleCompositionStart = () => {
+            isComposingRef.current = true
+        }
+        const handleCompositionEnd = () => {
+            isComposingRef.current = false
+        }
+
+        document.addEventListener('compositionstart', handleCompositionStart)
+        document.addEventListener('compositionend', handleCompositionEnd)
+
+        return () => {
+            document.removeEventListener('compositionstart', handleCompositionStart)
+            document.removeEventListener('compositionend', handleCompositionEnd)
+        }
+    }, [])
+
     // 編集モードに入ったらテキストエリアにフォーカス
     useEffect(() => {
         if (isEditing && textareaRef.current) {
             textareaRef.current.focus()
         }
     }, [isEditing])
+
+    // 自動保存（2秒のデバウンス）
+    useEffect(() => {
+        if (!isEditing) return
+
+        // 前回のタイムアウトをクリア
+        if (autoSaveTimeoutRef.current) {
+            clearTimeout(autoSaveTimeoutRef.current)
+        }
+
+        // 変更があったかチェック
+        const hasChanges = title !== memo.title || content !== memo.content
+
+        if (hasChanges) {
+            // 2秒後に自動保存
+            autoSaveTimeoutRef.current = setTimeout(() => {
+                onUpdate(memo.id, title, content)
+            }, 2000)
+        }
+
+        return () => {
+            if (autoSaveTimeoutRef.current) {
+                clearTimeout(autoSaveTimeoutRef.current)
+            }
+        }
+    }, [title, content, isEditing, memo.id, memo.title, memo.content, onUpdate])
 
     const handleSave = useCallback(() => {
         onUpdate(memo.id, title, content)
@@ -88,8 +138,24 @@ export function MarkdownMemo({
                 handleSave()
                 return
             }
+            // Cmd+E または Ctrl+E で編集モード切り替え
+            if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+                e.preventDefault()
+                if (isEditing) {
+                    handleSave()
+                } else {
+                    startEditing()
+                }
+                return
+            }
+            // Cmd+F または Ctrl+F で全画面切り替え
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault()
+                toggleFullscreen()
+                return
+            }
         },
-        [handleSave]
+        [handleSave, isEditing, startEditing, toggleFullscreen]
     )
 
     // 全画面モードの切り替え
@@ -124,8 +190,6 @@ export function MarkdownMemo({
     const memoContent = (
         <div
             className={`flex flex-col rounded-lg border ${
-                isFullscreen ? 'h-full' : 'h-full'
-            } ${
                 darkMode
                     ? 'bg-gray-800 border-gray-700'
                     : 'bg-white border-gray-200'
@@ -133,7 +197,7 @@ export function MarkdownMemo({
         >
             {/* ヘッダー */}
             <div
-                className={`flex items-center justify-between p-3 border-b ${
+                className={`flex-shrink-0 flex items-center justify-between p-3 border-b ${
                     darkMode ? 'border-gray-700' : 'border-gray-200'
                 }`}
             >
@@ -294,7 +358,7 @@ export function MarkdownMemo({
 
             {/* フッター（更新日時） */}
             <div
-                className={`px-3 py-2 text-xs border-t ${
+                className={`flex-shrink-0 px-3 py-2 text-xs border-t ${
                     darkMode
                         ? 'border-gray-700 text-gray-500'
                         : 'border-gray-200 text-gray-400'
@@ -396,12 +460,43 @@ export function MarkdownMemo({
                 tabIndex={0}
             >
                 <div
-                    className={`w-[90vw] h-[90vh] flex flex-col rounded-xl shadow-2xl overflow-hidden ${
-                        darkMode ? 'bg-gray-900' : 'bg-gray-50'
-                    }`}
+                    className='w-[90vw] h-[90vh] flex items-center justify-center gap-2'
                     onClick={(e) => e.stopPropagation()}
                 >
-                    {memoContent}
+                    {/* 左矢印 */}
+                    <button
+                        onClick={onNavigatePrev}
+                        className={`flex-shrink-0 p-2 rounded-full transition-colors ${
+                            darkMode
+                                ? 'hover:bg-gray-700 text-gray-400 hover:text-gray-200'
+                                : 'hover:bg-gray-200 text-gray-600 hover:text-gray-800'
+                        }`}
+                        title='前のメモ (←)'
+                    >
+                        <ChevronLeft size={24} />
+                    </button>
+
+                    {/* メモコンテンツ */}
+                    <div
+                        className={`flex-1 flex flex-col rounded-xl shadow-2xl overflow-hidden h-full ${
+                            darkMode ? 'bg-gray-900' : 'bg-gray-50'
+                        }`}
+                    >
+                        {memoContent}
+                    </div>
+
+                    {/* 右矢印 */}
+                    <button
+                        onClick={onNavigateNext}
+                        className={`flex-shrink-0 p-2 rounded-full transition-colors ${
+                            darkMode
+                                ? 'hover:bg-gray-700 text-gray-400 hover:text-gray-200'
+                                : 'hover:bg-gray-200 text-gray-600 hover:text-gray-800'
+                        }`}
+                        title='次のメモ (→)'
+                    >
+                        <ChevronRight size={24} />
+                    </button>
                 </div>
             </div>,
             document.body
