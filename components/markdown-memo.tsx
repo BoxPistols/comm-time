@@ -343,12 +343,20 @@ export function MarkdownMemo({
         if (typeof document === 'undefined') return null
 
         return createPortal(
-            <div className='fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm'>
+            <div
+                className='fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm'
+                onClick={(e) => {
+                    if (e.target === e.currentTarget) {
+                        onToggleFullscreen?.()
+                    }
+                }}
+            >
                 <div
                     className={`w-[90vw] h-[90vh] flex flex-col rounded-xl shadow-2xl overflow-hidden ${
                         darkMode ? 'bg-gray-900' : 'bg-gray-50'
                     }`}
                     onClick={(e) => e.stopPropagation()}
+                    onWheel={(e) => e.stopPropagation()}
                 >
                     {memoContent}
                 </div>
