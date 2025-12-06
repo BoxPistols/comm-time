@@ -370,17 +370,22 @@ export function MarkdownMemo({
                     }
                 }}
                 onKeyDown={(e) => {
+                    // テキスト入力要素がフォーカスされている場合は矢印キーを処理しない
+                    const activeElement = document.activeElement
+                    const isInputFocused = activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement
+                    const isEditing = isInputFocused || isComposingRef.current
+
                     if (e.key === 'Escape') {
                         e.preventDefault()
                         onToggleFullscreen?.()
-                    } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    } else if (!isEditing && (e.key === 'ArrowRight' || e.key === 'ArrowDown')) {
                         e.preventDefault()
                         // Swiperに右矢印を送る
                         document.dispatchEvent(new KeyboardEvent('keydown', {
                             key: 'ArrowRight',
                             bubbles: true
                         }))
-                    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    } else if (!isEditing && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')) {
                         e.preventDefault()
                         document.dispatchEvent(new KeyboardEvent('keydown', {
                             key: 'ArrowLeft',
