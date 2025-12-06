@@ -30,7 +30,6 @@ export function MarkdownMemo({
     onUpdate,
     onDelete,
     darkMode,
-    isActive = true,
     onToggleFullscreen,
     onStartEditing,
     isFullscreenMode,
@@ -109,15 +108,6 @@ export function MarkdownMemo({
         }
         setIsEditing(true)
     }, [onStartEditing])
-
-    // 全画面表示を解除
-    const exitFullscreen = useCallback(() => {
-        if (onToggleFullscreen) {
-            onToggleFullscreen()
-        } else {
-            setInternalFullscreen(false)
-        }
-    }, [onToggleFullscreen])
 
     const formatDate = (dateString: string) => {
         const date = new Date(dateString)
