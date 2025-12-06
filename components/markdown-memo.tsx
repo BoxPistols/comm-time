@@ -113,6 +113,50 @@ export function MarkdownMemo({
         }
     }, [title, content, isEditing, memo.id, memo.title, memo.content, onUpdate])
 
+    // グローバルキーボードショートカット（通常モード用）
+    useEffect(() => {
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            if (isComposingRef.current) return
+
+            // Cmd+S または Ctrl+S で保存
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault()
+                handleSave()
+                return
+            }
+
+            // Cmd+E または Ctrl+E で編集モード切り替え
+            if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+                e.preventDefault()
+                if (isEditing) {
+                    handleSave()
+                } else {
+                    startEditing()
+                }
+                return
+            }
+
+            // Cmd+F または Ctrl+F で全画面切り替え
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault()
+                toggleFullscreen()
+                return
+            }
+
+            // Ctrl+Esc で編集キャンセル
+            if (e.ctrlKey && e.key === 'Escape') {
+                e.preventDefault()
+                handleCancel()
+                return
+            }
+        }
+
+        window.addEventListener('keydown', handleGlobalKeyDown)
+        return () => {
+            window.removeEventListener('keydown', handleGlobalKeyDown)
+        }
+    }, [handleSave, handleCancel, isEditing, startEditing, toggleFullscreen])
+
     const handleSave = useCallback(() => {
         onUpdate(memo.id, title, content)
         setIsEditing(false)
@@ -445,17 +489,54 @@ export function MarkdownMemo({
                     const isInputFocused = activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement
                     const isEditing = isInputFocused || isComposingRef.current
 
+                    // Escape で全画面を閉じる
                     if (e.key === 'Escape') {
                         e.preventDefault()
                         onToggleFullscreen?.()
-                    } else if (!isEditing && (e.key === 'ArrowRight' || e.key === 'ArrowDown')) {
+                        return
+                    }
+
+                    // Cmd+S または Ctrl+S で保存
+                    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                         e.preventDefault()
-                        // Swiperに右矢印を送る
+                        handleSave()
+                        return
+                    }
+
+                    // Cmd+E または Ctrl+E で編集モード切り替え
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+                        e.preventDefault()
+                        if (isEditing) {
+                            handleSave()
+                        } else {
+                            startEditing()
+                        }
+                        return
+                    }
+
+                    // Ctrl+Esc で編集キャンセル
+                    if (e.ctrlKey && e.key === 'Escape') {
+                        e.preventDefault()
+                        handleCancel()
+                        return
+                    }
+
+                    // 拡大時・編集中は左右キーでの移動を廃止
+                    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                        if (isEditing) {
+                            // 編集中は何もしない（デフォルト動作に任せる）
+                            return
+                        }
+                        e.preventDefault()
                         document.dispatchEvent(new KeyboardEvent('keydown', {
                             key: 'ArrowRight',
                             bubbles: true
                         }))
-                    } else if (!isEditing && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')) {
+                    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                        if (isEditing) {
+                            // 編集中は何もしない（デフォルト動作に任せる）
+                            return
+                        }
                         e.preventDefault()
                         document.dispatchEvent(new KeyboardEvent('keydown', {
                             key: 'ArrowLeft',
