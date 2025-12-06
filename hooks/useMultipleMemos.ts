@@ -21,22 +21,33 @@ function createNewMemo(): MemoData {
 
 // ローカルストレージからメモを取得
 function getLocalMemos(): MemoData[] {
-  if (typeof window === "undefined") return []
+  if (typeof window === "undefined") {
+    console.log("[useMultipleMemos] getLocalMemos: window is undefined (SSR)")
+    return []
+  }
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY)
-    return saved ? JSON.parse(saved) : []
-  } catch {
+    const memos = saved ? JSON.parse(saved) : []
+    console.log("[useMultipleMemos] getLocalMemos: retrieved", memos.length, "memos")
+    return memos
+  } catch (error) {
+    console.error("[useMultipleMemos] getLocalMemos error:", error)
     return []
   }
 }
 
 // ローカルストレージにメモを保存
 function saveLocalMemos(memos: MemoData[]) {
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined") {
+    console.log("[useMultipleMemos] saveLocalMemos: window is undefined (SSR)")
+    return
+  }
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(memos))
+    const data = JSON.stringify(memos)
+    localStorage.setItem(LOCAL_STORAGE_KEY, data)
+    console.log("[useMultipleMemos] saveLocalMemos: saved", memos.length, "memos, size:", data.length, "bytes")
   } catch (error) {
-    console.error("Error saving memos to localStorage:", error)
+    console.error("[useMultipleMemos] saveLocalMemos error:", error)
   }
 }
 
