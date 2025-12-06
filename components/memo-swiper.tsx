@@ -4,7 +4,21 @@ import { useState, useCallback, useEffect, useRef } from "react"
 import { Swiper, SwiperSlide } from "swiper/react"
 import { Navigation, Pagination, Keyboard } from "swiper/modules"
 import type { Swiper as SwiperType } from "swiper"
-import { Plus, FileText, ChevronLeft, ChevronRight } from "lucide-react"
+import {
+    Plus,
+    FileText,
+    ChevronLeft,
+    ChevronRight,
+    List,
+    Grid,
+    GripVertical,
+} from 'lucide-react'
+import {
+    DragDropContext,
+    Droppable,
+    Draggable,
+    DropResult,
+} from 'react-beautiful-dnd'
 import { MarkdownMemo, type MemoData } from "./markdown-memo"
 
 // Swiper CSS
@@ -17,6 +31,7 @@ interface MemoSwiperProps {
     onCreateMemo: () => void
     onUpdateMemo: (id: string, title: string, content: string) => void
     onDeleteMemo: (id: string) => void
+    onReorderMemos?: (memos: MemoData[]) => void
     darkMode: boolean
 }
 
@@ -25,6 +40,7 @@ export function MemoSwiper({
     onCreateMemo,
     onUpdateMemo,
     onDeleteMemo,
+    onReorderMemos,
     darkMode,
 }: MemoSwiperProps) {
     const [swiperInstance, setSwiperInstance] = useState<SwiperType | null>(
@@ -35,12 +51,16 @@ export function MemoSwiper({
     const [isEnd, setIsEnd] = useState(false)
     const prevMemosLengthRef = useRef(memos.length)
 
+    // 表示モード: 'swiper' | 'list'
+    const [viewMode, setViewMode] = useState<'swiper' | 'list'>('swiper')
     // 全画面表示状態（アクティブなメモのみ）
     const [isFullscreen, setIsFullscreen] = useState(false)
     // IME変換中フラグ
     const isComposingRef = useRef(false)
-    // コンテナRef（フォーカス判定用）
+    // コンテナRef
     const containerRef = useRef<HTMLDivElement>(null)
+    // StrictMode対応
+    const [droppableEnabled, setDroppableEnabled] = useState(false)
 
     // メモが追加されたら最後のスライド（右端）に移動
     useEffect(() => {
@@ -54,6 +74,15 @@ export function MemoSwiper({
         // 現在の長さを保存
         prevMemosLengthRef.current = memos.length
     }, [memos.length, swiperInstance])
+
+    // StrictMode対応: Droppableを遅延有効化
+    useEffect(() => {
+        const animation = requestAnimationFrame(() => setDroppableEnabled(true))
+        return () => {
+            cancelAnimationFrame(animation)
+            setDroppableEnabled(false)
+        }
+    }, [])
 
     // IME変換状態の監視
     useEffect(() => {
@@ -77,7 +106,7 @@ export function MemoSwiper({
         }
     }, [])
 
-    // グローバルキーボードショートカット（親コンポーネントで一元管理）
+    // グローバルキーボードショートカット
     useEffect(() => {
         const handleGlobalKeyDown = (e: KeyboardEvent) => {
             // IME変換中は無視
@@ -138,6 +167,43 @@ export function MemoSwiper({
         setIsFullscreen((prev) => !prev)
     }, [])
 
+    // ドラッグ&ドロップの処理
+    const handleDragEnd = useCallback(
+        (result: DropResult) => {
+            if (!result.destination) return
+
+            const items = Array.from(memos)
+            const [reorderedItem] = items.splice(result.source.index, 1)
+            items.splice(result.destination.index, 0, reorderedItem)
+
+            if (onReorderMemos) {
+                onReorderMemos(items)
+            }
+        },
+        [memos, onReorderMemos]
+    )
+
+    // リストビューでメモをクリックしたらスワイパービューに切り替え
+    const handleMemoClick = useCallback(
+        (index: number) => {
+            setViewMode('swiper')
+            setTimeout(() => {
+                swiperInstance?.slideTo(index, 300)
+            }, 100)
+        },
+        [swiperInstance]
+    )
+
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString)
+        return date.toLocaleDateString('ja-JP', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        })
+    }
+
     return (
         <div ref={containerRef} className='w-full h-full flex flex-col'>
             {/* ヘッダー */}
@@ -158,7 +224,7 @@ export function MemoSwiper({
                     >
                         メモ ({memos.length})
                     </span>
-                    {memos.length > 0 && (
+                    {viewMode === 'swiper' && memos.length > 0 && (
                         <span
                             className={`text-sm ${
                                 darkMode ? 'text-gray-500' : 'text-gray-400'
@@ -168,17 +234,58 @@ export function MemoSwiper({
                         </span>
                     )}
                 </div>
-                <button
-                    onClick={onCreateMemo}
-                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        darkMode
-                            ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                            : 'bg-blue-500 hover:bg-blue-600 text-white'
-                    }`}
-                >
-                    <Plus size={16} />
-                    <span>新規メモ</span>
-                </button>
+                <div className='flex items-center gap-2'>
+                    {/* 表示モード切替ボタン */}
+                    {memos.length > 0 && (
+                        <div
+                            className={`flex rounded-lg overflow-hidden border ${
+                                darkMode ? 'border-gray-600' : 'border-gray-300'
+                            }`}
+                        >
+                            <button
+                                onClick={() => setViewMode('swiper')}
+                                className={`p-1.5 transition-colors ${
+                                    viewMode === 'swiper'
+                                        ? darkMode
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-blue-500 text-white'
+                                        : darkMode
+                                        ? 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
+                                title='スライド表示'
+                            >
+                                <Grid size={16} />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('list')}
+                                className={`p-1.5 transition-colors ${
+                                    viewMode === 'list'
+                                        ? darkMode
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-blue-500 text-white'
+                                        : darkMode
+                                        ? 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
+                                title='リスト表示（並び替え可能）'
+                            >
+                                <List size={16} />
+                            </button>
+                        </div>
+                    )}
+                    <button
+                        onClick={onCreateMemo}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                            darkMode
+                                ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                : 'bg-blue-500 hover:bg-blue-600 text-white'
+                        }`}
+                    >
+                        <Plus size={16} />
+                        <span>新規</span>
+                    </button>
+                </div>
             </div>
 
             {/* メモコンテンツ */}
@@ -205,7 +312,108 @@ export function MemoSwiper({
                         <span>最初のメモを作成</span>
                     </button>
                 </div>
+            ) : viewMode === 'list' ? (
+                // リストビュー（ドラッグ並び替え可能）
+                <div className='flex-1 overflow-auto p-4'>
+                    <DragDropContext onDragEnd={handleDragEnd}>
+                        {droppableEnabled && (
+                            <Droppable droppableId='memo-list'>
+                                {(provided) => (
+                                    <ul
+                                        {...provided.droppableProps}
+                                        ref={provided.innerRef}
+                                        className='space-y-2'
+                                    >
+                                        {memos.map((memo, index) => (
+                                            <Draggable
+                                                key={memo.id}
+                                                draggableId={memo.id}
+                                                index={index}
+                                            >
+                                                {(provided, snapshot) => (
+                                                    <li
+                                                        ref={provided.innerRef}
+                                                        {...provided.draggableProps}
+                                                        className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                                                            snapshot.isDragging
+                                                                ? darkMode
+                                                                    ? 'bg-gray-700 border-blue-500 shadow-lg'
+                                                                    : 'bg-white border-blue-500 shadow-lg'
+                                                                : darkMode
+                                                                ? 'bg-gray-800 border-gray-700 hover:border-gray-600'
+                                                                : 'bg-white border-gray-200 hover:border-gray-300'
+                                                        }`}
+                                                    >
+                                                        {/* ドラッグハンドル */}
+                                                        <div
+                                                            {...provided.dragHandleProps}
+                                                            className={`cursor-grab active:cursor-grabbing ${
+                                                                darkMode
+                                                                    ? 'text-gray-500'
+                                                                    : 'text-gray-400'
+                                                            }`}
+                                                        >
+                                                            <GripVertical
+                                                                size={20}
+                                                            />
+                                                        </div>
+
+                                                        {/* メモ情報 */}
+                                                        <div
+                                                            className='flex-1 min-w-0 cursor-pointer'
+                                                            onClick={() =>
+                                                                handleMemoClick(
+                                                                    index
+                                                                )
+                                                            }
+                                                        >
+                                                            <h4
+                                                                className={`font-medium truncate ${
+                                                                    darkMode
+                                                                        ? 'text-white'
+                                                                        : 'text-gray-900'
+                                                                }`}
+                                                            >
+                                                                {memo.title ||
+                                                                    '無題のメモ'}
+                                                            </h4>
+                                                            <p
+                                                                className={`text-sm truncate ${
+                                                                    darkMode
+                                                                        ? 'text-gray-400'
+                                                                        : 'text-gray-500'
+                                                                }`}
+                                                            >
+                                                                {memo.content ||
+                                                                    'コンテンツなし'}
+                                                            </p>
+                                                        </div>
+
+                                                        {/* 更新日時 */}
+                                                        <span
+                                                            className={`text-xs whitespace-nowrap ${
+                                                                darkMode
+                                                                    ? 'text-gray-500'
+                                                                    : 'text-gray-400'
+                                                            }`}
+                                                        >
+                                                            {formatDate(
+                                                                memo.updated_at
+                                                            )}
+                                                        </span>
+                                                    </li>
+                                                )}
+                                            </Draggable>
+                                        ))}
+                                        {provided.placeholder}
+                                    </ul>
+                                )}
+                            </Droppable>
+                        )}
+                    </DragDropContext>
+                </div>
             ) : (
+                // スワイパービュー
                 <div className='flex-1 relative overflow-hidden'>
                     {/* ナビゲーションボタン（左） */}
                     {memos.length > 1 && !isBeginning && (
@@ -251,7 +459,6 @@ export function MemoSwiper({
                         className='h-full px-4 py-4'
                         style={
                             {
-                                // Pagination bullets styling
                                 '--swiper-pagination-color': darkMode
                                     ? '#3b82f6'
                                     : '#2563eb',
@@ -270,7 +477,6 @@ export function MemoSwiper({
                                         onUpdate={onUpdateMemo}
                                         onDelete={onDeleteMemo}
                                         darkMode={darkMode}
-                                        isActive={index === activeIndex}
                                         isFullscreenMode={
                                             index === activeIndex
                                                 ? isFullscreen

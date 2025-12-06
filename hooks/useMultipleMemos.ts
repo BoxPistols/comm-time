@@ -63,12 +63,12 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
 
         try {
             if (useDatabase && user) {
-                // Supabaseから取得
+                // Supabaseから取得（作成日時の昇順で取得、古いものが左、新しいものが右）
                 const { data, error: fetchError } = await supabase
                     .from('memos')
                     .select('*')
                     .eq('user_id', user.id)
-                    .order('updated_at', { ascending: false })
+                    .order('created_at', { ascending: true })
 
                 if (fetchError) throw fetchError
 
@@ -354,6 +354,21 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
         }
     }, [user, useDatabase, fetchMemos])
 
+    // メモの並び替え
+    const reorderMemos = useCallback(
+        (reorderedMemos: MemoData[]) => {
+            setMemos(reorderedMemos)
+
+            // ローカルストレージに保存
+            if (!useDatabase || !user) {
+                saveLocalMemos(reorderedMemos)
+            }
+            // Note: Supabaseモードでは順序はcreated_atで決まるため、
+            // 順序の永続化が必要な場合はorder_indexカラムを追加する必要があります
+        },
+        [useDatabase, user]
+    )
+
     return {
         memos,
         loading,
@@ -362,6 +377,7 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
         updateMemo,
         deleteMemo,
         restoreMemo,
+        reorderMemos,
         refreshMemos: fetchMemos,
     }
 }

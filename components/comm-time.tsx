@@ -2892,6 +2892,7 @@ export function CommTimeComponent() {
                                 onCreateMemo={multipleMemos.createMemo}
                                 onUpdateMemo={multipleMemos.updateMemo}
                                 onDeleteMemo={handleDeleteMemo}
+                                onReorderMemos={multipleMemos.reorderMemos}
                                 darkMode={darkMode}
                             />
                         </div>
