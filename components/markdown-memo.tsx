@@ -19,6 +19,10 @@ interface MarkdownMemoProps {
     onUpdate: (id: string, title: string, content: string) => void
     onDelete: (id: string) => void
     darkMode: boolean
+    isActive?: boolean // このメモがアクティブ（表示中）かどうか
+    onToggleFullscreen?: () => void // 親から全画面切り替えをコールバック
+    onStartEditing?: () => void // 親から編集モード開始をコールバック
+    isFullscreenMode?: boolean // 親から制御される全画面状態
 }
 
 export function MarkdownMemo({
@@ -26,15 +30,23 @@ export function MarkdownMemo({
     onUpdate,
     onDelete,
     darkMode,
+    isActive = true,
+    onToggleFullscreen,
+    onStartEditing,
+    isFullscreenMode,
 }: MarkdownMemoProps) {
     const [isEditing, setIsEditing] = useState(false)
     const [title, setTitle] = useState(memo.title)
     const [content, setContent] = useState(memo.content)
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-    const [isFullscreen, setIsFullscreen] = useState(false)
+    // 内部の全画面状態（親から制御されない場合に使用）
+    const [internalFullscreen, setInternalFullscreen] = useState(false)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const titleInputRef = useRef<HTMLInputElement>(null)
-    const isComposingRef = useRef(false) // IME変換中フラグ
+
+    // 全画面状態（親から制御される場合はそちらを優先）
+    const isFullscreen =
+        isFullscreenMode !== undefined ? isFullscreenMode : internalFullscreen
 
     // メモが更新されたら状態を同期（編集中でない場合のみ）
     useEffect(() => {
@@ -52,28 +64,6 @@ export function MarkdownMemo({
         }
     }, [isEditing])
 
-    // IME変換状態の監視
-    useEffect(() => {
-        const handleCompositionStart = () => {
-            isComposingRef.current = true
-        }
-
-        const handleCompositionEnd = () => {
-            isComposingRef.current = false
-        }
-
-        window.addEventListener('compositionstart', handleCompositionStart)
-        window.addEventListener('compositionend', handleCompositionEnd)
-
-        return () => {
-            window.removeEventListener(
-                'compositionstart',
-                handleCompositionStart
-            )
-            window.removeEventListener('compositionend', handleCompositionEnd)
-        }
-    }, [])
-
     const handleSave = useCallback(() => {
         onUpdate(memo.id, title, content)
         setIsEditing(false)
@@ -90,7 +80,7 @@ export function MarkdownMemo({
         setShowDeleteConfirm(false)
     }, [memo.id, onDelete])
 
-    // キーボードショートカット
+    // キーボードショートカット（入力フィールド内でのみ有効）
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
             // Cmd+S または Ctrl+S で保存
@@ -99,88 +89,35 @@ export function MarkdownMemo({
                 handleSave()
                 return
             }
-
-            // Ctrl+F または Cmd+F で全画面表示を切り替え（編集中でも動作）
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault()
-                setIsFullscreen((prev) => !prev)
-                return
-            }
-
-            // Ctrl+E または Cmd+E で編集モードに入る（全画面表示中でも動作）
-            if ((e.ctrlKey || e.metaKey) && e.key === 'e' && !isEditing) {
-                e.preventDefault()
-                setIsEditing(true)
-                return
-            }
-
-            // Ctrl+Esc または Cmd+Esc で全画面表示を解除 / 編集をキャンセル
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Escape') {
-                e.preventDefault()
-                if (isFullscreen) {
-                    setIsFullscreen(false)
-                } else if (isEditing) {
-                    handleCancel()
-                }
-            }
         },
-        [handleCancel, handleSave, isFullscreen, isEditing]
+        [handleSave]
     )
-
-    // グローバルキーボードショートカット（全画面表示・編集用）
-    useEffect(() => {
-        const handleGlobalKeyDown = (e: KeyboardEvent) => {
-            // IME変換中は無視（2つの方法でチェック）
-            if (isComposingRef.current || e.isComposing) {
-                return
-            }
-
-            // input/textareaにフォーカスがある場合
-            const target = e.target as HTMLElement
-            const isInputFocused =
-                target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
-
-            // Ctrl+Esc または Cmd+Esc で全画面表示を解除
-            if (
-                (e.ctrlKey || e.metaKey) &&
-                e.key === 'Escape' &&
-                isFullscreen
-            ) {
-                e.preventDefault()
-                setIsFullscreen(false)
-                return
-            }
-
-            // Ctrl+F または Cmd+F で全画面表示を切り替え（常に動作）
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault()
-                setIsFullscreen((prev) => !prev)
-                return
-            }
-
-            // Ctrl+E または Cmd+E で編集モードに入る（常に動作）
-            if ((e.ctrlKey || e.metaKey) && e.key === 'e' && !isEditing) {
-                e.preventDefault()
-                setIsEditing(true)
-                return
-            }
-
-            // 編集中のテキストエリアでは、上記以外のショートカットを無視
-            if (isEditing && isInputFocused) {
-                return
-            }
-        }
-
-        window.addEventListener('keydown', handleGlobalKeyDown)
-        return () => {
-            window.removeEventListener('keydown', handleGlobalKeyDown)
-        }
-    }, [isEditing, isFullscreen])
 
     // 全画面モードの切り替え
     const toggleFullscreen = useCallback(() => {
-        setIsFullscreen((prev) => !prev)
-    }, [])
+        if (onToggleFullscreen) {
+            onToggleFullscreen()
+        } else {
+            setInternalFullscreen((prev) => !prev)
+        }
+    }, [onToggleFullscreen])
+
+    // 編集モード開始
+    const startEditing = useCallback(() => {
+        if (onStartEditing) {
+            onStartEditing()
+        }
+        setIsEditing(true)
+    }, [onStartEditing])
+
+    // 全画面表示を解除
+    const exitFullscreen = useCallback(() => {
+        if (onToggleFullscreen) {
+            onToggleFullscreen()
+        } else {
+            setInternalFullscreen(false)
+        }
+    }, [onToggleFullscreen])
 
     const formatDate = (dateString: string) => {
         const date = new Date(dateString)
@@ -262,7 +199,7 @@ export function MarkdownMemo({
                     ) : (
                         <>
                             <button
-                                onClick={() => setIsEditing(true)}
+                                onClick={startEditing}
                                 className={`p-1.5 rounded transition-colors ${
                                     darkMode
                                         ? 'hover:bg-gray-700 text-blue-400'
@@ -327,7 +264,7 @@ export function MarkdownMemo({
                         className={`prose prose-sm max-w-none ${
                             darkMode ? 'prose-invert' : ''
                         }`}
-                        onClick={() => setIsEditing(true)}
+                        onClick={startEditing}
                     >
                         {content ? (
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>

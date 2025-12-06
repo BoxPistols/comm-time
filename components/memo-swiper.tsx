@@ -35,6 +35,13 @@ export function MemoSwiper({
     const [isEnd, setIsEnd] = useState(false)
     const prevMemosLengthRef = useRef(memos.length)
 
+    // 全画面表示状態（アクティブなメモのみ）
+    const [isFullscreen, setIsFullscreen] = useState(false)
+    // IME変換中フラグ
+    const isComposingRef = useRef(false)
+    // コンテナRef（フォーカス判定用）
+    const containerRef = useRef<HTMLDivElement>(null)
+
     // メモが追加されたら最後のスライド（右端）に移動
     useEffect(() => {
         // 新しいメモが追加された場合（配列長が増加した場合）のみ、最後に移動
@@ -48,10 +55,75 @@ export function MemoSwiper({
         prevMemosLengthRef.current = memos.length
     }, [memos.length, swiperInstance])
 
+    // IME変換状態の監視
+    useEffect(() => {
+        const handleCompositionStart = () => {
+            isComposingRef.current = true
+        }
+
+        const handleCompositionEnd = () => {
+            isComposingRef.current = false
+        }
+
+        window.addEventListener('compositionstart', handleCompositionStart)
+        window.addEventListener('compositionend', handleCompositionEnd)
+
+        return () => {
+            window.removeEventListener(
+                'compositionstart',
+                handleCompositionStart
+            )
+            window.removeEventListener('compositionend', handleCompositionEnd)
+        }
+    }, [])
+
+    // グローバルキーボードショートカット（親コンポーネントで一元管理）
+    useEffect(() => {
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            // IME変換中は無視
+            if (isComposingRef.current || e.isComposing) {
+                return
+            }
+
+            // メモがない場合は無視
+            if (memos.length === 0) {
+                return
+            }
+
+            // Ctrl+Esc または Cmd+Esc で全画面表示を解除
+            if (
+                (e.ctrlKey || e.metaKey) &&
+                e.key === 'Escape' &&
+                isFullscreen
+            ) {
+                e.preventDefault()
+                setIsFullscreen(false)
+                return
+            }
+
+            // Ctrl+F または Cmd+F で全画面表示を切り替え
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault()
+                setIsFullscreen((prev) => !prev)
+                return
+            }
+        }
+
+        window.addEventListener('keydown', handleGlobalKeyDown)
+        return () => {
+            window.removeEventListener('keydown', handleGlobalKeyDown)
+        }
+    }, [memos.length, isFullscreen])
+
     const handleSlideChange = useCallback((swiper: SwiperType) => {
         setActiveIndex(swiper.activeIndex)
         setIsBeginning(swiper.isBeginning)
         setIsEnd(swiper.isEnd)
+        // スライド変更時は全画面表示を解除
+        if (isFullscreen) {
+            setIsFullscreen(false)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     const handlePrev = useCallback(() => {
@@ -62,8 +134,12 @@ export function MemoSwiper({
         swiperInstance?.slideNext()
     }, [swiperInstance])
 
+    const toggleFullscreen = useCallback(() => {
+        setIsFullscreen((prev) => !prev)
+    }, [])
+
     return (
-        <div className='w-full h-full flex flex-col'>
+        <div ref={containerRef} className='w-full h-full flex flex-col'>
             {/* ヘッダー */}
             <div
                 className={`flex items-center justify-between px-4 py-3 border-b ${
@@ -186,7 +262,7 @@ export function MemoSwiper({
                             } as React.CSSProperties
                         }
                     >
-                        {memos.map((memo) => (
+                        {memos.map((memo, index) => (
                             <SwiperSlide key={memo.id} className='pb-8'>
                                 <div className='h-full'>
                                     <MarkdownMemo
@@ -194,6 +270,17 @@ export function MemoSwiper({
                                         onUpdate={onUpdateMemo}
                                         onDelete={onDeleteMemo}
                                         darkMode={darkMode}
+                                        isActive={index === activeIndex}
+                                        isFullscreenMode={
+                                            index === activeIndex
+                                                ? isFullscreen
+                                                : false
+                                        }
+                                        onToggleFullscreen={
+                                            index === activeIndex
+                                                ? toggleFullscreen
+                                                : undefined
+                                        }
                                     />
                                 </div>
                             </SwiperSlide>
