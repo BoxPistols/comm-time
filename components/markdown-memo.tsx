@@ -129,6 +129,23 @@ export function MarkdownMemo({
         setShowDeleteConfirm(false)
     }, [memo.id, onDelete])
 
+    // 全画面モードの切り替え
+    const toggleFullscreen = useCallback(() => {
+        if (onToggleFullscreen) {
+            onToggleFullscreen()
+        } else {
+            setInternalFullscreen((prev) => !prev)
+        }
+    }, [onToggleFullscreen])
+
+    // 編集モード開始
+    const startEditing = useCallback(() => {
+        if (onStartEditing) {
+            onStartEditing()
+        }
+        setIsEditing(true)
+    }, [onStartEditing])
+
     // キーボードショートカット（入力フィールド内でのみ有効）
     const handleKeyDown = useCallback(
         (e: React.KeyboardEvent) => {
@@ -157,23 +174,6 @@ export function MarkdownMemo({
         },
         [handleSave, isEditing, startEditing, toggleFullscreen]
     )
-
-    // 全画面モードの切り替え
-    const toggleFullscreen = useCallback(() => {
-        if (onToggleFullscreen) {
-            onToggleFullscreen()
-        } else {
-            setInternalFullscreen((prev) => !prev)
-        }
-    }, [onToggleFullscreen])
-
-    // 編集モード開始
-    const startEditing = useCallback(() => {
-        if (onStartEditing) {
-            onStartEditing()
-        }
-        setIsEditing(true)
-    }, [onStartEditing])
 
     const formatDate = (dateString: string) => {
         const date = new Date(dateString)
