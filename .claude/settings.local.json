@@ -18,7 +18,11 @@
       "Bash(git pull:*)",
       "Bash(xxd:*)",
       "Bash(pnpm exec tsc:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(bun install:*)",
+      "Bash(npm run build:*)",
+      "Bash(git merge:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []
