@@ -595,7 +595,7 @@ export function MarkdownMemo({
         tabIndex={0}
       >
         <div
-          className="w-[98vw] sm:w-[95vw] md:w-[90vw] h-[95vh] sm:h-[90vh] flex flex-col md:flex-row items-center justify-center gap-2"
+          className="w-[98vw] sm:w-[95vw] md:w-[90vw] h-dvh-95 sm:h-dvh-90 flex flex-col md:flex-row items-center justify-center gap-2 pb-safe"
           onClick={(e) => e.stopPropagation()}
         >
           {/* 左矢印（デスクトップのみ表示） */}

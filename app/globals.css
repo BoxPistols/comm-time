@@ -89,3 +89,22 @@ body {
 .swiper-slide {
   max-height: 100%;
 }
+
+/* iPhone Safari対応のビューポート高さユーティリティ */
+@layer utilities {
+  .h-dvh-95 {
+    height: 95vh;
+    height: 95dvh;
+  }
+  .h-dvh-90 {
+    height: 90vh;
+    height: 90dvh;
+  }
+  /* iPhone下部セーフエリア対応 */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}

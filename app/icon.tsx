@@ -18,7 +18,7 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #6366f1 0%, #9333ea 100%)",
+          background: "linear-gradient(135deg, #fb923c 0%, #ea580c 100%)",
           borderRadius: "6px",
         }}
       >
@@ -39,7 +39,7 @@ export default function Icon() {
             style={{
               width: "3px",
               height: "3px",
-              background: "#6366f1",
+              background: "#ea580c",
               borderRadius: "2px",
               position: "absolute",
             }}
@@ -49,7 +49,7 @@ export default function Icon() {
             style={{
               width: "2px",
               height: "8px",
-              background: "#6366f1",
+              background: "#ea580c",
               borderRadius: "1px",
               position: "absolute",
               top: "5px",
@@ -61,7 +61,7 @@ export default function Icon() {
             style={{
               width: "2px",
               height: "6px",
-              background: "#9333ea",
+              background: "#f97316",
               borderRadius: "1px",
               position: "absolute",
               right: "7px",

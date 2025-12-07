@@ -1,17 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <defs>
     <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#9333ea;stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#fb923c;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ea580c;stop-opacity:1" />
     </linearGradient>
   </defs>
   <circle cx="50" cy="50" r="45" fill="url(#gradient)"/>
-  <circle cx="50" cy="50" r="40" fill="white"/>
-  <circle cx="50" cy="50" r="3" fill="#6366f1"/>
-  <line x1="50" y1="50" x2="50" y2="25" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
-  <line x1="50" y1="50" x2="65" y2="50" stroke="#9333ea" stroke-width="2.5" stroke-linecap="round"/>
-  <circle cx="50" cy="15" r="2" fill="#6366f1"/>
-  <circle cx="85" cy="50" r="2" fill="#6366f1"/>
-  <circle cx="50" cy="85" r="2" fill="#6366f1"/>
-  <circle cx="15" cy="50" r="2" fill="#6366f1"/>
+  <circle cx="50" cy="50" r="35" fill="white"/>
+  <circle cx="50" cy="50" r="3" fill="#ea580c"/>
+  <line x1="50" y1="50" x2="50" y2="28" stroke="#ea580c" stroke-width="3" stroke-linecap="round"/>
+  <line x1="50" y1="50" x2="68" y2="50" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="50" cy="18" r="2" fill="#ea580c"/>
+  <circle cx="82" cy="50" r="2" fill="#ea580c"/>
+  <circle cx="50" cy="82" r="2" fill="#ea580c"/>
+  <circle cx="18" cy="50" r="2" fill="#ea580c"/>
 </svg>

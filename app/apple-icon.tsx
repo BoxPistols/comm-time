@@ -18,16 +18,16 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(135deg, #6366f1 0%, #9333ea 100%)",
+          background: "linear-gradient(135deg, #fb923c 0%, #ea580c 100%)",
           borderRadius: "40px",
         }}
       >
         <div
           style={{
-            width: "160px",
-            height: "160px",
+            width: "120px",
+            height: "120px",
             background: "white",
-            borderRadius: "80px",
+            borderRadius: "60px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -37,34 +37,34 @@ export default function AppleIcon() {
           {/* Clock face center */}
           <div
             style={{
-              width: "12px",
-              height: "12px",
-              background: "#6366f1",
-              borderRadius: "6px",
+              width: "10px",
+              height: "10px",
+              background: "#ea580c",
+              borderRadius: "5px",
               position: "absolute",
             }}
           />
           {/* Hour hand */}
           <div
             style={{
-              width: "8px",
-              height: "50px",
-              background: "#6366f1",
-              borderRadius: "4px",
+              width: "6px",
+              height: "38px",
+              background: "#ea580c",
+              borderRadius: "3px",
               position: "absolute",
-              top: "30px",
+              top: "22px",
               transformOrigin: "center bottom",
             }}
           />
           {/* Minute hand */}
           <div
             style={{
-              width: "6px",
-              height: "35px",
-              background: "#9333ea",
+              width: "5px",
+              height: "28px",
+              background: "#f97316",
               borderRadius: "3px",
               position: "absolute",
-              right: "42px",
+              right: "31px",
               transform: "rotate(90deg)",
               transformOrigin: "center right",
             }}
@@ -72,42 +72,42 @@ export default function AppleIcon() {
           {/* Hour markers */}
           <div
             style={{
-              width: "8px",
-              height: "8px",
-              background: "#6366f1",
-              borderRadius: "4px",
+              width: "6px",
+              height: "6px",
+              background: "#ea580c",
+              borderRadius: "3px",
               position: "absolute",
-              top: "12px",
+              top: "8px",
             }}
           />
           <div
             style={{
-              width: "8px",
-              height: "8px",
-              background: "#6366f1",
-              borderRadius: "4px",
+              width: "6px",
+              height: "6px",
+              background: "#ea580c",
+              borderRadius: "3px",
               position: "absolute",
-              right: "12px",
+              right: "8px",
             }}
           />
           <div
             style={{
-              width: "8px",
-              height: "8px",
-              background: "#6366f1",
-              borderRadius: "4px",
+              width: "6px",
+              height: "6px",
+              background: "#ea580c",
+              borderRadius: "3px",
               position: "absolute",
-              bottom: "12px",
+              bottom: "8px",
             }}
           />
           <div
             style={{
-              width: "8px",
-              height: "8px",
-              background: "#6366f1",
-              borderRadius: "4px",
+              width: "6px",
+              height: "6px",
+              background: "#ea580c",
+              borderRadius: "3px",
               position: "absolute",
-              left: "12px",
+              left: "8px",
             }}
           />
         </div>
