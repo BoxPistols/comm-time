@@ -618,7 +618,7 @@ export function MarkdownMemo({
 
           {/* メモコンテンツ */}
           <div
-            className={`flex-1 w-full md:w-auto flex flex-col rounded-xl shadow-2xl overflow-hidden min-h-0 ${
+            className={`flex-1 w-full md:w-auto flex flex-col rounded-xl shadow-2xl overflow-hidden min-h-0 mt-4 ${
               darkMode ? "bg-gray-900" : "bg-gray-50"
             }`}
           >
