@@ -245,29 +245,37 @@ export function MarkdownMemo({
     });
   };
 
-  // チェックボックスをトグルする関数
+  // チェックボックスをトグルする関数（行番号ベース）
   const toggleCheckbox = useCallback(
-    (checkboxIndex: number) => {
+    (lineNumber: number) => {
+      const lines = content.split("\n");
+      const lineIndex = lineNumber - 1;
+
+      if (lineIndex < 0 || lineIndex >= lines.length) {
+        return;
+      }
+
+      const line = lines[lineIndex];
       // Markdownのチェックボックスパターン: - [ ] または - [x] (*, + も対応)
-      const checkboxPattern = /^(\s*[-*+]\s*)\[([ xX])\]/gm;
-      let currentIndex = 0;
-      const newContent = content.replace(
+      const checkboxPattern = /^(\s*[-*+]\s*)\[([ xX])\]/;
+
+      const newLine = line.replace(
         checkboxPattern,
         (match: string, prefix: string, checked: string) => {
-          if (currentIndex === checkboxIndex) {
-            currentIndex++;
-            // トグル: 空白なら x に、x/X なら空白に
-            const newChecked = checked === " " ? "x" : " ";
-            return `${prefix}[${newChecked}]`;
-          }
-          currentIndex++;
-          return match;
+          // トグル: 空白なら x に、x/X なら空白に
+          const newChecked = checked === " " ? "x" : " ";
+          return `${prefix}[${newChecked}]`;
         }
       );
 
-      // コンテンツを更新して保存
-      setContent(newContent);
-      onUpdate(memo.id, title, newContent);
+      if (line !== newLine) {
+        lines[lineIndex] = newLine;
+        const newContent = lines.join("\n");
+
+        // コンテンツを更新して保存
+        setContent(newContent);
+        onUpdate(memo.id, title, newContent);
+      }
     },
     [content, memo.id, title, onUpdate]
   );
@@ -394,63 +402,60 @@ export function MarkdownMemo({
             onKeyDown={handleKeyDown}
           />
         ) : (
-          (() => {
-            // チェックボックスのインデックスを追跡するカウンター
-            let checkboxCounter = 0;
-            return (
-              <div
-                className={`prose prose-sm max-w-none ${
-                  darkMode ? "prose-invert" : ""
-                }`}
-                onClick={(e) => {
-                  // チェックボックスがクリックされた場合は編集モードに入らない
-                  if ((e.target as HTMLElement).tagName === "INPUT") {
-                    return;
-                  }
-                  startEditing();
+          <div
+            className={`prose prose-sm max-w-none ${
+              darkMode ? "prose-invert" : ""
+            }`}
+            onClick={(e) => {
+              // チェックボックスがクリックされた場合は編集モードに入らない
+              if ((e.target as HTMLElement).tagName === "INPUT") {
+                return;
+              }
+              startEditing();
+            }}
+          >
+            {content ? (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  input: (props) => {
+                    if (props.type === "checkbox") {
+                      // react-markdownのノード位置情報から行番号を取得
+                      const line = (props.node as { position?: { start: { line: number } } })?.position?.start.line;
+                      return (
+                        <input
+                          {...props}
+                          className={`w-5 h-5 rounded border-2 cursor-pointer mx-1 transition-colors ${
+                            darkMode
+                              ? "border-gray-500 checked:bg-blue-600 checked:border-blue-600 hover:border-gray-400"
+                              : "border-gray-300 checked:bg-blue-500 checked:border-blue-500 hover:border-gray-400"
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (line) {
+                              toggleCheckbox(line);
+                            }
+                          }}
+                          onChange={() => {}} // コントロールドコンポーネントの警告を回避
+                        />
+                      );
+                    }
+                    return <input {...props} />;
+                  },
                 }}
               >
-                {content ? (
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      input: (props) => {
-                        if (props.type === "checkbox") {
-                          const currentIndex = checkboxCounter++;
-                          return (
-                            <input
-                              {...props}
-                              className={`w-5 h-5 rounded border-2 cursor-pointer mx-1 transition-colors ${
-                                darkMode
-                                  ? "border-gray-500 checked:bg-blue-600 checked:border-blue-600 hover:border-gray-400"
-                                  : "border-gray-300 checked:bg-blue-500 checked:border-blue-500 hover:border-gray-400"
-                              }`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleCheckbox(currentIndex);
-                              }}
-                              onChange={() => {}} // コントロールドコンポーネントの警告を回避
-                            />
-                          );
-                        }
-                        return <input {...props} />;
-                      },
-                    }}
-                  >
-                    {content}
-                  </ReactMarkdown>
-                ) : (
-                  <p
-                    className={`italic ${
-                      darkMode ? "text-gray-500" : "text-gray-400"
-                    }`}
-                  >
-                    クリックして編集を開始...
-                  </p>
-                )}
-              </div>
-            );
-          })()
+                {content}
+              </ReactMarkdown>
+            ) : (
+              <p
+                className={`italic ${
+                  darkMode ? "text-gray-500" : "text-gray-400"
+                }`}
+              >
+                クリックして編集を開始...
+              </p>
+            )}
+          </div>
         )}
       </div>
 
