@@ -41,6 +41,7 @@ export function MarkdownMemo({
   onUpdate,
   onDelete,
   darkMode,
+  isActive,
   onToggleFullscreen,
   onStartEditing,
   isFullscreenMode,
@@ -57,6 +58,13 @@ export function MarkdownMemo({
   const titleInputRef = useRef<HTMLInputElement>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isComposingRef = useRef(false);
+
+  // デスクトップ環境判定
+  const isDesktop = useCallback(() => {
+    return !/mobile|tablet|android|iphone|ipad|ipod/i.test(
+      navigator.userAgent.toLowerCase()
+    );
+  }, []);
 
   // 全画面状態（親から制御される場合はそちらを優先）
   const isFullscreen =
@@ -168,15 +176,12 @@ export function MarkdownMemo({
   // キーボードショートカット（入力フィールド内でのみ有効）
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      // Cmd+S または Ctrl+S
-      // 編集中: 保存
-      // 編集時以外: 編集モードに入る（グローバルハンドラーで処理）
+      // Cmd+S または Ctrl+S: 保存のみ
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
         if (isEditing) {
           handleSave();
         }
-        // 編集時以外はグローバルハンドラーで処理される
         return;
       }
       // Cmd+E または Ctrl+E で編集モード切り替え
@@ -205,34 +210,54 @@ export function MarkdownMemo({
     [handleSave, handleCancel, isEditing, startEditing, toggleFullscreen]
   );
 
-  // グローバルキーボードショートカット（編集中でない場合のCmd+Sで編集モードに入る）
+  // グローバルキーボードショートカット（Cmd+S で保存、Cmd+E で編集切り替え - アクティブなメモのみ）
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       // IME変換中は無視
       if (isComposingRef.current || e.isComposing) return;
 
-      // テキスト入力要素がフォーカスされている場合は無視
+      // PC環境のみで動作
+      if (!isDesktop()) return;
+
+      // テキスト入力要素がフォーカスされている場合は無視（input/textareaの onKeyDown で処理される）
       const activeElement = document.activeElement;
       const isInputFocused =
         activeElement instanceof HTMLInputElement ||
         activeElement instanceof HTMLTextAreaElement;
 
-      // Cmd+S または Ctrl+S: 編集時以外は編集モードに入る
+      // Cmd+S または Ctrl+S: 保存（編集中のみ）
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        // 編集中の場合は入力フィールド内のハンドラーで処理される
-        if (isEditing || isInputFocused) return;
+        e.preventDefault();
+        if (isEditing) {
+          handleSave();
+        }
+        return;
+      }
+
+      // Cmd+E または Ctrl+E で編集開始（編集中は input/textarea の onKeyDown で処理）
+      if ((e.ctrlKey || e.metaKey) && e.key === "e") {
+        // 入力フィールドがフォーカスされている場合はスキップ（そこの onKeyDown で処理）
+        if (isInputFocused) return;
 
         e.preventDefault();
-        startEditing();
+        if (isEditing) {
+          handleSave();
+        } else {
+          startEditing();
+        }
         return;
       }
     };
+
+    // memo-swiper.tsx から isActive が渡されない場合は、全てのメモのハンドラーを登録
+    // isActive が true のみ登録して、他のメモのハンドラーを削除する
+    if (!isActive) return;
 
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => {
       window.removeEventListener("keydown", handleGlobalKeyDown);
     };
-  }, [isEditing, startEditing]);
+  }, [isEditing, startEditing, handleSave, isDesktop, isActive]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -279,6 +304,9 @@ export function MarkdownMemo({
     },
     [content, memo.id, title, onUpdate]
   );
+
+  // チェックボックス用の ref（index ベースでのアクセス）
+  const checkboxRefsRef = useRef<Map<number, HTMLInputElement>>(new Map());
 
   // 全画面モード用のコンテンツ
   const memoContent = (
@@ -351,7 +379,7 @@ export function MarkdownMemo({
                     ? "hover:bg-gray-700 text-blue-400"
                     : "hover:bg-gray-100 text-blue-600"
                 }`}
-                title="編集 (Cmd+S または Ctrl+E)"
+                title="編集 (Cmd+S)"
               >
                 <Edit size={18} />
               </button>
@@ -387,7 +415,7 @@ export function MarkdownMemo({
       </div>
 
       {/* コンテンツエリア */}
-      <div className="flex-1 min-h-0 overflow-auto px-5 py-4">
+      <div className="flex-1 min-h-0 overflow-auto px-3 py-3">
         {isEditing ? (
           <textarea
             ref={textareaRef}
@@ -407,11 +435,11 @@ export function MarkdownMemo({
               darkMode ? "prose-invert" : ""
             }`}
             onClick={(e) => {
-              // チェックボックスがクリックされた場合は編集モードに入らない
+              // チェックボックスがクリックされた場合のみイベント処理
               if ((e.target as HTMLElement).tagName === "INPUT") {
                 return;
               }
-              startEditing();
+              // 編集モードへの自動切り替えは行わない
             }}
           >
             {content ? (
@@ -421,22 +449,29 @@ export function MarkdownMemo({
                   input: (props) => {
                     if (props.type === "checkbox") {
                       // react-markdownのノード位置情報から行番号を取得
-                      const line = (props.node as { position?: { start: { line: number } } })?.position?.start.line;
+                      const positionNode = props.node as {
+                        position?: { start: { line: number } }
+                      };
+                      const line = positionNode?.position?.start?.line;
+
                       return (
                         <input
-                          {...props}
+                          type="checkbox"
+                          checked={props.checked || false}
                           className={`w-5 h-5 rounded border-2 cursor-pointer mx-1 transition-colors ${
                             darkMode
                               ? "border-gray-500 checked:bg-blue-600 checked:border-blue-600 hover:border-gray-400"
                               : "border-gray-300 checked:bg-blue-500 checked:border-blue-500 hover:border-gray-400"
                           }`}
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
-                            if (line) {
+                            if (line !== undefined && line > 0) {
                               toggleCheckbox(line);
                             }
                           }}
-                          onChange={() => {}} // コントロールドコンポーネントの警告を回避
+                          onChange={() => {}} // コントロールドコンポーネント
+                          disabled={false}
                         />
                       );
                     }
@@ -540,25 +575,32 @@ export function MarkdownMemo({
           // IME変換中は無視
           if (isComposingRef.current) return;
 
+          // PC環境のみで動作
+          if (!isDesktop()) return;
+
           // テキスト入力要素がフォーカスされている場合は処理しない
           const activeElement = document.activeElement;
           const isInputFocused =
             activeElement instanceof HTMLInputElement ||
             activeElement instanceof HTMLTextAreaElement;
 
-          // Cmd+S または Ctrl+S: 編集モード切り替え
+          // Cmd+S または Ctrl+S: 保存のみ（PC環境のみ）
           if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+            // 入力フィールドがフォーカスされている場合はスキップ（そこの onKeyDown で処理）
+            if (isInputFocused) return;
+
             e.preventDefault();
             if (isEditing) {
               handleSave();
-            } else {
-              startEditing();
             }
             return;
           }
 
           // Cmd+E または Ctrl+E で編集モード切り替え
           if ((e.ctrlKey || e.metaKey) && e.key === "e") {
+            // 入力フィールドがフォーカスされている場合はスキップ
+            if (isInputFocused) return;
+
             e.preventDefault();
             if (isEditing) {
               handleSave();
@@ -583,24 +625,13 @@ export function MarkdownMemo({
             return;
           }
 
-          // 矢印キーでの移動（編集中でない場合のみ）
-          if (!isInputFocused) {
-            if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-              e.preventDefault();
-              onNavigatePrev?.();
-              return;
-            }
-            if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-              e.preventDefault();
-              onNavigateNext?.();
-              return;
-            }
-          }
+          // 矢印キーはグローバルハンドラー（memo-swiper.tsx）で処理するためスキップ
+          // ここで処理するとダブル処理になってメモをスキップしてしまう
         }}
         tabIndex={0}
       >
         <div
-          className="w-[98vw] sm:w-[95vw] md:w-[90vw] h-dvh-95 sm:h-dvh-90 flex flex-col md:flex-row items-center justify-center gap-2 pb-safe"
+          className="w-[98vw] sm:w-[95vw] md:w-[90vw] h-dvh-95 sm:h-dvh-90 mb:flex flex-col _md:flex-row items-center justify-center gap-2 pb-safe"
           onClick={(e) => e.stopPropagation()}
         >
           {/* 左矢印（デスクトップのみ表示） */}
@@ -626,7 +657,7 @@ export function MarkdownMemo({
           </div>
 
           {/* ナビゲーションボタン（モバイルは下部に横並び、デスクトップは右矢印のみ） */}
-          <div className="flex md:hidden items-center justify-center gap-4 py-2 flex-shrink-0">
+          <div className="flex _md:hidden items-center justify-center gap-4 py-2 flex-shrink-0">
             <button
               onClick={onNavigatePrev}
               className={`p-3 rounded-full transition-colors ${

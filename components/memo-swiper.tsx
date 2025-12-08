@@ -15,10 +15,14 @@ import {
   GripVertical,
   Edit,
   Trash2,
+  Keyboard as KeyboardIcon,
 } from "lucide-react";
 import { DragDropContext, Draggable, DropResult } from "react-beautiful-dnd";
 import { StrictModeDroppable } from "./strict-mode-droppable";
 import { MarkdownMemo, type MemoData } from "./markdown-memo";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { ShortcutsModal } from "./ShortcutsModal";
+import { ShortcutsDropdown } from "./ShortcutsDropdown";
 
 // Swiper CSS
 import "swiper/css";
@@ -46,7 +50,11 @@ export function MemoSwiper({
   const [activeIndex, setActiveIndex] = useState(0);
   const [isBeginning, setIsBeginning] = useState(true);
   const [isEnd, setIsEnd] = useState(false);
+  const [isShortcutsDropdownOpen, setIsShortcutsDropdownOpen] = useState(false);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const prevMemosLengthRef = useRef(memos.length);
+  const { shortcuts, saveShortcuts, resetShortcuts } =
+    useKeyboardShortcuts();
 
   // 表示モード: 'swiper' | 'list'
   const [viewMode, setViewMode] = useState<"swiper" | "list">("swiper");
@@ -85,7 +93,6 @@ export function MemoSwiper({
     };
   }, []);
 
-
   // グローバルキーボードショートカット
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -110,7 +117,7 @@ export function MemoSwiper({
         return;
       }
 
-      // 矢印キーでメモを移動（編集中は無視）
+      // 矢印キーでメモを移動（全画面モード＆編集中でない場合のみ）
       if (isFullscreen && memos.length > 1 && !isInputFocused) {
         if (e.key === "ArrowRight" || e.key === "ArrowDown") {
           e.preventDefault();
@@ -278,6 +285,26 @@ export function MemoSwiper({
               </button>
             </div>
           )}
+          <div className="relative">
+            <button
+              onClick={() => setIsShortcutsDropdownOpen(!isShortcutsDropdownOpen)}
+              className={`p-1.5 rounded-lg transition-colors ${
+                darkMode
+                  ? "hover:bg-gray-700 text-gray-400 hover:text-gray-200"
+                  : "hover:bg-gray-100 text-gray-600 hover:text-gray-800"
+              }`}
+              title="キーボードショートカット"
+            >
+              <KeyboardIcon size={20} />
+            </button>
+            <ShortcutsDropdown
+              isOpen={isShortcutsDropdownOpen}
+              onClose={() => setIsShortcutsDropdownOpen(false)}
+              onSettingsClick={() => setIsShortcutsModalOpen(true)}
+              shortcuts={shortcuts}
+              darkMode={darkMode}
+            />
+          </div>
           <button
             onClick={onCreateMemo}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
@@ -436,7 +463,7 @@ export function MemoSwiper({
         </div>
       ) : (
         // スワイパービュー
-        <div className="flex-1 min-h-0 flex items-center justify-between gap-1 overflow-hidden">
+        <div className="mt-3 flex-1 min-h-0 flex items-center justify-between gap-1 overflow-hidden">
           {/* 前のメモボタン */}
           {memos.length > 1 && (
             <button
@@ -494,6 +521,7 @@ export function MemoSwiper({
                       onUpdate={onUpdateMemo}
                       onDelete={onDeleteMemo}
                       darkMode={darkMode}
+                      isActive={index === activeIndex}
                       isFullscreenMode={
                         index === activeIndex ? isFullscreen : false
                       }
@@ -531,6 +559,16 @@ export function MemoSwiper({
           )}
         </div>
       )}
+
+      {/* キーボードショートカット設定モーダル */}
+      <ShortcutsModal
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setIsShortcutsModalOpen(false)}
+        shortcuts={shortcuts}
+        onSave={saveShortcuts}
+        onReset={resetShortcuts}
+        darkMode={darkMode}
+      />
     </div>
   );
 }
