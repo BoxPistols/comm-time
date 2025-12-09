@@ -305,9 +305,6 @@ export function MarkdownMemo({
     [content, memo.id, title, onUpdate]
   );
 
-  // チェックボックス用の ref（index ベースでのアクセス）
-  const checkboxRefsRef = useRef<Map<number, HTMLInputElement>>(new Map());
-
   // 全画面モード用のコンテンツ
   const memoContent = (
     <div
