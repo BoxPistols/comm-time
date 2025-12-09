@@ -1302,8 +1302,7 @@ export function CommTimeComponent() {
         }
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    // Note: setMeetingTodos and setPomodoroTodos are aliases of setSharedTodos
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setMeetingTodos and setPomodoroTodos are stable aliases of setSharedTodos
     [useDatabase, user, sharedSupabaseTodos]
   );
 
@@ -1326,8 +1325,7 @@ export function CommTimeComponent() {
         }
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    // Note: setMeetingTodos and setPomodoroTodos are aliases of setSharedTodos
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setMeetingTodos and setPomodoroTodos are stable aliases of setSharedTodos
     [useDatabase, user, sharedSupabaseTodos]
   );
 
@@ -1380,6 +1378,7 @@ export function CommTimeComponent() {
         }
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setMeetingTodos and setPomodoroTodos are stable aliases of setSharedTodos
     [
       useDatabase,
       user,
@@ -1407,6 +1406,7 @@ export function CommTimeComponent() {
       // ゴミ箱から削除
       setTrashedTodos((prev) => prev.filter((t) => t.id !== trashedTodo.id));
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setMeetingTodos is a stable alias of setSharedTodos
     [useDatabase, user, sharedSupabaseTodos]
   );
 
@@ -1474,6 +1474,7 @@ export function CommTimeComponent() {
       }
       setEditingTodoId(null);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setMeetingTodos and setPomodoroTodos are stable aliases of setSharedTodos
     [
       useDatabase,
       user,
@@ -1562,6 +1563,7 @@ export function CommTimeComponent() {
         }
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setMeetingTodos and setPomodoroTodos are stable aliases of setSharedTodos
     [useDatabase, user, sharedSupabaseTodos]
   );
 
@@ -1689,8 +1691,7 @@ export function CommTimeComponent() {
         linkTodoToAlarmPoint(todoId, alarmPointId);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    // Note: setMeetingTodos and setPomodoroTodos are aliases of setSharedTodos
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setMeetingTodos and setPomodoroTodos are stable aliases of setSharedTodos
     [
       meetingTodos,
       pomodoroTodos,
