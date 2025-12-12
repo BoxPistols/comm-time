@@ -15,6 +15,9 @@ import {
   ChevronRight,
 } from "lucide-react";
 
+// Markdownのチェックボックスパターン: - [ ] または - [x] (*, + も対応)
+const CHECKBOX_PATTERN = /^(\s*[-*+]\s*)\[([ xX])\]/;
+
 export interface MemoData {
   id: string;
   title: string;
@@ -274,15 +277,13 @@ export function MarkdownMemo({
   const toggleCheckbox = useCallback(
     (checkboxIndex: number) => {
       const lines = content.split("\n");
-      // Markdownのチェックボックスパターン: - [ ] または - [x] (*, + も対応)
-      const checkboxPattern = /^(\s*[-*+]\s*)\[([ xX])\]/;
 
       let currentIndex = 0;
       let targetLineIndex = -1;
 
       // 指定されたインデックスのチェックボックスを見つける
       for (let i = 0; i < lines.length; i++) {
-        if (checkboxPattern.test(lines[i])) {
+        if (CHECKBOX_PATTERN.test(lines[i])) {
           if (currentIndex === checkboxIndex) {
             targetLineIndex = i;
             break;
@@ -297,7 +298,7 @@ export function MarkdownMemo({
 
       const line = lines[targetLineIndex];
       const newLine = line.replace(
-        checkboxPattern,
+        CHECKBOX_PATTERN,
         (match: string, prefix: string, checked: string) => {
           // トグル: 空白なら x に、x/X なら空白に
           const newChecked = checked === " " ? "x" : " ";
