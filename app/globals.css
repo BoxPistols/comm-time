@@ -100,6 +100,14 @@ body {
     height: 90vh;
     height: 90dvh;
   }
+  .max-h-dvh-95 {
+    max-height: 95vh;
+    max-height: 95dvh;
+  }
+  .max-h-dvh-90 {
+    max-height: 90vh;
+    max-height: 90dvh;
+  }
   /* iPhone下部セーフエリア対応 */
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom, 0px);
