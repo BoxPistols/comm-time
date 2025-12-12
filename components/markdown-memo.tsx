@@ -15,6 +15,9 @@ import {
   ChevronRight,
 } from "lucide-react";
 
+// Markdownのチェックボックスパターン: - [ ] または - [x] (*, + も対応)
+const CHECKBOX_PATTERN = /^(\s*[-*+]\s*)\[([ xX])\]/;
+
 export interface MemoData {
   id: string;
   title: string;
@@ -270,22 +273,32 @@ export function MarkdownMemo({
     });
   };
 
-  // チェックボックスをトグルする関数（行番号ベース）
+  // チェックボックスをトグルする関数（インデックスベース）
   const toggleCheckbox = useCallback(
-    (lineNumber: number) => {
+    (checkboxIndex: number) => {
       const lines = content.split("\n");
-      const lineIndex = lineNumber - 1;
 
-      if (lineIndex < 0 || lineIndex >= lines.length) {
+      let currentIndex = 0;
+      let targetLineIndex = -1;
+
+      // 指定されたインデックスのチェックボックスを見つける
+      for (let i = 0; i < lines.length; i++) {
+        if (CHECKBOX_PATTERN.test(lines[i])) {
+          if (currentIndex === checkboxIndex) {
+            targetLineIndex = i;
+            break;
+          }
+          currentIndex++;
+        }
+      }
+
+      if (targetLineIndex === -1) {
         return;
       }
 
-      const line = lines[lineIndex];
-      // Markdownのチェックボックスパターン: - [ ] または - [x] (*, + も対応)
-      const checkboxPattern = /^(\s*[-*+]\s*)\[([ xX])\]/;
-
+      const line = lines[targetLineIndex];
       const newLine = line.replace(
-        checkboxPattern,
+        CHECKBOX_PATTERN,
         (match: string, prefix: string, checked: string) => {
           // トグル: 空白なら x に、x/X なら空白に
           const newChecked = checked === " " ? "x" : " ";
@@ -294,7 +307,7 @@ export function MarkdownMemo({
       );
 
       if (line !== newLine) {
-        lines[lineIndex] = newLine;
+        lines[targetLineIndex] = newLine;
         const newContent = lines.join("\n");
 
         // コンテンツを更新して保存
@@ -440,44 +453,45 @@ export function MarkdownMemo({
             }}
           >
             {content ? (
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  input: (props) => {
-                    if (props.type === "checkbox") {
-                      // react-markdownのノード位置情報から行番号を取得
-                      const positionNode = props.node as {
-                        position?: { start: { line: number } }
-                      };
-                      const line = positionNode?.position?.start?.line;
+              (() => {
+                // チェックボックスのインデックスを追跡するためのカウンター
+                let checkboxCounter = 0;
+                return (
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      input: (props) => {
+                        if (props.type === "checkbox") {
+                          // 現在のチェックボックスのインデックスを取得して、カウンターをインクリメント
+                          const currentIndex = checkboxCounter++;
 
-                      return (
-                        <input
-                          type="checkbox"
-                          checked={props.checked || false}
-                          className={`w-5 h-5 rounded border-2 cursor-pointer mx-1 transition-colors ${
-                            darkMode
-                              ? "border-gray-500 checked:bg-blue-600 checked:border-blue-600 hover:border-gray-400"
-                              : "border-gray-300 checked:bg-blue-500 checked:border-blue-500 hover:border-gray-400"
-                          }`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (line !== undefined && line > 0) {
-                              toggleCheckbox(line);
-                            }
-                          }}
-                          onChange={() => {}} // コントロールドコンポーネント
-                          disabled={false}
-                        />
-                      );
-                    }
-                    return <input {...props} />;
-                  },
-                }}
-              >
-                {content}
-              </ReactMarkdown>
+                          return (
+                            <input
+                              type="checkbox"
+                              checked={props.checked || false}
+                              className={`w-5 h-5 rounded border-2 cursor-pointer mx-1 transition-colors ${
+                                darkMode
+                                  ? "border-gray-500 checked:bg-blue-600 checked:border-blue-600 hover:border-gray-400"
+                                  : "border-gray-300 checked:bg-blue-500 checked:border-blue-500 hover:border-gray-400"
+                              }`}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                toggleCheckbox(currentIndex);
+                              }}
+                              onChange={() => {}} // コントロールドコンポーネント
+                              disabled={false}
+                            />
+                          );
+                        }
+                        return <input {...props} />;
+                      },
+                    }}
+                  >
+                    {content}
+                  </ReactMarkdown>
+                );
+              })()
             ) : (
               <p
                 className={`italic ${
