@@ -576,7 +576,7 @@ export function MarkdownMemo({
 
     return createPortal(
       <div
-        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+        className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto bg-black/70 backdrop-blur-sm"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             onToggleFullscreen?.();
@@ -642,7 +642,7 @@ export function MarkdownMemo({
         tabIndex={0}
       >
         <div
-          className="w-[98vw] sm:w-[95vw] md:w-[90vw] h-dvh-95 sm:h-dvh-90 mb:flex flex-col _md:flex-row items-center justify-center gap-2 pb-safe"
+          className="w-[98vw] sm:w-[95vw] md:w-[90vw] max-h-dvh-95 sm:max-h-dvh-90 my-auto flex flex-col md:flex-row items-center gap-2 pb-safe"
           onClick={(e) => e.stopPropagation()}
         >
           {/* 左矢印（デスクトップのみ表示） */}
