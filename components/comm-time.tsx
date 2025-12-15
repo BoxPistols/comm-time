@@ -27,6 +27,7 @@ import {
   ChevronDown,
   Trash2,
   RotateCcw,
+  Briefcase,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -324,6 +325,9 @@ export function CommTimeComponent() {
   // ダークモードの状態
   const [darkMode, setDarkMode] = useState(false);
 
+  // ワークモードの状態（モバイルでToDo/メモを上部に表示）
+  const [workMode, setWorkMode] = useState(false);
+
   // アラーム状態（繰り返し用）
   const [isAlarmRinging, setIsAlarmRinging] = useState(false);
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -416,6 +420,7 @@ export function CommTimeComponent() {
     setTickSoundVolume(getStorageValue("tickSoundVolume", 5));
     setFlashEnabled(getStorageValue("flashEnabled", true));
     setDarkMode(getStorageValue("darkMode", false));
+    setWorkMode(getStorageValue("workMode", false));
 
     // 初期値設定の読み込み
     setDefaultMeetingAlarmSettings(
@@ -496,6 +501,7 @@ export function CommTimeComponent() {
       localStorage.setItem("tickSoundVolume", JSON.stringify(tickSoundVolume));
       localStorage.setItem("flashEnabled", JSON.stringify(flashEnabled));
       localStorage.setItem("darkMode", JSON.stringify(darkMode));
+      localStorage.setItem("workMode", JSON.stringify(workMode));
       localStorage.setItem("useDatabase", JSON.stringify(useDatabase));
       localStorage.setItem("activeTab", activeTab);
 
@@ -549,6 +555,7 @@ export function CommTimeComponent() {
     tickSoundVolume,
     flashEnabled,
     darkMode,
+    workMode,
     useDatabase,
     activeTab,
     defaultMeetingAlarmSettings,
@@ -1903,6 +1910,24 @@ export function CommTimeComponent() {
                   <BellOff className="w-4 h-4 sm:w-5 sm:h-5" />
                 )}
               </button>
+
+              {/* ワークモード設定（モバイルでToDo/メモを上部に表示） */}
+              <button
+                type="button"
+                onClick={() => setWorkMode(!workMode)}
+                className={`p-2 sm:p-2.5 rounded-xl transition-all duration-200 lg:hidden ${
+                  workMode
+                    ? "bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-lg"
+                    : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                }`}
+                title={
+                  workMode
+                    ? "ワークモード ON（ToDo/メモ優先）"
+                    : "ワークモード OFF（タイマー優先）"
+                }
+              >
+                <Briefcase className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
             </div>
           </div>
         </div>
@@ -1937,7 +1962,13 @@ export function CommTimeComponent() {
           </button>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+        <div
+          className={`flex gap-4 sm:gap-6 ${
+            workMode
+              ? "flex-col-reverse lg:flex-row"
+              : "flex-col lg:flex-row"
+          }`}
+        >
           <div className="w-full lg:w-2/3">
             {activeTab === "meeting" && (
               <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 border border-white/20 dark:border-gray-700/20">
@@ -2618,9 +2649,13 @@ export function CommTimeComponent() {
             )}
           </div>
 
-          <div className="w-full lg:w-1/3">
+          <div
+            className={`w-full lg:w-1/3 flex ${
+              workMode ? "flex-col-reverse lg:flex-col" : "flex-col"
+            } gap-4`}
+          >
             {/* メモセクション（Markdownプレビュー対応） */}
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl mb-4 border border-white/20 dark:border-gray-700/20 h-[600px] lg:h-[700px] overflow-hidden">
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl border border-white/20 dark:border-gray-700/20 h-[600px] lg:h-[700px] overflow-hidden">
               <MemoSwiper
                 memos={multipleMemos.memos}
                 onCreateMemo={multipleMemos.createMemo}
