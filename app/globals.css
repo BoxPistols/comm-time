@@ -116,3 +116,22 @@ body {
     margin-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
+
+/* iOS Safari フォーム入力時の自動ズーム防止 */
+/* iOSではフォントサイズが16px未満のフォームフィールドにフォーカスすると自動ズームが発生する */
+@supports (-webkit-touch-callout: none) {
+  input:is([type="text"],
+           [type="email"],
+           [type="password"],
+           [type="number"],
+           [type="tel"],
+           [type="url"],
+           [type="search"],
+           [type="date"],
+           [type="time"],
+           [type="datetime-local"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
