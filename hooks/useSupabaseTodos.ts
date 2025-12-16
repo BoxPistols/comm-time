@@ -4,6 +4,11 @@ import { useState, useEffect } from "react"
 import { supabase, type TodoItem as SupabaseTodoItem } from "@/lib/supabase"
 import type { User } from "@supabase/supabase-js"
 
+// 優先度・重要度・カンバンステータスの型
+type PriorityLevel = "high" | "medium" | "low" | "none"
+type ImportanceLevel = "high" | "medium" | "low" | "none"
+type KanbanStatus = "backlog" | "todo" | "doing" | "done"
+
 // ローカル用のTodo型（既存のcomm-time.tsxと互換性を保つ）
 export type LocalTodoItem = {
   id: string
@@ -12,6 +17,10 @@ export type LocalTodoItem = {
   dueDate?: string
   dueTime?: string
   alarmPointId?: string
+  tagIds?: string[]
+  priority?: PriorityLevel
+  importance?: ImportanceLevel
+  kanbanStatus?: KanbanStatus
 }
 
 export function useSupabaseTodos(user: User | null) {
@@ -30,13 +39,16 @@ export function useSupabaseTodos(user: User | null) {
   })
 
   // ローカル型からSupabaseの型に変換
-  const convertToDb = (localTodo: Partial<LocalTodoItem>) => ({
-    text: localTodo.text,
-    is_completed: localTodo.isCompleted,
-    due_date: localTodo.dueDate,
-    due_time: localTodo.dueTime,
-    alarm_point_id: localTodo.alarmPointId,
-  })
+  // tagIds, priority, importance, kanbanStatusはローカル専用フィールドなので除外
+  const convertToDb = (localTodo: Partial<LocalTodoItem>) => {
+    const dbFields: Record<string, unknown> = {}
+    if (localTodo.text !== undefined) dbFields.text = localTodo.text
+    if (localTodo.isCompleted !== undefined) dbFields.is_completed = localTodo.isCompleted
+    if (localTodo.dueDate !== undefined) dbFields.due_date = localTodo.dueDate
+    if (localTodo.dueTime !== undefined) dbFields.due_time = localTodo.dueTime
+    if (localTodo.alarmPointId !== undefined) dbFields.alarm_point_id = localTodo.alarmPointId
+    return dbFields
+  }
 
   // TODOリストを取得
   const fetchTodos = async () => {
@@ -101,14 +113,20 @@ export function useSupabaseTodos(user: User | null) {
     if (!user) return
 
     try {
-      const { error } = await supabase
-        .from("todos")
-        .update(convertToDb(updates))
-        .eq("id", id)
-        .eq("user_id", user.id)
+      const dbUpdates = convertToDb(updates)
 
-      if (error) throw error
+      // データベースに反映するフィールドがある場合のみSupabaseを更新
+      if (Object.keys(dbUpdates).length > 0) {
+        const { error } = await supabase
+          .from("todos")
+          .update(dbUpdates)
+          .eq("id", id)
+          .eq("user_id", user.id)
 
+        if (error) throw error
+      }
+
+      // ローカル状態は常に更新（ローカル専用フィールドを含む）
       setTodos(todos.map((todo) => (todo.id === id ? { ...todo, ...updates } : todo)))
     } catch (err: any) {
       setError(err.message)
