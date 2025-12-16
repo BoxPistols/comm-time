@@ -303,9 +303,9 @@ export function CommTimeComponent() {
 
   // TODO編集ダイアログの状態
   const [editDialogTodoId, setEditDialogTodoId] = useState<string | null>(null);
-  const editDialogTodo = editDialogTodoId
+  const editDialogTodo = React.useMemo(() => editDialogTodoId
     ? sharedTodos.find((todo) => todo.id === editDialogTodoId) || null
-    : null;
+    : null, [editDialogTodoId, sharedTodos]);
 
   // 期限入力を展開中のTodoのID
   const [expandedDeadlineTodoId, setExpandedDeadlineTodoId] = useState<
