@@ -469,7 +469,7 @@ export function MarkdownMemo({
                             <input
                               type="checkbox"
                               checked={props.checked || false}
-                              className={`w-5 h-5 rounded border-2 cursor-pointer mx-1 transition-colors ${
+                              className={`w-4 h-4 rounded border-2 cursor-pointer mr-1.5 align-middle relative -top-[1px] transition-colors ${
                                 darkMode
                                   ? "border-gray-500 checked:bg-blue-600 checked:border-blue-600 hover:border-gray-400"
                                   : "border-gray-300 checked:bg-blue-500 checked:border-blue-500 hover:border-gray-400"
