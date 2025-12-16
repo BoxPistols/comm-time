@@ -2650,9 +2650,9 @@ export function CommTimeComponent() {
           </div>
 
           <div
-            className={`w-full lg:w-1/3 flex ${
-              workMode ? "flex-col-reverse lg:flex-col" : "flex-col"
-            } gap-4`}
+            className={`w-full lg:w-1/3 flex flex-col gap-4 ${
+              workMode ? "flex-col-reverse lg:flex-col" : ""
+            }`}
           >
             {/* メモセクション（Markdownプレビュー対応） */}
             <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl border border-white/20 dark:border-gray-700/20 h-[600px] lg:h-[700px] overflow-hidden">
