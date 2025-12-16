@@ -176,7 +176,7 @@ export function FilterPanel({
                 onClick={() => handlePriorityChange(level)}
                 className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${
                   filterState.priority === level
-                    ? `bg-${PRIORITY_CONFIG[level].color}-500 text-white`
+                    ? PRIORITY_CONFIG[level].activeClass
                     : darkMode
                     ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -219,7 +219,7 @@ export function FilterPanel({
                 onClick={() => handleImportanceChange(level)}
                 className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${
                   filterState.importance === level
-                    ? `bg-${IMPORTANCE_CONFIG[level].color}-500 text-white`
+                    ? IMPORTANCE_CONFIG[level].activeClass
                     : darkMode
                     ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -261,7 +261,7 @@ export function FilterPanel({
               onClick={() => handleKanbanStatusChange(col.id)}
               className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${
                 filterState.kanbanStatus === col.id
-                  ? `bg-${col.color}-500 text-white`
+                  ? col.activeClass
                   : darkMode
                   ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"

@@ -281,8 +281,21 @@ export function CommTimeComponent() {
   // タグはデータベースモードに応じて切り替え
   const tags = useDatabase && user ? supabaseTags.tags : localTags;
 
+  // tagsをMapに変換してO(1)検索を実現
+  const tagsMap = React.useMemo(() => {
+    return new Map(tags.map(tag => [tag.id, tag]));
+  }, [tags]);
+
   // フィルター状態
   const [filterState, setFilterState] = useState<FilterState>(initialFilterState);
+
+  // フィルターがアクティブかどうかを判定
+  const hasActiveFilters = React.useMemo(() => {
+    return filterState.tags.length > 0 ||
+           filterState.priority !== "all" ||
+           filterState.importance !== "all" ||
+           filterState.kanbanStatus !== "all";
+  }, [filterState]);
 
   // 表示モード（リスト / カンバン）
   const [viewMode, setViewMode] = useState<"list" | "kanban">(() => {
@@ -1402,15 +1415,8 @@ export function CommTimeComponent() {
   const deleteTag = useCallback(
     (id: string) => {
       if (useDatabase && user) {
+        // データベースモード: RPCがTODOからのタグ参照も一括削除
         supabaseTags.deleteTag(id);
-        // TODOのタグ参照も削除（データベースモード）
-        sharedTodos.forEach((todo) => {
-          if (todo.tagIds?.includes(id)) {
-            sharedSupabaseTodos.updateTodo(todo.id, {
-              tagIds: todo.tagIds.filter((tagId) => tagId !== id),
-            });
-          }
-        });
       } else {
         setLocalTags((prev) => prev.filter((tag) => tag.id !== id));
         // 関連するTODOからもタグを削除
@@ -1422,7 +1428,7 @@ export function CommTimeComponent() {
         );
       }
     },
-    [useDatabase, user, supabaseTags, sharedTodos, sharedSupabaseTodos]
+    [useDatabase, user, supabaseTags]
   );
 
   // カンバンステータス更新関数（看板ビューで使用）
@@ -2961,11 +2967,7 @@ export function CommTimeComponent() {
                     type="button"
                     onClick={() => setShowFilterPanel(!showFilterPanel)}
                     className={`text-xs px-2 py-1 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1 ${
-                      showFilterPanel ||
-                      filterState.tags.length > 0 ||
-                      filterState.priority !== "all" ||
-                      filterState.importance !== "all" ||
-                      filterState.kanbanStatus !== "all"
+                      showFilterPanel || hasActiveFilters
                         ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md"
                         : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
                     }`}
@@ -3449,14 +3451,13 @@ export function CommTimeComponent() {
                                       {todo.tagIds && todo.tagIds.length > 0 && (
                                         <div className="flex flex-wrap gap-1">
                                           {todo.tagIds.map((tagId) => {
-                                            const tag = tags.find((t) => t.id === tagId);
+                                            const tag = tagsMap.get(tagId);
                                             if (!tag) return null;
+                                            const textColor = TAG_COLORS.find((c) => c.value === tag.color)?.textColor || "text-white";
                                             return (
                                               <span
                                                 key={tagId}
-                                                className={`text-xs px-1.5 py-0.5 rounded-full ${tag.color} ${
-                                                  TAG_COLORS.find((c) => c.value === tag.color)?.textColor || "text-white"
-                                                }`}
+                                                className={`text-xs px-1.5 py-0.5 rounded-full ${tag.color} ${textColor}`}
                                               >
                                                 {tag.name}
                                               </span>

@@ -78,7 +78,10 @@ export function KanbanBoard({
     onStatusChange(draggableId, newStatus);
   };
 
-  const getTagById = (tagId: string) => tags.find((t) => t.id === tagId);
+  // tagsをMapに変換してO(1)検索を実現
+  const tagsMap = React.useMemo(() => {
+    return new Map(tags.map(tag => [tag.id, tag]));
+  }, [tags]);
 
   const getTextColorClass = (bgColor: string) => {
     const colorConfig = TAG_COLORS.find((c) => c.value === bgColor);
@@ -297,7 +300,7 @@ export function KanbanBoard({
                               {todo.tagIds && todo.tagIds.length > 0 && (
                                 <div className="mt-2 flex flex-wrap gap-1">
                                   {todo.tagIds.slice(0, 3).map((tagId) => {
-                                    const tag = getTagById(tagId);
+                                    const tag = tagsMap.get(tagId);
                                     if (!tag) return null;
                                     return (
                                       <span

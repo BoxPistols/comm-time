@@ -104,11 +104,24 @@ export function useSupabaseTags(user: User | null) {
     }
   }
 
-  // タグ削除
+  // タグ削除（RPCでTODOからのタグ参照も一括削除）
   const deleteTag = async (id: string) => {
     if (!user) return
 
     try {
+      // 1. RPCでTODOからタグ参照を一括削除（N+1問題を回避）
+      const { error: rpcError } = await supabase
+        .rpc("remove_tag_from_todos", {
+          tag_id_to_remove: id,
+          user_id_param: user.id,
+        })
+
+      if (rpcError) {
+        console.warn("RPC not available, tag references in todos may remain:", rpcError)
+        // RPCが利用できない場合は続行（タグ自体は削除される）
+      }
+
+      // 2. タグを削除
       const { error } = await supabase
         .from("tags")
         .delete()
