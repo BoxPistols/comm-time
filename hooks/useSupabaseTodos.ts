@@ -36,10 +36,13 @@ export function useSupabaseTodos(user: User | null) {
     dueDate: dbTodo.due_date || undefined,
     dueTime: dbTodo.due_time || undefined,
     alarmPointId: dbTodo.alarm_point_id || undefined,
+    tagIds: dbTodo.tag_ids || [],
+    priority: dbTodo.priority || "none",
+    importance: dbTodo.importance || "none",
+    kanbanStatus: dbTodo.kanban_status || "backlog",
   })
 
   // ローカル型からSupabaseの型に変換
-  // tagIds, priority, importance, kanbanStatusはローカル専用フィールドなので除外
   const convertToDb = (localTodo: Partial<LocalTodoItem>) => {
     const dbFields: Record<string, unknown> = {}
     if (localTodo.text !== undefined) dbFields.text = localTodo.text
@@ -47,6 +50,10 @@ export function useSupabaseTodos(user: User | null) {
     if (localTodo.dueDate !== undefined) dbFields.due_date = localTodo.dueDate
     if (localTodo.dueTime !== undefined) dbFields.due_time = localTodo.dueTime
     if (localTodo.alarmPointId !== undefined) dbFields.alarm_point_id = localTodo.alarmPointId
+    if (localTodo.tagIds !== undefined) dbFields.tag_ids = localTodo.tagIds
+    if (localTodo.priority !== undefined) dbFields.priority = localTodo.priority
+    if (localTodo.importance !== undefined) dbFields.importance = localTodo.importance
+    if (localTodo.kanbanStatus !== undefined) dbFields.kanban_status = localTodo.kanbanStatus
     return dbFields
   }
 

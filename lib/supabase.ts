@@ -30,6 +30,19 @@ export type TodoItem = {
   due_time?: string
   alarm_point_id?: string
   order_index: number
+  tag_ids?: string[]
+  priority?: 'high' | 'medium' | 'low' | 'none'
+  importance?: 'high' | 'medium' | 'low' | 'none'
+  kanban_status?: 'backlog' | 'todo' | 'doing' | 'done'
+  created_at: string
+  updated_at: string
+}
+
+export type Tag = {
+  id: string
+  user_id: string
+  name: string
+  color: string
   created_at: string
   updated_at: string
 }

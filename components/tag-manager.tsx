@@ -6,7 +6,7 @@ import { type Tag, TAG_COLORS } from "@/types";
 
 interface TagManagerProps {
   tags: Tag[];
-  onAddTag: (name: string, color: string) => Tag;
+  onAddTag: (name: string, color: string) => Tag | Promise<Tag>;
   onUpdateTag: (id: string, name: string, color: string) => void;
   onDeleteTag: (id: string) => void;
   darkMode: boolean;
@@ -27,9 +27,9 @@ export function TagManager({
   const [editingName, setEditingName] = useState("");
   const [editingColor, setEditingColor] = useState("");
 
-  const handleAddTag = () => {
+  const handleAddTag = async () => {
     if (newTagName.trim()) {
-      onAddTag(newTagName.trim(), newTagColor);
+      await onAddTag(newTagName.trim(), newTagColor);
       setNewTagName("");
       setNewTagColor(TAG_COLORS[0].value);
     }

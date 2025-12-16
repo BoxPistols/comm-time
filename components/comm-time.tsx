@@ -51,6 +51,7 @@ import {
 import { AuthDialog } from "@/components/auth-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useSupabaseTodos } from "@/hooks/useSupabaseTodos";
+import { useSupabaseTags } from "@/hooks/useSupabaseTags";
 // import { useSupabaseMemos } from "@/hooks/useSupabaseMemos";
 import { useMultipleMemos } from "@/hooks/useMultipleMemos";
 import { MemoSwiper } from "@/components/memo-swiper";
@@ -236,6 +237,9 @@ export function CommTimeComponent() {
   // 複数メモ管理フック
   const multipleMemos = useMultipleMemos(user, useDatabase);
 
+  // タグ管理フック（データベースモード用）
+  const supabaseTags = useSupabaseTags(useDatabase ? user : null);
+
   // その他の状態
   const [forceFocus, setForceFocus] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -259,8 +263,8 @@ export function CommTimeComponent() {
   // TODOソート状態
   const [sortByDeadline, setSortByDeadline] = useState(false);
 
-  // タグ管理の状態
-  const [tags, setTags] = useState<Tag[]>(() => {
+  // タグ管理の状態（ローカルストレージ用）
+  const [localTags, setLocalTags] = useState<Tag[]>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("tags");
       if (saved) {
@@ -273,6 +277,9 @@ export function CommTimeComponent() {
     }
     return [];
   });
+
+  // タグはデータベースモードに応じて切り替え
+  const tags = useDatabase && user ? supabaseTags.tags : localTags;
 
   // フィルター状態
   const [filterState, setFilterState] = useState<FilterState>(initialFilterState);
@@ -607,8 +614,8 @@ export function CommTimeComponent() {
       localStorage.setItem("todoVersions", JSON.stringify(todoVersions));
       localStorage.setItem("trashedMemos", JSON.stringify(trashedMemos));
 
-      // タグ、フィルター、ビューモードの保存
-      localStorage.setItem("tags", JSON.stringify(tags));
+      // タグ、フィルター、ビューモードの保存（ローカルタグのみ保存）
+      localStorage.setItem("tags", JSON.stringify(localTags));
       localStorage.setItem("todoViewMode", viewMode);
     }
   }, [
@@ -639,7 +646,7 @@ export function CommTimeComponent() {
     trashedTodos,
     todoVersions,
     trashedMemos,
-    tags,
+    localTags,
     viewMode,
   ]);
 
@@ -1358,33 +1365,65 @@ export function CommTimeComponent() {
     [createAlarmAudio]
   );
 
-  // タグCRUD関数
-  const addTag = useCallback((name: string, color: string) => {
-    const newTag: Tag = {
-      id: `tag-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name,
-      color,
-    };
-    setTags((prev) => [...prev, newTag]);
-    return newTag;
-  }, []);
+  // タグCRUD関数（データベースモード対応）
+  const addTag = useCallback(
+    async (name: string, color: string) => {
+      if (useDatabase && user) {
+        // データベースモード: Supabaseに保存
+        const newTag = await supabaseTags.addTag(name, color);
+        return newTag || { id: "", name, color };
+      } else {
+        // ローカルモード: LocalStorageに保存
+        const newTag: Tag = {
+          id: `tag-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          name,
+          color,
+        };
+        setLocalTags((prev) => [...prev, newTag]);
+        return newTag;
+      }
+    },
+    [useDatabase, user, supabaseTags]
+  );
 
-  const updateTag = useCallback((id: string, name: string, color: string) => {
-    setTags((prev) =>
-      prev.map((tag) => (tag.id === id ? { ...tag, name, color } : tag))
-    );
-  }, []);
+  const updateTag = useCallback(
+    (id: string, name: string, color: string) => {
+      if (useDatabase && user) {
+        supabaseTags.updateTag(id, name, color);
+      } else {
+        setLocalTags((prev) =>
+          prev.map((tag) => (tag.id === id ? { ...tag, name, color } : tag))
+        );
+      }
+    },
+    [useDatabase, user, supabaseTags]
+  );
 
-  const deleteTag = useCallback((id: string) => {
-    setTags((prev) => prev.filter((tag) => tag.id !== id));
-    // 関連するTODOからもタグを削除
-    setSharedTodos((prev) =>
-      prev.map((todo) => ({
-        ...todo,
-        tagIds: todo.tagIds?.filter((tagId) => tagId !== id),
-      }))
-    );
-  }, []);
+  const deleteTag = useCallback(
+    (id: string) => {
+      if (useDatabase && user) {
+        supabaseTags.deleteTag(id);
+        // TODOのタグ参照も削除（データベースモード）
+        sharedTodos.forEach((todo) => {
+          if (todo.tagIds?.includes(id)) {
+            sharedSupabaseTodos.updateTodo(todo.id, {
+              tagIds: todo.tagIds.filter((tagId) => tagId !== id),
+            });
+          }
+        });
+      } else {
+        setLocalTags((prev) => prev.filter((tag) => tag.id !== id));
+        // 関連するTODOからもタグを削除
+        setSharedTodos((prev) =>
+          prev.map((todo) => ({
+            ...todo,
+            tagIds: todo.tagIds?.filter((tagId) => tagId !== id),
+          }))
+        );
+      }
+    },
+    [useDatabase, user, supabaseTags, sharedTodos, sharedSupabaseTodos]
+  );
 
   // カンバンステータス更新関数（看板ビューで使用）
   const updateTodoKanbanStatus = useCallback(
