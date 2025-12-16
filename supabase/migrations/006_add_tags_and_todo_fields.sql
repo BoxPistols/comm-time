@@ -39,7 +39,8 @@ CREATE POLICY "Users can delete own tags"
   ON tags FOR DELETE
   USING (auth.uid() = user_id);
 
--- トリガー設定
+-- トリガー設定（既存のトリガーを削除してから作成）
+DROP TRIGGER IF EXISTS update_tags_updated_at ON tags;
 CREATE TRIGGER update_tags_updated_at
   BEFORE UPDATE ON tags
   FOR EACH ROW

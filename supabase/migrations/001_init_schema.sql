@@ -112,17 +112,20 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- トリガー設定
+-- トリガー設定（既存のトリガーを削除してから作成）
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
 CREATE TRIGGER update_profiles_updated_at
   BEFORE UPDATE ON profiles
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_memos_updated_at ON memos;
 CREATE TRIGGER update_memos_updated_at
   BEFORE UPDATE ON memos
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_todos_updated_at ON todos;
 CREATE TRIGGER update_todos_updated_at
   BEFORE UPDATE ON todos
   FOR EACH ROW
@@ -138,7 +141,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- サインアップ時のトリガー
+-- サインアップ時のトリガー（既存のトリガーを削除してから作成）
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW
