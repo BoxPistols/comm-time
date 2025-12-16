@@ -2881,7 +2881,10 @@ export function CommTimeComponent() {
                                       isComposingRef.current = true;
                                     }}
                                     onCompositionEnd={() => {
-                                      isComposingRef.current = false;
+                                      // IME変換確定後のEnterキーによる誤送信を防ぐため、遅延してフラグをリセット
+                                      requestAnimationFrame(() => {
+                                        isComposingRef.current = false;
+                                      });
                                     }}
                                     onKeyDown={(e) => {
                                       if (
@@ -2891,6 +2894,7 @@ export function CommTimeComponent() {
                                       )
                                         return;
                                       if (e.key === "Enter") {
+                                        e.preventDefault();
                                         const value =
                                           editingInputRef.current?.value.trim() ||
                                           "";
@@ -3226,7 +3230,10 @@ export function CommTimeComponent() {
                     isComposingRef.current = true;
                   }}
                   onCompositionEnd={() => {
-                    isComposingRef.current = false;
+                    // IME変換確定後のEnterキーによる誤送信を防ぐため、遅延してフラグをリセット
+                    requestAnimationFrame(() => {
+                      isComposingRef.current = false;
+                    });
                   }}
                   onKeyDown={(e) => {
                     // 日本語入力（IME）の変換中はスキップ
@@ -3237,6 +3244,7 @@ export function CommTimeComponent() {
                     )
                       return;
                     if (e.key === "Enter") {
+                      e.preventDefault();
                       const value = todoInputRef.current?.value.trim() || "";
                       if (value) {
                         addTodo(value, activeTab === "pomodoro");
