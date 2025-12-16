@@ -1963,10 +1963,10 @@ export function CommTimeComponent() {
         </div>
 
         <div
-          className={`flex gap-4 sm:gap-6 ${
+          className={`flex gap-4 sm:gap-6 lg:flex-row ${ 
             workMode
-              ? "flex-col-reverse lg:flex-row"
-              : "flex-col lg:flex-row"
+              ? "flex-col-reverse"
+              : "flex-col"
           }`}
         >
           <div className="w-full lg:w-2/3">
