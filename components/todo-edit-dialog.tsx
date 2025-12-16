@@ -193,15 +193,14 @@ export function TodoEditDialog({
                   <button
                     key={level}
                     onClick={() => setPriority(level)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${ 
                       priority === level
-                        ? level === "none"
-                          ? "bg-gray-500 text-white"
-                          : level === "high"
-                          ? "bg-red-500 text-white"
-                          : level === "medium"
-                          ? "bg-yellow-500 text-black"
-                          : "bg-blue-500 text-white"
+                        ? {
+                            none: "bg-gray-500 text-white",
+                            low: "bg-blue-500 text-white",
+                            medium: "bg-yellow-500 text-black",
+                            high: "bg-red-500 text-white",
+                          }[level]
                         : darkMode
                         ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
