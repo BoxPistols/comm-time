@@ -3159,7 +3159,7 @@ export function CommTimeComponent() {
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
-                              className={`flex items-start gap-2 p-2 sm:p-3 rounded-xl transition-all duration-200 ${
+                              className={`grid grid-cols-[1fr_auto] gap-1 p-2 sm:p-3 rounded-xl transition-all duration-200 ${
                                 todo.isCompleted
                                   ? "bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border border-green-200 dark:border-green-800"
                                   : "bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600"
@@ -3239,7 +3239,7 @@ export function CommTimeComponent() {
                                 </>
                               ) : (
                                 <>
-                                  <div className="flex-1 space-y-2 min-w-0">
+                                  <div className="min-w-0 space-y-1">
                                     {/* TODO内容 - 3行省略+クリック展開 */}
                                     <div
                                       className={`text-xs sm:text-sm ${
@@ -3296,17 +3296,17 @@ export function CommTimeComponent() {
 
                                       // ステータスに応じたスタイルクラス
                                       const statusClasses = status.isOverdue
-                                        ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 font-semibold"
+                                        ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 font-medium"
                                         : status.isSoon
-                                        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300 font-semibold"
+                                        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300 font-medium"
                                         : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300";
 
-                                      // 残り時間テキスト
+                                      // 残り時間テキスト（短縮版）
                                       const remainingText = status.isOverdue
-                                        ? " (期限切れ)"
+                                        ? "期限切れ"
                                         : status.isSoon
-                                        ? ` (残り${status.diffHours}時間)`
-                                        : ` (残り${status.diffDays}日)`;
+                                        ? `${status.diffHours}h`
+                                        : `${status.diffDays}d`;
 
                                       const isExpanded =
                                         expandedDeadlineTodoId === todo.id;
@@ -3319,21 +3319,13 @@ export function CommTimeComponent() {
                                               isExpanded ? null : todo.id
                                             )
                                           }
-                                          className={`text-xs px-2 py-1 rounded-full inline-flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity whitespace-nowrap max-w-full ${statusClasses}`}
-                                          title={`${todo.dueDate}${
-                                            todo.dueTime
-                                              ? ` ${todo.dueTime}`
-                                              : ""
-                                          }${remainingText} - クリックして期限設定を開く`}
+                                          className={`text-[10px] px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 cursor-pointer hover:opacity-80 transition-opacity ${statusClasses}`}
+                                          title={`${todo.dueDate}${todo.dueTime ? ` ${todo.dueTime}` : ""} - クリックで編集`}
                                         >
-                                          <Calendar className="w-3 h-3 flex-shrink-0" />
-                                          <span className="truncate">
-                                            {todo.dueDate}
-                                            {todo.dueTime && ` ${todo.dueTime}`}
-                                            {remainingText}
-                                          </span>
+                                          <Calendar className="w-2.5 h-2.5 flex-shrink-0" />
+                                          <span>{remainingText}</span>
                                           <ChevronDown
-                                            className={`w-3 h-3 flex-shrink-0 transition-transform ${
+                                            className={`w-2.5 h-2.5 flex-shrink-0 transition-transform ${
                                               isExpanded ? "rotate-180" : ""
                                             }`}
                                           />
@@ -3445,60 +3437,53 @@ export function CommTimeComponent() {
                                       </div>
                                     )}
 
-                                    {/* タグ・優先度・重要度表示 */}
-                                    <div className="flex flex-wrap items-center gap-1 mt-1">
-                                      {/* タグ表示 */}
+                                    {/* タグ・優先度・重要度表示 - コンパクト */}
+                                    <div className="flex flex-wrap items-center gap-0.5">
+                                      {/* タグ表示 - コンパクト */}
                                       {todo.tagIds && todo.tagIds.length > 0 && (
-                                        <div className="flex flex-wrap gap-1">
-                                          {todo.tagIds.map((tagId) => {
+                                        <>
+                                          {todo.tagIds.slice(0, 2).map((tagId) => {
                                             const tag = tagsMap.get(tagId);
                                             if (!tag) return null;
                                             const textColor = TAG_COLORS.find((c) => c.value === tag.color)?.textColor || "text-white";
                                             return (
                                               <span
                                                 key={tagId}
-                                                className={`text-xs px-1.5 py-0.5 rounded-full ${tag.color} ${textColor}`}
+                                                className={`text-[10px] px-1 py-0.5 rounded ${tag.color} ${textColor}`}
                                               >
                                                 {tag.name}
                                               </span>
                                             );
                                           })}
-                                        </div>
+                                          {todo.tagIds.length > 2 && (
+                                            <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                                              +{todo.tagIds.length - 2}
+                                            </span>
+                                          )}
+                                        </>
                                       )}
-                                      {/* 優先度バッジ */}
+                                      {/* 優先度バッジ - コンパクト */}
                                       {todo.priority && todo.priority !== "none" && (
                                         <span
-                                          className={`text-xs px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${
-                                            todo.priority === "high"
-                                              ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300"
-                                              : todo.priority === "medium"
-                                              ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300"
-                                              : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
-                                          }`}
+                                          className={`text-[10px] px-1 py-0.5 rounded flex items-center ${PRIORITY_CONFIG[todo.priority].badgeClass}`}
+                                          title={`優先度: ${PRIORITY_CONFIG[todo.priority].label}`}
                                         >
-                                          <Flag className="w-3 h-3" />
-                                          {PRIORITY_CONFIG[todo.priority].label}
+                                          <Flag className="w-2.5 h-2.5" />
                                         </span>
                                       )}
-                                      {/* 重要度バッジ */}
+                                      {/* 重要度バッジ - コンパクト */}
                                       {todo.importance && todo.importance !== "none" && (
                                         <span
-                                          className={`text-xs px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${
-                                            todo.importance === "high"
-                                              ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300"
-                                              : todo.importance === "medium"
-                                              ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300"
-                                              : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
-                                          }`}
+                                          className={`text-[10px] px-1 py-0.5 rounded flex items-center ${IMPORTANCE_CONFIG[todo.importance].badgeClass}`}
+                                          title={`重要度: ${IMPORTANCE_CONFIG[todo.importance].label}`}
                                         >
-                                          <Star className="w-3 h-3" />
-                                          {IMPORTANCE_CONFIG[todo.importance].label}
+                                          <Star className="w-2.5 h-2.5" />
                                         </span>
                                       )}
-                                      {/* カンバンステータスバッジ */}
+                                      {/* カンバンステータスバッジ - コンパクト */}
                                       {todo.kanbanStatus && todo.kanbanStatus !== "backlog" && (
                                         <span
-                                          className={`text-xs px-1.5 py-0.5 rounded-full ${
+                                          className={`text-[10px] px-1 py-0.5 rounded ${
                                             todo.kanbanStatus === "done"
                                               ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
                                               : todo.kanbanStatus === "doing"
@@ -3511,7 +3496,8 @@ export function CommTimeComponent() {
                                       )}
                                     </div>
                                   </div>
-                                  <div className="flex gap-1 flex-shrink-0 items-start">
+                                  {/* アクションボタン - コンパクト配置 */}
+                                  <div className="flex gap-0.5 items-center self-start">
                                     <button
                                       type="button"
                                       onClick={() =>
@@ -3520,15 +3506,14 @@ export function CommTimeComponent() {
                                           activeTab === "pomodoro"
                                         )
                                       }
-                                      className={`p-1.5 rounded-lg transition-colors duration-200 ${
+                                      className={`p-1 rounded transition-colors ${
                                         todo.isCompleted
-                                          ? "text-green-600 bg-green-100"
-                                          : "text-gray-400 hover:text-green-600 hover:bg-green-100"
+                                          ? "text-green-600 bg-green-100 dark:bg-green-900/50"
+                                          : "text-gray-400 hover:text-green-600 hover:bg-green-100 dark:hover:bg-green-900/50"
                                       }`}
                                       title="完了/未完了"
-                                      aria-label="check"
                                     >
-                                      <Check className="w-4 h-4" />
+                                      <Check className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       type="button"
@@ -3539,38 +3524,37 @@ export function CommTimeComponent() {
                                             : todo.id
                                         )
                                       }
-                                      className={`p-1.5 rounded-lg transition-colors duration-200 ${
+                                      className={`p-1 rounded transition-colors ${
                                         expandedDeadlineTodoId === todo.id ||
                                         todo.dueDate
-                                          ? "text-indigo-600 bg-indigo-100"
-                                          : "text-gray-400 hover:text-indigo-600 hover:bg-indigo-100"
+                                          ? "text-indigo-600 bg-indigo-100 dark:bg-indigo-900/50"
+                                          : "text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
                                       }`}
                                       title="期限を設定"
                                     >
-                                      <Calendar className="w-4 h-4" />
+                                      <Calendar className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setEditDialogTodoId(todo.id)}
-                                      className={`p-1.5 rounded-lg transition-colors duration-200 ${
+                                      className={`p-1 rounded transition-colors ${
                                         (todo.tagIds && todo.tagIds.length > 0) ||
                                         (todo.priority && todo.priority !== "none") ||
                                         (todo.importance && todo.importance !== "none")
-                                          ? "text-purple-600 bg-purple-100"
-                                          : "text-gray-400 hover:text-purple-600 hover:bg-purple-100"
+                                          ? "text-purple-600 bg-purple-100 dark:bg-purple-900/50"
+                                          : "text-gray-400 hover:text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900/50"
                                       }`}
-                                      title="タグ・優先度・重要度を設定"
+                                      title="タグ・優先度・重要度"
                                     >
-                                      <TagIcon className="w-4 h-4" />
+                                      <TagIcon className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => startEditingTodo(todo.id)}
-                                      className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors duration-200"
+                                      className="p-1 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded transition-colors"
                                       title="編集"
-                                      aria-label="edit"
                                     >
-                                      <Edit className="w-4 h-4" />
+                                      <Edit className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       type="button"
@@ -3580,11 +3564,10 @@ export function CommTimeComponent() {
                                           activeTab === "pomodoro"
                                         )
                                       }
-                                      className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors duration-200"
+                                      className="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50 rounded transition-colors"
                                       title="削除"
-                                      aria-label="delete"
                                     >
-                                      <X className="w-4 h-4" />
+                                      <X className="w-3.5 h-3.5" />
                                     </button>
                                   </div>
                                 </>
