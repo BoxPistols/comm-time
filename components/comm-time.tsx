@@ -28,6 +28,12 @@ import {
   Trash2,
   RotateCcw,
   Briefcase,
+  Tag as TagIcon,
+  Filter,
+  LayoutGrid,
+  Columns,
+  Flag,
+  Star,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -45,11 +51,28 @@ import {
 import { AuthDialog } from "@/components/auth-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useSupabaseTodos } from "@/hooks/useSupabaseTodos";
+import { useSupabaseTags } from "@/hooks/useSupabaseTags";
 // import { useSupabaseMemos } from "@/hooks/useSupabaseMemos";
 import { useMultipleMemos } from "@/hooks/useMultipleMemos";
 import { MemoSwiper } from "@/components/memo-swiper";
 import { type MemoData } from "@/components/markdown-memo";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { TagManager } from "@/components/tag-manager";
+import { KanbanBoard } from "@/components/kanban-board";
+import { FilterPanel } from "@/components/filter-panel";
+import { TodoEditDialog } from "@/components/todo-edit-dialog";
+import {
+  type Tag,
+  type PriorityLevel,
+  type ImportanceLevel,
+  type KanbanStatus,
+  type FilterState,
+  initialFilterState,
+  PRIORITY_CONFIG,
+  IMPORTANCE_CONFIG,
+  KANBAN_COLUMNS,
+  TAG_COLORS,
+} from "@/types";
 
 // 型定義
 type AlarmPoint = {
@@ -73,6 +96,10 @@ type TodoItem = {
   isCompleted: boolean;
   dueDate?: string; // YYYY-MM-DD
   dueTime?: string; // HH:MM
+  tagIds?: string[]; // タグIDの配列
+  priority?: PriorityLevel; // 優先度
+  importance?: ImportanceLevel; // 重要度
+  kanbanStatus?: KanbanStatus; // カンバンステータス
 };
 
 // ゴミ箱に入ったTODOの型
@@ -210,6 +237,9 @@ export function CommTimeComponent() {
   // 複数メモ管理フック
   const multipleMemos = useMultipleMemos(user, useDatabase);
 
+  // タグ管理フック（データベースモード用）
+  const supabaseTags = useSupabaseTags(useDatabase ? user : null);
+
   // その他の状態
   const [forceFocus, setForceFocus] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -232,6 +262,63 @@ export function CommTimeComponent() {
 
   // TODOソート状態
   const [sortByDeadline, setSortByDeadline] = useState(false);
+
+  // タグ管理の状態（ローカルストレージ用）
+  const [localTags, setLocalTags] = useState<Tag[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("tags");
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {
+          return [];
+        }
+      }
+    }
+    return [];
+  });
+
+  // タグはデータベースモードに応じて切り替え
+  const tags = useDatabase && user ? supabaseTags.tags : localTags;
+
+  // tagsをMapに変換してO(1)検索を実現
+  const tagsMap = React.useMemo(() => {
+    return new Map(tags.map(tag => [tag.id, tag]));
+  }, [tags]);
+
+  // フィルター状態
+  const [filterState, setFilterState] = useState<FilterState>(initialFilterState);
+
+  // フィルターがアクティブかどうかを判定
+  const hasActiveFilters = React.useMemo(() => {
+    return filterState.tags.length > 0 ||
+           filterState.priority !== "all" ||
+           filterState.importance !== "all" ||
+           filterState.kanbanStatus !== "all";
+  }, [filterState]);
+
+  // 表示モード（リスト / カンバン）
+  const [viewMode, setViewMode] = useState<"list" | "kanban">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("todoViewMode");
+      if (saved === "kanban" || saved === "list") {
+        return saved;
+      }
+    }
+    return "list";
+  });
+
+  // タグ管理パネルの表示状態
+  const [showTagManager, setShowTagManager] = useState(false);
+
+  // フィルターパネルの表示状態
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+
+  // TODO編集ダイアログの状態
+  const [editDialogTodoId, setEditDialogTodoId] = useState<string | null>(null);
+  const editDialogTodo = React.useMemo(() => editDialogTodoId
+    ? sharedTodos.find((todo) => todo.id === editDialogTodoId) || null
+    : null, [editDialogTodoId, sharedTodos]);
 
   // 期限入力を展開中のTodoのID
   const [expandedDeadlineTodoId, setExpandedDeadlineTodoId] = useState<
@@ -539,6 +626,10 @@ export function CommTimeComponent() {
       localStorage.setItem("trashedTodos", JSON.stringify(trashedTodos));
       localStorage.setItem("todoVersions", JSON.stringify(todoVersions));
       localStorage.setItem("trashedMemos", JSON.stringify(trashedMemos));
+
+      // タグ、フィルター、ビューモードの保存（ローカルタグのみ保存）
+      localStorage.setItem("tags", JSON.stringify(localTags));
+      localStorage.setItem("todoViewMode", viewMode);
     }
   }, [
     mounted, // mountedを依存配列に追加
@@ -568,6 +659,8 @@ export function CommTimeComponent() {
     trashedTodos,
     todoVersions,
     trashedMemos,
+    localTags,
+    viewMode,
   ]);
 
   // Supabaseデータの同期（データベースモード有効時）
@@ -1284,6 +1377,131 @@ export function CommTimeComponent() {
     },
     [createAlarmAudio]
   );
+
+  // タグCRUD関数（データベースモード対応）
+  const addTag = useCallback(
+    async (name: string, color: string) => {
+      if (useDatabase && user) {
+        // データベースモード: Supabaseに保存
+        const newTag = await supabaseTags.addTag(name, color);
+        return newTag || { id: "", name, color };
+      } else {
+        // ローカルモード: LocalStorageに保存
+        const newTag: Tag = {
+          id: `tag-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          name,
+          color,
+        };
+        setLocalTags((prev) => [...prev, newTag]);
+        return newTag;
+      }
+    },
+    [useDatabase, user, supabaseTags]
+  );
+
+  const updateTag = useCallback(
+    (id: string, name: string, color: string) => {
+      if (useDatabase && user) {
+        supabaseTags.updateTag(id, name, color);
+      } else {
+        setLocalTags((prev) =>
+          prev.map((tag) => (tag.id === id ? { ...tag, name, color } : tag))
+        );
+      }
+    },
+    [useDatabase, user, supabaseTags]
+  );
+
+  const deleteTag = useCallback(
+    (id: string) => {
+      if (useDatabase && user) {
+        // データベースモード: RPCがTODOからのタグ参照も一括削除
+        supabaseTags.deleteTag(id);
+      } else {
+        setLocalTags((prev) => prev.filter((tag) => tag.id !== id));
+        // 関連するTODOからもタグを削除
+        setSharedTodos((prev) =>
+          prev.map((todo) => ({
+            ...todo,
+            tagIds: todo.tagIds?.filter((tagId) => tagId !== id),
+          }))
+        );
+      }
+    },
+    [useDatabase, user, supabaseTags]
+  );
+
+  // カンバンステータス更新関数（看板ビューで使用）
+  const updateTodoKanbanStatus = useCallback(
+    (todoId: string, kanbanStatus: KanbanStatus) => {
+      if (useDatabase && user) {
+        sharedSupabaseTodos.updateTodo(todoId, { kanbanStatus });
+      } else {
+        setSharedTodos((prev) =>
+          prev.map((todo) =>
+            todo.id === todoId ? { ...todo, kanbanStatus } : todo
+          )
+        );
+      }
+    },
+    [useDatabase, user, sharedSupabaseTodos]
+  );
+
+  // TODO詳細保存（タグ・優先度・重要度・ステータス）
+  const handleSaveTodoDetails = useCallback(
+    (
+      todoId: string,
+      updates: {
+        tagIds?: string[];
+        priority?: PriorityLevel;
+        importance?: ImportanceLevel;
+        kanbanStatus?: KanbanStatus;
+      }
+    ) => {
+      if (useDatabase && user) {
+        sharedSupabaseTodos.updateTodo(todoId, updates);
+      } else {
+        setSharedTodos((prev) =>
+          prev.map((todo) =>
+            todo.id === todoId ? { ...todo, ...updates } : todo
+          )
+        );
+      }
+    },
+    [useDatabase, user, sharedSupabaseTodos]
+  );
+
+  // フィルタリングされたTODOを取得
+  const filteredTodos = React.useMemo(() => {
+    return sharedTodos.filter((todo) => {
+      // タグフィルター
+      if (filterState.tags.length > 0) {
+        const todoTags = todo.tagIds || [];
+        if (!filterState.tags.some((tagId) => todoTags.includes(tagId))) {
+          return false;
+        }
+      }
+      // 優先度フィルター
+      if (filterState.priority !== "all") {
+        if ((todo.priority || "none") !== filterState.priority) {
+          return false;
+        }
+      }
+      // 重要度フィルター
+      if (filterState.importance !== "all") {
+        if ((todo.importance || "none") !== filterState.importance) {
+          return false;
+        }
+      }
+      // カンバンステータスフィルター
+      if (filterState.kanbanStatus !== "all") {
+        if ((todo.kanbanStatus || "backlog") !== filterState.kanbanStatus) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [sharedTodos, filterState]);
 
   // TODO管理機能
   const addTodo = useCallback(
@@ -2731,8 +2949,81 @@ export function CommTimeComponent() {
                       </span>
                     )}
                   </button>
+                  <span className="w-px h-4 bg-gray-300 dark:bg-gray-600 mx-1" />
+                  <button
+                    type="button"
+                    onClick={() => setShowTagManager(!showTagManager)}
+                    className={`text-xs px-2 py-1 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1 ${
+                      showTagManager
+                        ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md"
+                        : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                    }`}
+                    title="タグ管理"
+                  >
+                    <TagIcon className="w-3 h-3" />
+                    タグ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowFilterPanel(!showFilterPanel)}
+                    className={`text-xs px-2 py-1 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1 ${
+                      showFilterPanel || hasActiveFilters
+                        ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-md"
+                        : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                    }`}
+                    title="フィルター"
+                  >
+                    <Filter className="w-3 h-3" />
+                    絞込
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setViewMode(viewMode === "list" ? "kanban" : "list")
+                    }
+                    className={`text-xs px-2 py-1 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1 ${
+                      viewMode === "kanban"
+                        ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-md"
+                        : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                    }`}
+                    title={viewMode === "list" ? "カンバン表示" : "リスト表示"}
+                  >
+                    {viewMode === "list" ? (
+                      <Columns className="w-3 h-3" />
+                    ) : (
+                      <LayoutGrid className="w-3 h-3" />
+                    )}
+                    {viewMode === "list" ? "看板" : "リスト"}
+                  </button>
                 </div>
               </div>
+
+              {/* タグ管理パネル */}
+              {showTagManager && (
+                <div className="mb-4">
+                  <TagManager
+                    tags={tags}
+                    onAddTag={addTag}
+                    onUpdateTag={updateTag}
+                    onDeleteTag={deleteTag}
+                    darkMode={darkMode}
+                    onClose={() => setShowTagManager(false)}
+                  />
+                </div>
+              )}
+
+              {/* フィルターパネル */}
+              {showFilterPanel && (
+                <div className="mb-4">
+                  <FilterPanel
+                    tags={tags}
+                    filterState={filterState}
+                    onFilterChange={setFilterState}
+                    darkMode={darkMode}
+                    onClose={() => setShowFilterPanel(false)}
+                  />
+                </div>
+              )}
 
               {/* ゴミ箱UI */}
               {showTrash && (
@@ -2828,6 +3119,19 @@ export function CommTimeComponent() {
                 </div>
               )}
 
+              {/* カンバンビュー */}
+              {viewMode === "kanban" ? (
+                <div className="mb-4">
+                  <KanbanBoard
+                    todos={filteredTodos}
+                    tags={tags}
+                    darkMode={darkMode}
+                    onStatusChange={updateTodoKanbanStatus}
+                    onToggleTodo={(id) => toggleTodo(id, activeTab === "pomodoro")}
+                    onEditTodo={(id) => setEditingTodoId(id)}
+                  />
+                </div>
+              ) : (
               <DragDropContext onDragEnd={onDragEnd}>
                 <StrictModeDroppable
                   droppableId={
@@ -2841,14 +3145,8 @@ export function CommTimeComponent() {
                       className="space-y-2 mb-3 sm:mb-4 max-h-[400px] overflow-y-auto"
                     >
                       {(sortByDeadline
-                        ? sortTodosByDeadline(
-                            activeTab === "meeting"
-                              ? meetingTodos
-                              : pomodoroTodos
-                          )
-                        : activeTab === "meeting"
-                        ? meetingTodos
-                        : pomodoroTodos
+                        ? sortTodosByDeadline(filteredTodos)
+                        : filteredTodos
                       ).map((todo, index) => (
                         <Draggable
                           key={todo.id}
@@ -2861,7 +3159,7 @@ export function CommTimeComponent() {
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
-                              className={`flex items-start gap-2 p-2 sm:p-3 rounded-xl transition-all duration-200 ${
+                              className={`grid grid-cols-[1fr_auto] gap-1 p-2 sm:p-3 rounded-xl transition-all duration-200 ${
                                 todo.isCompleted
                                   ? "bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border border-green-200 dark:border-green-800"
                                   : "bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600"
@@ -2941,7 +3239,7 @@ export function CommTimeComponent() {
                                 </>
                               ) : (
                                 <>
-                                  <div className="flex-1 space-y-2 min-w-0">
+                                  <div className="min-w-0 space-y-1">
                                     {/* TODO内容 - 3行省略+クリック展開 */}
                                     <div
                                       className={`text-xs sm:text-sm ${
@@ -2998,17 +3296,17 @@ export function CommTimeComponent() {
 
                                       // ステータスに応じたスタイルクラス
                                       const statusClasses = status.isOverdue
-                                        ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 font-semibold"
+                                        ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 font-medium"
                                         : status.isSoon
-                                        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300 font-semibold"
+                                        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300 font-medium"
                                         : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300";
 
-                                      // 残り時間テキスト
+                                      // 残り時間テキスト（短縮版）
                                       const remainingText = status.isOverdue
-                                        ? " (期限切れ)"
+                                        ? "期限切れ"
                                         : status.isSoon
-                                        ? ` (残り${status.diffHours}時間)`
-                                        : ` (残り${status.diffDays}日)`;
+                                        ? `${status.diffHours}h`
+                                        : `${status.diffDays}d`;
 
                                       const isExpanded =
                                         expandedDeadlineTodoId === todo.id;
@@ -3021,21 +3319,13 @@ export function CommTimeComponent() {
                                               isExpanded ? null : todo.id
                                             )
                                           }
-                                          className={`text-xs px-2 py-1 rounded-full inline-flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity whitespace-nowrap max-w-full ${statusClasses}`}
-                                          title={`${todo.dueDate}${
-                                            todo.dueTime
-                                              ? ` ${todo.dueTime}`
-                                              : ""
-                                          }${remainingText} - クリックして期限設定を開く`}
+                                          className={`text-[10px] px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 cursor-pointer hover:opacity-80 transition-opacity ${statusClasses}`}
+                                          title={`${todo.dueDate}${todo.dueTime ? ` ${todo.dueTime}` : ""} - クリックで編集`}
                                         >
-                                          <Calendar className="w-3 h-3 flex-shrink-0" />
-                                          <span className="truncate">
-                                            {todo.dueDate}
-                                            {todo.dueTime && ` ${todo.dueTime}`}
-                                            {remainingText}
-                                          </span>
+                                          <Calendar className="w-2.5 h-2.5 flex-shrink-0" />
+                                          <span>{remainingText}</span>
                                           <ChevronDown
-                                            className={`w-3 h-3 flex-shrink-0 transition-transform ${
+                                            className={`w-2.5 h-2.5 flex-shrink-0 transition-transform ${
                                               isExpanded ? "rotate-180" : ""
                                             }`}
                                           />
@@ -3146,8 +3436,68 @@ export function CommTimeComponent() {
                                         )}
                                       </div>
                                     )}
+
+                                    {/* タグ・優先度・重要度表示 - コンパクト */}
+                                    <div className="flex flex-wrap items-center gap-0.5">
+                                      {/* タグ表示 - コンパクト */}
+                                      {todo.tagIds && todo.tagIds.length > 0 && (
+                                        <>
+                                          {todo.tagIds.slice(0, 2).map((tagId) => {
+                                            const tag = tagsMap.get(tagId);
+                                            if (!tag) return null;
+                                            const textColor = TAG_COLORS.find((c) => c.value === tag.color)?.textColor || "text-white";
+                                            return (
+                                              <span
+                                                key={tagId}
+                                                className={`text-[10px] px-1 py-0.5 rounded ${tag.color} ${textColor}`}
+                                              >
+                                                {tag.name}
+                                              </span>
+                                            );
+                                          })}
+                                          {todo.tagIds.length > 2 && (
+                                            <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                                              +{todo.tagIds.length - 2}
+                                            </span>
+                                          )}
+                                        </>
+                                      )}
+                                      {/* 優先度バッジ - コンパクト */}
+                                      {todo.priority && todo.priority !== "none" && (
+                                        <span
+                                          className={`text-[10px] px-1 py-0.5 rounded flex items-center ${PRIORITY_CONFIG[todo.priority].badgeClass}`}
+                                          title={`優先度: ${PRIORITY_CONFIG[todo.priority].label}`}
+                                        >
+                                          <Flag className="w-2.5 h-2.5" />
+                                        </span>
+                                      )}
+                                      {/* 重要度バッジ - コンパクト */}
+                                      {todo.importance && todo.importance !== "none" && (
+                                        <span
+                                          className={`text-[10px] px-1 py-0.5 rounded flex items-center ${IMPORTANCE_CONFIG[todo.importance].badgeClass}`}
+                                          title={`重要度: ${IMPORTANCE_CONFIG[todo.importance].label}`}
+                                        >
+                                          <Star className="w-2.5 h-2.5" />
+                                        </span>
+                                      )}
+                                      {/* カンバンステータスバッジ - コンパクト */}
+                                      {todo.kanbanStatus && todo.kanbanStatus !== "backlog" && (
+                                        <span
+                                          className={`text-[10px] px-1 py-0.5 rounded ${
+                                            todo.kanbanStatus === "done"
+                                              ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
+                                              : todo.kanbanStatus === "doing"
+                                              ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300"
+                                              : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
+                                          }`}
+                                        >
+                                          {KANBAN_COLUMNS.find((c) => c.id === todo.kanbanStatus)?.label}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="flex gap-1 flex-shrink-0 items-start">
+                                  {/* アクションボタン - コンパクト配置 */}
+                                  <div className="flex gap-0.5 items-center self-start">
                                     <button
                                       type="button"
                                       onClick={() =>
@@ -3156,15 +3506,14 @@ export function CommTimeComponent() {
                                           activeTab === "pomodoro"
                                         )
                                       }
-                                      className={`p-1.5 rounded-lg transition-colors duration-200 ${
+                                      className={`p-1 rounded transition-colors ${
                                         todo.isCompleted
-                                          ? "text-green-600 bg-green-100"
-                                          : "text-gray-400 hover:text-green-600 hover:bg-green-100"
+                                          ? "text-green-600 bg-green-100 dark:bg-green-900/50"
+                                          : "text-gray-400 hover:text-green-600 hover:bg-green-100 dark:hover:bg-green-900/50"
                                       }`}
                                       title="完了/未完了"
-                                      aria-label="check"
                                     >
-                                      <Check className="w-4 h-4" />
+                                      <Check className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       type="button"
@@ -3175,24 +3524,37 @@ export function CommTimeComponent() {
                                             : todo.id
                                         )
                                       }
-                                      className={`p-1.5 rounded-lg transition-colors duration-200 ${
+                                      className={`p-1 rounded transition-colors ${
                                         expandedDeadlineTodoId === todo.id ||
                                         todo.dueDate
-                                          ? "text-indigo-600 bg-indigo-100"
-                                          : "text-gray-400 hover:text-indigo-600 hover:bg-indigo-100"
+                                          ? "text-indigo-600 bg-indigo-100 dark:bg-indigo-900/50"
+                                          : "text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
                                       }`}
                                       title="期限を設定"
                                     >
-                                      <Calendar className="w-4 h-4" />
+                                      <Calendar className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditDialogTodoId(todo.id)}
+                                      className={`p-1 rounded transition-colors ${
+                                        (todo.tagIds && todo.tagIds.length > 0) ||
+                                        (todo.priority && todo.priority !== "none") ||
+                                        (todo.importance && todo.importance !== "none")
+                                          ? "text-purple-600 bg-purple-100 dark:bg-purple-900/50"
+                                          : "text-gray-400 hover:text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-900/50"
+                                      }`}
+                                      title="タグ・優先度・重要度"
+                                    >
+                                      <TagIcon className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => startEditingTodo(todo.id)}
-                                      className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors duration-200"
+                                      className="p-1 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded transition-colors"
                                       title="編集"
-                                      aria-label="edit"
                                     >
-                                      <Edit className="w-4 h-4" />
+                                      <Edit className="w-3.5 h-3.5" />
                                     </button>
                                     <button
                                       type="button"
@@ -3202,11 +3564,10 @@ export function CommTimeComponent() {
                                           activeTab === "pomodoro"
                                         )
                                       }
-                                      className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors duration-200"
+                                      className="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50 rounded transition-colors"
                                       title="削除"
-                                      aria-label="delete"
                                     >
-                                      <X className="w-4 h-4" />
+                                      <X className="w-3.5 h-3.5" />
                                     </button>
                                   </div>
                                 </>
@@ -3220,6 +3581,7 @@ export function CommTimeComponent() {
                   )}
                 </StrictModeDroppable>
               </DragDropContext>
+              )}
 
               {/* TODO追加フォーム */}
               <div className="flex gap-2">
@@ -3933,6 +4295,17 @@ export function CommTimeComponent() {
             setUseDatabase(true);
           }}
         />
+
+        {/* TODO編集ダイアログ */}
+        {editDialogTodo && (
+          <TodoEditDialog
+            todo={editDialogTodo}
+            tags={tags}
+            darkMode={darkMode}
+            onSave={handleSaveTodoDetails}
+            onClose={() => setEditDialogTodoId(null)}
+          />
+        )}
       </div>
     </div>
   );

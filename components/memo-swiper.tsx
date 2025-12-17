@@ -362,7 +362,7 @@ export function MemoSwiper({
                         <li
                           ref={provided.innerRef}
                           {...provided.draggableProps}
-                          className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                          className={`grid grid-cols-[auto_1fr_auto] gap-2 p-2 rounded-lg border transition-all ${
                             snapshot.isDragging
                               ? darkMode
                                 ? "bg-gray-700 border-blue-500 shadow-lg"
@@ -375,27 +375,36 @@ export function MemoSwiper({
                           {/* ドラッグハンドル */}
                           <div
                             {...provided.dragHandleProps}
-                            className={`cursor-grab active:cursor-grabbing ${
+                            className={`cursor-grab active:cursor-grabbing self-center ${
                               darkMode ? "text-gray-500" : "text-gray-400"
                             }`}
                           >
-                            <GripVertical size={20} />
+                            <GripVertical size={16} />
                           </div>
 
-                          {/* メモ情報 */}
+                          {/* メモ情報 - Gridで最大幅確保 */}
                           <div
-                            className="flex-1 min-w-0 cursor-pointer"
+                            className="min-w-0 cursor-pointer"
                             onClick={() => handleMemoClick(index)}
                           >
-                            <h4
-                              className={`font-medium truncate ${
-                                darkMode ? "text-white" : "text-gray-900"
-                              }`}
-                            >
-                              {memo.title || "無題のメモ"}
-                            </h4>
+                            <div className="flex items-center gap-2">
+                              <h4
+                                className={`font-medium truncate text-sm ${
+                                  darkMode ? "text-white" : "text-gray-900"
+                                }`}
+                              >
+                                {memo.title || "無題のメモ"}
+                              </h4>
+                              <span
+                                className={`text-[10px] whitespace-nowrap flex-shrink-0 ${
+                                  darkMode ? "text-gray-500" : "text-gray-400"
+                                }`}
+                              >
+                                {formatDate(memo.updated_at)}
+                              </span>
+                            </div>
                             <p
-                              className={`text-sm truncate ${
+                              className={`text-xs truncate ${
                                 darkMode ? "text-gray-400" : "text-gray-500"
                               }`}
                             >
@@ -403,30 +412,21 @@ export function MemoSwiper({
                             </p>
                           </div>
 
-                          {/* 更新日時 */}
-                          <span
-                            className={`text-xs whitespace-nowrap ${
-                              darkMode ? "text-gray-500" : "text-gray-400"
-                            }`}
-                          >
-                            {formatDate(memo.updated_at)}
-                          </span>
-
-                          {/* 編集・削除ボタン */}
-                          <div className="flex items-center gap-1">
+                          {/* 編集・削除ボタン - コンパクト */}
+                          <div className="flex items-center gap-0.5 self-center">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleMemoClick(index);
                               }}
-                              className={`p-1.5 rounded transition-colors ${
+                              className={`p-1 rounded transition-colors ${
                                 darkMode
                                   ? "hover:bg-gray-600 text-blue-400"
                                   : "hover:bg-gray-100 text-blue-600"
                               }`}
                               title="編集"
                             >
-                              <Edit size={16} />
+                              <Edit size={14} />
                             </button>
                             <button
                               onClick={(e) => {
@@ -441,14 +441,14 @@ export function MemoSwiper({
                                   onDeleteMemo(memo.id);
                                 }
                               }}
-                              className={`p-1.5 rounded transition-colors ${
+                              className={`p-1 rounded transition-colors ${
                                 darkMode
                                   ? "hover:bg-gray-600 text-red-400"
                                   : "hover:bg-gray-100 text-red-600"
                               }`}
                               title="削除"
                             >
-                              <Trash2 size={16} />
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         </li>
