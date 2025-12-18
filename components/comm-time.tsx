@@ -2873,7 +2873,7 @@ export function CommTimeComponent() {
             }`}
           >
             {/* メモセクション（Markdownプレビュー対応） */}
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl border border-white/20 dark:border-gray-700/20 h-[600px] lg:h-[700px] overflow-hidden">
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl border border-white/20 dark:border-gray-700/20 h-[400px] lg:h-[450px] overflow-hidden">
               <MemoSwiper
                 memos={multipleMemos.memos}
                 onCreateMemo={multipleMemos.createMemo}
