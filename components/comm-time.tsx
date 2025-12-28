@@ -311,6 +311,9 @@ export function CommTimeComponent() {
   // タグ管理パネルの表示状態
   const [showTagManager, setShowTagManager] = useState(false);
 
+  // カンバンモーダルの表示状態
+  const [showKanbanModal, setShowKanbanModal] = useState(false);
+
   // フィルターパネルの表示状態
   const [showFilterPanel, setShowFilterPanel] = useState(false);
 
@@ -2978,22 +2981,12 @@ export function CommTimeComponent() {
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      setViewMode(viewMode === "list" ? "kanban" : "list")
-                    }
-                    className={`text-xs px-2 py-1 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1 ${
-                      viewMode === "kanban"
-                        ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-white shadow-md"
-                        : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-                    }`}
-                    title={viewMode === "list" ? "カンバン表示" : "リスト表示"}
+                    onClick={() => setShowKanbanModal(true)}
+                    className="text-xs px-2 py-1 rounded-lg font-semibold transition-all duration-200 flex items-center gap-1 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                    title="カンバン表示"
                   >
-                    {viewMode === "list" ? (
-                      <Columns className="w-3 h-3" />
-                    ) : (
-                      <LayoutGrid className="w-3 h-3" />
-                    )}
-                    {viewMode === "list" ? "看板" : "リスト"}
+                    <Columns className="w-3 h-3" />
+                    看板
                   </button>
                 </div>
               </div>
@@ -3119,19 +3112,7 @@ export function CommTimeComponent() {
                 </div>
               )}
 
-              {/* カンバンビュー */}
-              {viewMode === "kanban" ? (
-                <div className="mb-4">
-                  <KanbanBoard
-                    todos={filteredTodos}
-                    tags={tags}
-                    darkMode={darkMode}
-                    onStatusChange={updateTodoKanbanStatus}
-                    onToggleTodo={(id) => toggleTodo(id, activeTab === "pomodoro")}
-                    onEditTodo={(id) => setEditingTodoId(id)}
-                  />
-                </div>
-              ) : (
+              {/* TODOリスト */}
               <DragDropContext onDragEnd={onDragEnd}>
                 <StrictModeDroppable
                   droppableId={
@@ -3581,7 +3562,6 @@ export function CommTimeComponent() {
                   )}
                 </StrictModeDroppable>
               </DragDropContext>
-              )}
 
               {/* TODO追加フォーム */}
               <div className="flex gap-2">
@@ -4295,6 +4275,63 @@ export function CommTimeComponent() {
             setUseDatabase(true);
           }}
         />
+
+        {/* カンバンモーダル */}
+        {showKanbanModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            {/* オーバーレイ */}
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={() => setShowKanbanModal(false)}
+            />
+            {/* モーダルコンテンツ */}
+            <div
+              className={`relative w-[95vw] h-[90vh] rounded-2xl shadow-2xl overflow-hidden ${
+                darkMode ? "bg-gray-900" : "bg-white"
+              }`}
+            >
+              {/* ヘッダー */}
+              <div
+                className={`flex items-center justify-between px-6 py-4 border-b ${
+                  darkMode ? "border-gray-700" : "border-gray-200"
+                }`}
+              >
+                <h2
+                  className={`text-xl font-bold flex items-center gap-2 ${
+                    darkMode ? "text-white" : "text-gray-800"
+                  }`}
+                >
+                  <Columns className="w-5 h-5" />
+                  カンバンボード
+                </h2>
+                <button
+                  onClick={() => setShowKanbanModal(false)}
+                  className={`p-2 rounded-full transition-colors ${
+                    darkMode
+                      ? "hover:bg-gray-700 text-gray-400"
+                      : "hover:bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              {/* カンバンボード */}
+              <div className="p-6 h-[calc(90vh-80px)] overflow-auto">
+                <KanbanBoard
+                  todos={filteredTodos}
+                  tags={tags}
+                  darkMode={darkMode}
+                  onStatusChange={updateTodoKanbanStatus}
+                  onToggleTodo={(id) => toggleTodo(id, activeTab === "pomodoro")}
+                  onEditTodo={(id) => {
+                    setEditingTodoId(id);
+                    setShowKanbanModal(false);
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* TODO編集ダイアログ */}
         {editDialogTodo && (
