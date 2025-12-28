@@ -91,12 +91,15 @@ export function useSupabaseTodos(user: User | null) {
     if (!user) return
 
     try {
-      // 現在のtodos長さを取得（関数形式で最新の状態を参照）
-      let orderIndex = 0
-      setTodos(prev => {
-        orderIndex = prev.length
-        return prev
-      })
+      // DBから現在のTODO件数を取得（他クライアントからの同時追加にも対応）
+      const { count, error: countError } = await supabase
+        .from("todos")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+
+      if (countError) throw countError
+
+      const orderIndex = count ?? 0
 
       const { data, error } = await supabase
         .from("todos")
@@ -168,15 +171,25 @@ export function useSupabaseTodos(user: User | null) {
 
   // TODO完了状態を切り替え
   const toggleTodo = async (id: string) => {
-    // 関数形式で最新の状態からtodoを取得
-    let targetTodo: LocalTodoItem | undefined
-    setTodos(prev => {
-      targetTodo = prev.find((t) => t.id === id)
-      return prev
-    })
-    if (!targetTodo) return
+    if (!user) return
 
-    await updateTodo(id, { isCompleted: !targetTodo.isCompleted })
+    try {
+      // DBから最新の状態を取得して、staleな状態を避ける
+      const { data: todoToToggle, error: fetchError } = await supabase
+        .from("todos")
+        .select("is_completed")
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .single()
+
+      if (fetchError) throw fetchError
+      if (!todoToToggle) return
+
+      await updateTodo(id, { isCompleted: !todoToToggle.is_completed })
+    } catch (err: any) {
+      setError(err.message)
+      console.error("Error toggling todo:", err)
+    }
   }
 
   // TODOの並び順を更新（ドラッグ＆ドロップ用）
