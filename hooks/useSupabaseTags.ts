@@ -54,14 +54,9 @@ export function useSupabaseTags(user: User | null) {
 
   // タグ追加
   const addTag = async (name: string, color: string): Promise<LocalTag | null> => {
-    console.log("[addTag] called with:", { name, color, userId: user?.id })
-    if (!user) {
-      console.warn("[addTag] No user, returning null")
-      return null
-    }
+    if (!user) return null
 
     try {
-      console.log("[addTag] Inserting tag to Supabase...")
       const { data, error } = await supabase
         .from("tags")
         .insert({
@@ -72,22 +67,18 @@ export function useSupabaseTags(user: User | null) {
         .select()
         .single()
 
-      console.log("[addTag] Supabase response:", { data, error })
-
       if (error) throw error
 
       if (data) {
         const newTag = convertToLocal(data)
-        // 関数形式で最新の状態を参照
         setTags(prev => [...prev, newTag])
-        console.log("[addTag] Tag added successfully:", newTag)
         return newTag
       }
       return null
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error"
       setError(message)
-      console.error("[addTag] Error:", err)
+      console.error("Error adding tag:", err)
       return null
     }
   }
