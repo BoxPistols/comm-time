@@ -43,9 +43,9 @@ type PriorityConfig = {
 
 // 優先度の表示設定（完全なTailwindクラス名を使用）
 export const PRIORITY_CONFIG: Record<PriorityLevel, PriorityConfig> = {
-  high: { label: "高", color: "red", icon: "🔴", bgClass: "bg-red-500", textClass: "text-red-600", badgeClass: "bg-red-100 text-red-700", activeClass: "bg-red-500 text-white" },
-  medium: { label: "中", color: "yellow", icon: "🟡", bgClass: "bg-yellow-500", textClass: "text-yellow-600", badgeClass: "bg-yellow-100 text-yellow-700", activeClass: "bg-yellow-500 text-black" },
-  low: { label: "低", color: "blue", icon: "🔵", bgClass: "bg-blue-500", textClass: "text-blue-600", badgeClass: "bg-blue-100 text-blue-700", activeClass: "bg-blue-500 text-white" },
+  high: { label: "高", color: "red", icon: "", bgClass: "bg-red-500", textClass: "text-red-600", badgeClass: "bg-red-100 text-red-700", activeClass: "bg-red-500 text-white" },
+  medium: { label: "中", color: "yellow", icon: "", bgClass: "bg-yellow-500", textClass: "text-yellow-600", badgeClass: "bg-yellow-100 text-yellow-700", activeClass: "bg-yellow-500 text-black" },
+  low: { label: "低", color: "blue", icon: "", bgClass: "bg-blue-500", textClass: "text-blue-600", badgeClass: "bg-blue-100 text-blue-700", activeClass: "bg-blue-500 text-white" },
   none: { label: "-", color: "gray", icon: "", bgClass: "bg-gray-500", textClass: "text-gray-600", badgeClass: "bg-gray-100 text-gray-700", activeClass: "bg-gray-500 text-white" },
 };
 
@@ -62,9 +62,9 @@ type ImportanceConfig = {
 
 // 重要度の表示設定（完全なTailwindクラス名を使用）
 export const IMPORTANCE_CONFIG: Record<ImportanceLevel, ImportanceConfig> = {
-  high: { label: "高", color: "red", icon: "⭐", bgClass: "bg-red-500", textClass: "text-red-600", badgeClass: "bg-red-100 text-red-700", activeClass: "bg-red-500 text-white" },
-  medium: { label: "中", color: "yellow", icon: "☆", bgClass: "bg-yellow-500", textClass: "text-yellow-600", badgeClass: "bg-yellow-100 text-yellow-700", activeClass: "bg-yellow-500 text-black" },
-  low: { label: "低", color: "blue", icon: "○", bgClass: "bg-blue-500", textClass: "text-blue-600", badgeClass: "bg-blue-100 text-blue-700", activeClass: "bg-blue-500 text-white" },
+  high: { label: "高", color: "red", icon: "", bgClass: "bg-red-500", textClass: "text-red-600", badgeClass: "bg-red-100 text-red-700", activeClass: "bg-red-500 text-white" },
+  medium: { label: "中", color: "yellow", icon: "", bgClass: "bg-yellow-500", textClass: "text-yellow-600", badgeClass: "bg-yellow-100 text-yellow-700", activeClass: "bg-yellow-500 text-black" },
+  low: { label: "低", color: "blue", icon: "", bgClass: "bg-blue-500", textClass: "text-blue-600", badgeClass: "bg-blue-100 text-blue-700", activeClass: "bg-blue-500 text-white" },
   none: { label: "-", color: "gray", icon: "", bgClass: "bg-gray-500", textClass: "text-gray-600", badgeClass: "bg-gray-100 text-gray-700", activeClass: "bg-gray-500 text-white" },
 };
 
@@ -75,11 +75,9 @@ export const TAG_COLORS = [
   { name: "イエロー", value: "bg-yellow-500", textColor: "text-black" },
   { name: "グリーン", value: "bg-green-500", textColor: "text-white" },
   { name: "ブルー", value: "bg-blue-500", textColor: "text-white" },
-  { name: "インディゴ", value: "bg-indigo-500", textColor: "text-white" },
   { name: "パープル", value: "bg-purple-500", textColor: "text-white" },
   { name: "ピンク", value: "bg-pink-500", textColor: "text-white" },
   { name: "グレー", value: "bg-gray-500", textColor: "text-white" },
-  { name: "ティール", value: "bg-teal-500", textColor: "text-white" },
 ];
 
 // フィルター状態の型
