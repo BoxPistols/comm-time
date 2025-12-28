@@ -75,9 +75,11 @@ export const TAG_COLORS = [
   { name: "イエロー", value: "bg-yellow-500", textColor: "text-black" },
   { name: "グリーン", value: "bg-green-500", textColor: "text-white" },
   { name: "ブルー", value: "bg-blue-500", textColor: "text-white" },
+  { name: "インディゴ", value: "bg-indigo-500", textColor: "text-white" },
   { name: "パープル", value: "bg-purple-500", textColor: "text-white" },
   { name: "ピンク", value: "bg-pink-500", textColor: "text-white" },
   { name: "グレー", value: "bg-gray-500", textColor: "text-white" },
+  { name: "ティール", value: "bg-teal-500", textColor: "text-white" },
 ];
 
 // フィルター状態の型
