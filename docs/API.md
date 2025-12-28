@@ -461,27 +461,27 @@ def search_memos(query):
 ```bash
 # 全TODOを取得
 curl -X GET "https://your-domain.com/api/v1/todos" \
-  -H "X-API-Key: your-api-key" \
-  -H "X-User-Id: user-uuid"
+  -H "X-API-Key: YOUR_PRIVATE_API_KEY" \
+  -H "X-User-Id: USER_UUID"
 
 # 新しいTODOを作成
 curl -X POST "https://your-domain.com/api/v1/todos" \
-  -H "X-API-Key: your-api-key" \
-  -H "X-User-Id: user-uuid" \
+  -H "X-API-Key: YOUR_PRIVATE_API_KEY" \
+  -H "X-User-Id: USER_UUID" \
   -H "Content-Type: application/json" \
   -d '{"text": "新しいタスク", "priority": "high"}'
 
 # TODOを更新
 curl -X PATCH "https://your-domain.com/api/v1/todos/TODO_ID" \
-  -H "X-API-Key: your-api-key" \
-  -H "X-User-Id: user-uuid" \
+  -H "X-API-Key: YOUR_PRIVATE_API_KEY" \
+  -H "X-User-Id: USER_UUID" \
   -H "Content-Type: application/json" \
   -d '{"is_completed": true}'
 
 # タグでフィルター
 curl -X GET "https://your-domain.com/api/v1/todos?tag_id=TAG_UUID" \
-  -H "X-API-Key: your-api-key" \
-  -H "X-User-Id: user-uuid"
+  -H "X-API-Key: YOUR_PRIVATE_API_KEY" \
+  -H "X-User-Id: USER_UUID"
 ```
 
 ---

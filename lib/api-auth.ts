@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { timingSafeEqual } from 'crypto'
 import { supabase, isSupabaseConfigured } from './supabase'
 
 // API認証の結果型
@@ -15,7 +16,7 @@ export type AuthResult = {
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key, X-User-Id',
 }
 
 // OPTIONS リクエストのレスポンス（CORS preflight）
@@ -113,7 +114,17 @@ export async function authenticateRequest(request: NextRequest): Promise<AuthRes
       }
     }
 
-    if (apiKey !== validApiKey) {
+    // タイミング攻撃対策: timingSafeEqualは同じ長さのBufferを要求する
+    if (apiKey.length !== validApiKey.length) {
+      return {
+        success: false,
+        error: 'Invalid API Key',
+        status: 401,
+      }
+    }
+
+    // 一定時間で比較してタイミング攻撃を防ぐ
+    if (!timingSafeEqual(Buffer.from(apiKey), Buffer.from(validApiKey))) {
       return {
         success: false,
         error: 'Invalid API Key',

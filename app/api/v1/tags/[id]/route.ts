@@ -70,6 +70,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return apiError('Invalid JSON body', 400)
   }
 
+  // 型チェック
+  if ('name' in body && typeof body.name !== 'string') {
+    return apiError('name must be a string', 400)
+  }
+
+  if ('color' in body && typeof body.color !== 'string') {
+    return apiError('color must be a string', 400)
+  }
+
   // 許可されたフィールドのみ抽出
   const allowedFields = ['name', 'color']
   const updates: Record<string, unknown> = {}
@@ -116,37 +125,32 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
   const { id } = await context.params
 
-  // 削除前に存在確認
-  const { data: existing } = await supabase
-    .from('tags')
-    .select('id')
-    .eq('id', id)
-    .eq('user_id', auth.userId)
-    .single()
+  // 関連するTODOからタグIDを削除（タグが存在しなくてもエラーにならない）
+  const { error: rpcError } = await supabase.rpc('remove_tag_from_todos', {
+    tag_id_to_remove: id,
+    user_id_param: auth.userId,
+  })
 
-  if (!existing) {
-    return apiError('Tag not found', 404)
+  // RPCが存在しない場合のエラー(42883: function does not exist, 42P01: relation does not exist)は無視
+  // それ以外のエラーはデータ不整合を防ぐために処理を中断
+  if (rpcError && rpcError.code !== '42883' && rpcError.code !== '42P01') {
+    console.error('RPC call to remove_tag_from_todos failed:', rpcError)
+    return apiError('Failed to update related todos', 500)
   }
 
-  // 関連するTODOからタグIDを削除（RPCがあれば使用）
-  try {
-    await supabase.rpc('remove_tag_from_todos', {
-      tag_id_to_remove: id,
-      user_id_param: auth.userId,
-    })
-  } catch {
-    // RPCが存在しない場合はスキップ（タグのみ削除）
-  }
-
-  // タグを削除
-  const { error } = await supabase
+  // 存在確認と削除を1つのクエリで実行
+  const { error, count } = await supabase
     .from('tags')
-    .delete()
+    .delete({ count: 'exact' })
     .eq('id', id)
     .eq('user_id', auth.userId)
 
   if (error) {
     return apiError(error.message, 500)
+  }
+
+  if (count === 0) {
+    return apiError('Tag not found', 404)
   }
 
   return apiResponse({ success: true, message: 'Tag deleted' })

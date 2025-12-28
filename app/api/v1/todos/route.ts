@@ -89,6 +89,11 @@ export async function GET(request: NextRequest) {
   })
 }
 
+// 許可される値の定義
+const VALID_PRIORITIES = ['high', 'medium', 'low', 'none'] as const
+const VALID_IMPORTANCES = ['high', 'medium', 'low', 'none'] as const
+const VALID_KANBAN_STATUSES = ['backlog', 'todo', 'doing', 'done'] as const
+
 /**
  * POST /api/v1/todos
  *
@@ -98,7 +103,6 @@ export async function GET(request: NextRequest) {
  * - due_date?: string (YYYY-MM-DD)
  * - due_time?: string (HH:mm)
  * - alarm_point_id?: string
- * - order_index?: number
  * - tag_ids?: string[]
  * - priority?: 'high' | 'medium' | 'low' | 'none'
  * - importance?: 'high' | 'medium' | 'low' | 'none'
@@ -117,40 +121,91 @@ export async function POST(request: NextRequest) {
     return apiError('Invalid JSON body', 400)
   }
 
+  // 必須フィールドのバリデーション
   if (!body.text || typeof body.text !== 'string') {
     return apiError('text is required and must be a string', 400)
   }
 
-  // 最大order_indexを取得
-  const { data: maxOrderData } = await supabase
-    .from('todos')
-    .select('order_index')
-    .eq('user_id', auth.userId)
-    .order('order_index', { ascending: false })
-    .limit(1)
-    .single()
-
-  const nextOrderIndex = (maxOrderData?.order_index ?? -1) + 1
-
-  const newTodo = {
-    user_id: auth.userId,
-    text: body.text,
-    is_completed: body.is_completed ?? false,
-    due_date: body.due_date ?? null,
-    due_time: body.due_time ?? null,
-    alarm_point_id: body.alarm_point_id ?? null,
-    order_index: body.order_index ?? nextOrderIndex,
-    tag_ids: body.tag_ids ?? [],
-    priority: body.priority ?? 'none',
-    importance: body.importance ?? 'none',
-    kanban_status: body.kanban_status ?? 'backlog',
+  // 型チェック
+  if ('is_completed' in body && typeof body.is_completed !== 'boolean') {
+    return apiError('is_completed must be a boolean', 400)
   }
 
-  const { data, error } = await supabase
-    .from('todos')
-    .insert(newTodo)
-    .select()
-    .single()
+  if ('due_date' in body && body.due_date !== null && typeof body.due_date !== 'string') {
+    return apiError('due_date must be a string (YYYY-MM-DD) or null', 400)
+  }
+
+  if ('due_time' in body && body.due_time !== null && typeof body.due_time !== 'string') {
+    return apiError('due_time must be a string (HH:mm) or null', 400)
+  }
+
+  if ('tag_ids' in body && !Array.isArray(body.tag_ids)) {
+    return apiError('tag_ids must be an array', 400)
+  }
+
+  if ('priority' in body && !VALID_PRIORITIES.includes(body.priority as typeof VALID_PRIORITIES[number])) {
+    return apiError(`priority must be one of: ${VALID_PRIORITIES.join(', ')}`, 400)
+  }
+
+  if ('importance' in body && !VALID_IMPORTANCES.includes(body.importance as typeof VALID_IMPORTANCES[number])) {
+    return apiError(`importance must be one of: ${VALID_IMPORTANCES.join(', ')}`, 400)
+  }
+
+  if ('kanban_status' in body && !VALID_KANBAN_STATUSES.includes(body.kanban_status as typeof VALID_KANBAN_STATUSES[number])) {
+    return apiError(`kanban_status must be one of: ${VALID_KANBAN_STATUSES.join(', ')}`, 400)
+  }
+
+  // RPC関数を使用してアトミックにTODOを作成（レースコンディション対策）
+  const { data, error } = await supabase.rpc('create_todo_with_order', {
+    p_user_id: auth.userId,
+    p_text: body.text,
+    p_is_completed: body.is_completed ?? false,
+    p_due_date: body.due_date ?? null,
+    p_due_time: body.due_time ?? null,
+    p_alarm_point_id: body.alarm_point_id ?? null,
+    p_tag_ids: body.tag_ids ?? [],
+    p_priority: body.priority ?? 'none',
+    p_importance: body.importance ?? 'none',
+    p_kanban_status: body.kanban_status ?? 'backlog',
+  })
+
+  // RPCが存在しない場合は従来の方法にフォールバック
+  if (error && (error.code === '42883' || error.code === '42P01')) {
+    // フォールバック: 従来のINSERT（レースコンディションの可能性あり）
+    const { data: maxOrderData } = await supabase
+      .from('todos')
+      .select('order_index')
+      .eq('user_id', auth.userId)
+      .order('order_index', { ascending: false })
+      .limit(1)
+      .single()
+
+    const nextOrderIndex = (maxOrderData?.order_index ?? -1) + 1
+
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('todos')
+      .insert({
+        user_id: auth.userId,
+        text: body.text,
+        is_completed: body.is_completed ?? false,
+        due_date: body.due_date ?? null,
+        due_time: body.due_time ?? null,
+        alarm_point_id: body.alarm_point_id ?? null,
+        order_index: nextOrderIndex,
+        tag_ids: body.tag_ids ?? [],
+        priority: body.priority ?? 'none',
+        importance: body.importance ?? 'none',
+        kanban_status: body.kanban_status ?? 'backlog',
+      })
+      .select()
+      .single()
+
+    if (fallbackError) {
+      return apiError(fallbackError.message, 500)
+    }
+
+    return apiResponse({ todo: fallbackData }, 201)
+  }
 
   if (error) {
     return apiError(error.message, 500)

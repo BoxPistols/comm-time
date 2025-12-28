@@ -11,6 +11,11 @@ type RouteContext = {
   params: Promise<{ id: string }>
 }
 
+// 許可される値の定義
+const VALID_PRIORITIES = ['high', 'medium', 'low', 'none'] as const
+const VALID_IMPORTANCES = ['high', 'medium', 'low', 'none'] as const
+const VALID_KANBAN_STATUSES = ['backlog', 'todo', 'doing', 'done'] as const
+
 // CORS preflight
 export async function OPTIONS() {
   return handleCors()
@@ -78,6 +83,43 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return apiError('Invalid JSON body', 400)
   }
 
+  // 型チェック
+  if ('text' in body && typeof body.text !== 'string') {
+    return apiError('text must be a string', 400)
+  }
+
+  if ('is_completed' in body && typeof body.is_completed !== 'boolean') {
+    return apiError('is_completed must be a boolean', 400)
+  }
+
+  if ('due_date' in body && body.due_date !== null && typeof body.due_date !== 'string') {
+    return apiError('due_date must be a string or null', 400)
+  }
+
+  if ('due_time' in body && body.due_time !== null && typeof body.due_time !== 'string') {
+    return apiError('due_time must be a string or null', 400)
+  }
+
+  if ('order_index' in body && typeof body.order_index !== 'number') {
+    return apiError('order_index must be a number', 400)
+  }
+
+  if ('tag_ids' in body && !Array.isArray(body.tag_ids)) {
+    return apiError('tag_ids must be an array', 400)
+  }
+
+  if ('priority' in body && !VALID_PRIORITIES.includes(body.priority as typeof VALID_PRIORITIES[number])) {
+    return apiError(`priority must be one of: ${VALID_PRIORITIES.join(', ')}`, 400)
+  }
+
+  if ('importance' in body && !VALID_IMPORTANCES.includes(body.importance as typeof VALID_IMPORTANCES[number])) {
+    return apiError(`importance must be one of: ${VALID_IMPORTANCES.join(', ')}`, 400)
+  }
+
+  if ('kanban_status' in body && !VALID_KANBAN_STATUSES.includes(body.kanban_status as typeof VALID_KANBAN_STATUSES[number])) {
+    return apiError(`kanban_status must be one of: ${VALID_KANBAN_STATUSES.join(', ')}`, 400)
+  }
+
   // 許可されたフィールドのみ抽出
   const allowedFields = [
     'text',
@@ -135,26 +177,19 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
   const { id } = await context.params
 
-  // 削除前に存在確認
-  const { data: existing } = await supabase
+  // 存在確認と削除を1つのクエリで実行
+  const { error, count } = await supabase
     .from('todos')
-    .select('id')
-    .eq('id', id)
-    .eq('user_id', auth.userId)
-    .single()
-
-  if (!existing) {
-    return apiError('Todo not found', 404)
-  }
-
-  const { error } = await supabase
-    .from('todos')
-    .delete()
+    .delete({ count: 'exact' })
     .eq('id', id)
     .eq('user_id', auth.userId)
 
   if (error) {
     return apiError(error.message, 500)
+  }
+
+  if (count === 0) {
+    return apiError('Todo not found', 404)
   }
 
   return apiResponse({ success: true, message: 'Todo deleted' })

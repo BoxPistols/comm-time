@@ -70,6 +70,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return apiError('Invalid JSON body', 400)
   }
 
+  // 型チェック
+  if ('title' in body && typeof body.title !== 'string') {
+    return apiError('title must be a string', 400)
+  }
+
+  if ('content' in body && typeof body.content !== 'string') {
+    return apiError('content must be a string', 400)
+  }
+
   // 許可されたフィールドのみ抽出
   const allowedFields = ['title', 'content']
   const updates: Record<string, unknown> = {}
@@ -115,26 +124,19 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
   const { id } = await context.params
 
-  // 削除前に存在確認
-  const { data: existing } = await supabase
+  // 存在確認と削除を1つのクエリで実行
+  const { error, count } = await supabase
     .from('memos')
-    .select('id')
-    .eq('id', id)
-    .eq('user_id', auth.userId)
-    .single()
-
-  if (!existing) {
-    return apiError('Memo not found', 404)
-  }
-
-  const { error } = await supabase
-    .from('memos')
-    .delete()
+    .delete({ count: 'exact' })
     .eq('id', id)
     .eq('user_id', auth.userId)
 
   if (error) {
     return apiError(error.message, 500)
+  }
+
+  if (count === 0) {
+    return apiError('Memo not found', 404)
   }
 
   return apiResponse({ success: true, message: 'Memo deleted' })
