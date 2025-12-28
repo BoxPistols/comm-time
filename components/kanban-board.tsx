@@ -144,7 +144,7 @@ export function KanbanBoard({
           return (
             <div
               key={column.id}
-              className={`flex-shrink-0 w-64 rounded-xl border ${colors.border} ${colors.bg}`}
+              className={`flex-shrink-0 w-52 sm:w-64 rounded-xl border ${colors.border} ${colors.bg}`}
             >
               {/* カラムヘッダー */}
               <div
@@ -198,7 +198,7 @@ export function KanbanBoard({
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
                               onClick={() => onEditTodo?.(todo.id)}
-                              className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                              className={`p-3 rounded-lg border cursor-pointer transition-all overflow-hidden ${
                                 snapshot.isDragging
                                   ? "shadow-lg scale-105"
                                   : "hover:shadow-md"
@@ -230,7 +230,7 @@ export function KanbanBoard({
                                   )}
                                 </button>
                                 <p
-                                  className={`flex-1 text-sm leading-tight ${
+                                  className={`flex-1 text-sm leading-tight break-words ${
                                     todo.isCompleted
                                       ? "line-through"
                                       : ""
@@ -238,8 +238,8 @@ export function KanbanBoard({
                                     darkMode ? "text-gray-200" : "text-gray-800"
                                   }`}
                                 >
-                                  {todo.text.length > 50
-                                    ? `${todo.text.slice(0, 50)}...`
+                                  {todo.text.length > 40
+                                    ? `${todo.text.slice(0, 40)}...`
                                     : todo.text}
                                 </p>
                               </div>

@@ -7,6 +7,30 @@ const config: Config = {
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  safelist: [
+    // タグカラー用
+    "bg-red-500",
+    "bg-orange-500",
+    "bg-yellow-500",
+    "bg-green-500",
+    "bg-blue-500",
+    "bg-indigo-500",
+    "bg-purple-500",
+    "bg-pink-500",
+    "bg-gray-500",
+    "bg-teal-500",
+    "text-white",
+    "text-black",
+    // 優先度・重要度バッジカラー用
+    "bg-red-100",
+    "bg-yellow-100",
+    "bg-blue-100",
+    "bg-gray-100",
+    "text-red-700",
+    "text-yellow-700",
+    "text-blue-700",
+    "text-gray-700",
+  ],
   theme: {
   	extend: {
   		colors: {

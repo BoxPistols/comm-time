@@ -131,12 +131,10 @@ export function FilterPanel({
               <button
                 key={tag.id}
                 onClick={() => handleTagToggle(tag.id)}
-                className={`px-2 py-1 rounded-full text-xs font-medium transition-all ${
+                className={`px-2 py-1 rounded-full text-xs font-medium transition-all ${tag.color} ${getTextColorClass(tag.color)} ${
                   filterState.tags.includes(tag.id)
-                    ? `${tag.color} ${getTextColorClass(tag.color)} ring-2 ring-blue-500`
-                    : darkMode
-                    ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    ? "ring-2 ring-offset-1 ring-blue-500 scale-105"
+                    : "opacity-70 hover:opacity-100"
                 }`}
               >
                 {tag.name}
@@ -159,30 +157,28 @@ export function FilterPanel({
         <div className="flex flex-wrap gap-1">
           <button
             onClick={() => handlePriorityChange("all")}
-            className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+            className={`px-2 py-1 rounded-full text-xs font-medium transition-all ${
               filterState.priority === "all"
-                ? "bg-blue-500 text-white"
+                ? "bg-blue-500 text-white ring-2 ring-offset-1 ring-blue-500"
                 : darkMode
                 ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
-            すべて
+            -
           </button>
-          {(["high", "medium", "low", "none"] as PriorityLevel[]).map(
+          {(["low", "medium", "high"] as PriorityLevel[]).map(
             (level) => (
               <button
                 key={level}
                 onClick={() => handlePriorityChange(level)}
-                className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+                className={`px-2 py-1 rounded-full text-xs font-medium transition-all ${
                   filterState.priority === level
-                    ? PRIORITY_CONFIG[level].activeClass
-                    : darkMode
-                    ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    ? `${PRIORITY_CONFIG[level].activeClass} ring-2 ring-offset-1 ring-blue-500`
+                    : `${PRIORITY_CONFIG[level].badgeClass} hover:opacity-80`
                 }`}
               >
-                {PRIORITY_CONFIG[level].icon} {PRIORITY_CONFIG[level].label}
+                {PRIORITY_CONFIG[level].label}
               </button>
             )
           )}
@@ -202,30 +198,28 @@ export function FilterPanel({
         <div className="flex flex-wrap gap-1">
           <button
             onClick={() => handleImportanceChange("all")}
-            className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+            className={`px-2 py-1 rounded-full text-xs font-medium transition-all ${
               filterState.importance === "all"
-                ? "bg-blue-500 text-white"
+                ? "bg-blue-500 text-white ring-2 ring-offset-1 ring-blue-500"
                 : darkMode
                 ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
-            すべて
+            -
           </button>
-          {(["high", "medium", "low", "none"] as ImportanceLevel[]).map(
+          {(["low", "medium", "high"] as ImportanceLevel[]).map(
             (level) => (
               <button
                 key={level}
                 onClick={() => handleImportanceChange(level)}
-                className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+                className={`px-2 py-1 rounded-full text-xs font-medium transition-all ${
                   filterState.importance === level
-                    ? IMPORTANCE_CONFIG[level].activeClass
-                    : darkMode
-                    ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    ? `${IMPORTANCE_CONFIG[level].activeClass} ring-2 ring-offset-1 ring-blue-500`
+                    : `${IMPORTANCE_CONFIG[level].badgeClass} hover:opacity-80`
                 }`}
               >
-                {IMPORTANCE_CONFIG[level].icon} {IMPORTANCE_CONFIG[level].label}
+                {IMPORTANCE_CONFIG[level].label}
               </button>
             )
           )}
