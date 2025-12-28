@@ -21,6 +21,15 @@ const config: Config = {
     "bg-teal-500",
     "text-white",
     "text-black",
+    // 優先度・重要度バッジカラー用
+    "bg-red-100",
+    "bg-yellow-100",
+    "bg-blue-100",
+    "bg-gray-100",
+    "text-red-700",
+    "text-yellow-700",
+    "text-blue-700",
+    "text-gray-700",
   ],
   theme: {
   	extend: {
