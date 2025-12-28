@@ -71,7 +71,8 @@ export function useSupabaseTags(user: User | null) {
 
       if (data) {
         const newTag = convertToLocal(data)
-        setTags([...tags, newTag])
+        // 関数形式で最新の状態を参照
+        setTags(prev => [...prev, newTag])
         return newTag
       }
       return null
@@ -96,7 +97,8 @@ export function useSupabaseTags(user: User | null) {
 
       if (error) throw error
 
-      setTags(tags.map((tag) => (tag.id === id ? { ...tag, name, color } : tag)))
+      // 関数形式で最新の状態を参照
+      setTags(prev => prev.map((tag) => (tag.id === id ? { ...tag, name, color } : tag)))
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error"
       setError(message)
@@ -130,7 +132,8 @@ export function useSupabaseTags(user: User | null) {
 
       if (error) throw error
 
-      setTags(tags.filter((tag) => tag.id !== id))
+      // 関数形式で最新の状態を参照
+      setTags(prev => prev.filter((tag) => tag.id !== id))
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Unknown error"
       setError(message)

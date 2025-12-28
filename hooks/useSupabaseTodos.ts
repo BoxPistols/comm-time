@@ -91,7 +91,12 @@ export function useSupabaseTodos(user: User | null) {
     if (!user) return
 
     try {
-      const orderIndex = todos.length
+      // 現在のtodos長さを取得（関数形式で最新の状態を参照）
+      let orderIndex = 0
+      setTodos(prev => {
+        orderIndex = prev.length
+        return prev
+      })
 
       const { data, error } = await supabase
         .from("todos")
@@ -107,7 +112,7 @@ export function useSupabaseTodos(user: User | null) {
       if (error) throw error
 
       if (data) {
-        setTodos([...todos, convertToLocal(data)])
+        setTodos(prev => [...prev, convertToLocal(data)])
       }
     } catch (err: any) {
       setError(err.message)
@@ -133,8 +138,8 @@ export function useSupabaseTodos(user: User | null) {
         if (error) throw error
       }
 
-      // ローカル状態は常に更新（ローカル専用フィールドを含む）
-      setTodos(todos.map((todo) => (todo.id === id ? { ...todo, ...updates } : todo)))
+      // ローカル状態は常に更新（関数形式で最新の状態を参照）
+      setTodos(prev => prev.map((todo) => (todo.id === id ? { ...todo, ...updates } : todo)))
     } catch (err: any) {
       setError(err.message)
       console.error("Error updating todo:", err)
@@ -154,7 +159,7 @@ export function useSupabaseTodos(user: User | null) {
 
       if (error) throw error
 
-      setTodos(todos.filter((todo) => todo.id !== id))
+      setTodos(prev => prev.filter((todo) => todo.id !== id))
     } catch (err: any) {
       setError(err.message)
       console.error("Error removing todo:", err)
@@ -163,10 +168,15 @@ export function useSupabaseTodos(user: User | null) {
 
   // TODO完了状態を切り替え
   const toggleTodo = async (id: string) => {
-    const todo = todos.find((t) => t.id === id)
-    if (!todo) return
+    // 関数形式で最新の状態からtodoを取得
+    let targetTodo: LocalTodoItem | undefined
+    setTodos(prev => {
+      targetTodo = prev.find((t) => t.id === id)
+      return prev
+    })
+    if (!targetTodo) return
 
-    await updateTodo(id, { isCompleted: !todo.isCompleted })
+    await updateTodo(id, { isCompleted: !targetTodo.isCompleted })
   }
 
   // TODOの並び順を更新（ドラッグ＆ドロップ用）
