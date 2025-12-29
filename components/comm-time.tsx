@@ -30,7 +30,6 @@ import {
   Briefcase,
   Tag as TagIcon,
   Filter,
-  LayoutGrid,
   Columns,
   Flag,
   Star,
@@ -298,7 +297,7 @@ export function CommTimeComponent() {
   }, [filterState]);
 
   // 表示モード（リスト / カンバン）
-  const [viewMode, setViewMode] = useState<"list" | "kanban">(() => {
+  const [viewMode] = useState<"list" | "kanban">(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("todoViewMode");
       if (saved === "kanban" || saved === "list") {
