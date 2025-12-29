@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -273,30 +273,32 @@ export function MarkdownMemo({
     });
   };
 
-  // チェックボックスをトグルする関数（インデックスベース）
-  const toggleCheckbox = useCallback(
-    (checkboxIndex: number) => {
+  // チェックボックスの行番号を事前に計算（安定したマッピング）
+  const checkboxLineNumbers = useMemo(() => {
+    const lineNumbers: number[] = [];
+    const lines = content.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      if (CHECKBOX_PATTERN.test(lines[i])) {
+        lineNumbers.push(i);
+      }
+    }
+    return lineNumbers;
+  }, [content]);
+
+  // チェックボックスをトグルする関数（行番号ベース）
+  const toggleCheckboxByLine = useCallback(
+    (lineIndex: number) => {
       const lines = content.split("\n");
 
-      let currentIndex = 0;
-      let targetLineIndex = -1;
-
-      // 指定されたインデックスのチェックボックスを見つける
-      for (let i = 0; i < lines.length; i++) {
-        if (CHECKBOX_PATTERN.test(lines[i])) {
-          if (currentIndex === checkboxIndex) {
-            targetLineIndex = i;
-            break;
-          }
-          currentIndex++;
-        }
-      }
-
-      if (targetLineIndex === -1) {
+      if (lineIndex < 0 || lineIndex >= lines.length) {
         return;
       }
 
-      const line = lines[targetLineIndex];
+      const line = lines[lineIndex];
+      if (!CHECKBOX_PATTERN.test(line)) {
+        return;
+      }
+
       const newLine = line.replace(
         CHECKBOX_PATTERN,
         (match: string, prefix: string, checked: string) => {
@@ -307,7 +309,7 @@ export function MarkdownMemo({
       );
 
       if (line !== newLine) {
-        lines[targetLineIndex] = newLine;
+        lines[lineIndex] = newLine;
         const newContent = lines.join("\n");
 
         // コンテンツを更新して保存
@@ -462,8 +464,9 @@ export function MarkdownMemo({
                     components={{
                       input: (props) => {
                         if (props.type === "checkbox") {
-                          // 現在のチェックボックスのインデックスを取得して、カウンターをインクリメント
-                          const currentIndex = checkboxCounter++;
+                          // 事前計算した行番号を使用
+                          const lineNumber = checkboxLineNumbers[checkboxCounter];
+                          checkboxCounter++;
 
                           return (
                             <input
@@ -477,7 +480,9 @@ export function MarkdownMemo({
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                toggleCheckbox(currentIndex);
+                                if (lineNumber !== undefined) {
+                                  toggleCheckboxByLine(lineNumber);
+                                }
                               }}
                               onChange={() => {}} // コントロールドコンポーネント
                               disabled={false}

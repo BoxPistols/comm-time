@@ -2508,7 +2508,16 @@ export function CommTimeComponent() {
                   }`}
                 >
                   <div className="text-4xl sm:text-5xl lg:text-6xl font-bold text-center mb-3 sm:mb-4 text-white tabular-nums tracking-tight">
-                    {formatTime(pomodoroElapsedTime)}
+                    {formatTime(
+                      Math.max(
+                        0,
+                        (pomodoroState === "work"
+                          ? pomodoroSettings.workDuration
+                          : pomodoroSettings.breakDuration) *
+                          60 -
+                          pomodoroElapsedTime
+                      )
+                    )}
                   </div>
                   <div className="text-xl sm:text-2xl font-semibold text-center text-white/90 mb-2">
                     {pomodoroState === "work" ? "🎯 作業時間" : "☕ 休憩時間"}
