@@ -642,7 +642,7 @@ export function MarkdownMemo({
         tabIndex={0}
       >
         <div
-          className="w-[98vw] sm:w-[95vw] md:w-[90vw] m-auto flex flex-col md:flex-row items-center gap-2 py-4 pb-safe"
+          className="w-[98vw] sm:w-[95vw] md:w-[90vw] max-w-[960px] m-auto flex flex-col md:flex-row items-center gap-2 py-4 pb-safe"
           onClick={(e) => e.stopPropagation()}
         >
           {/* 左矢印（デスクトップのみ表示） */}
@@ -667,8 +667,8 @@ export function MarkdownMemo({
             {memoContent}
           </div>
 
-          {/* ナビゲーションボタン（モバイルは下部に横並び、デスクトップは右矢印のみ） */}
-          <div className="flex _md:hidden items-center justify-center gap-4 py-2 flex-shrink-0">
+          {/* ナビゲーションボタン（モバイルのみ下部に横並び表示） */}
+          <div className="flex md:hidden items-center justify-center gap-4 py-2 flex-shrink-0">
             <button
               onClick={onNavigatePrev}
               className={`p-3 rounded-full transition-colors ${
