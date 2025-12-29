@@ -321,7 +321,7 @@ export function MarkdownMemo({
   // 全画面モード用のコンテンツ
   const memoContent = (
     <div
-      className={`flex flex-col h-full min-h-0 rounded-lg border ${
+      className={`flex flex-col max-h-[400px] rounded-lg border ${
         darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
       }`}
     >
