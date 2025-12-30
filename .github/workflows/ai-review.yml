@@ -1,0 +1,240 @@
+name: AI Code Review (Gemini)
+
+on:
+  # PRコメントでコマンド駆動
+  issue_comment:
+    types: [created]
+  # PR作成時に自動サマリー（オプション）
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  # /review コマンドでコードレビュー
+  review:
+    if: |
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/review')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR details
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            return {
+              base: pr.data.base.sha,
+              head: pr.data.head.sha,
+              branch: pr.data.head.ref
+            };
+
+      - name: Get diff
+        id: diff
+        run: |
+          git fetch origin ${{ fromJson(steps.pr.outputs.result).branch }}
+          DIFF=$(git diff ${{ fromJson(steps.pr.outputs.result).base }}..${{ fromJson(steps.pr.outputs.result).head }} -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.css' '*.json' | head -c 30000)
+          echo "diff<<EOF" >> $GITHUB_OUTPUT
+          echo "$DIFF" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Review with Gemini
+        id: review
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$GEMINI_API_KEY" \
+            -H 'Content-Type: application/json' \
+            -d @- <<PAYLOAD
+          {
+            "contents": [{
+              "parts": [{
+                "text": "あなたは経験豊富なシニアエンジニアです。以下のコード差分をレビューしてください。\n\n## レビュー観点\n1. バグや潜在的な問題\n2. セキュリティリスク\n3. パフォーマンス改善点\n4. コードの可読性・保守性\n5. ベストプラクティスへの準拠\n\n## 出力形式\n- 問題がある場合は具体的なファイル名と行を示してください\n- 改善案があれば具体的なコード例を提示してください\n- 問題がなければ「LGTM」と回答してください\n\n## コード差分\n\`\`\`diff\n${{ steps.diff.outputs.diff }}\n\`\`\`"
+              }]
+            }],
+            "generationConfig": {
+              "temperature": 0.2,
+              "maxOutputTokens": 4096
+            }
+          }
+          PAYLOAD
+          )
+
+          REVIEW=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // "レビューを生成できませんでした"')
+          echo "review<<EOF" >> $GITHUB_OUTPUT
+          echo "$REVIEW" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post review comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const review = `## 🤖 AI Code Review (Gemini)\n\n${{ steps.review.outputs.review }}\n\n---\n*Powered by Gemini 1.5 Flash*`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: review
+            });
+
+  # /summary コマンドでPRサマリー生成
+  summary:
+    if: |
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/summary')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR details
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            const commits = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            return {
+              title: pr.data.title,
+              body: pr.data.body || '',
+              base: pr.data.base.sha,
+              head: pr.data.head.sha,
+              branch: pr.data.head.ref,
+              commits: commits.data.map(c => c.commit.message).join('\n')
+            };
+
+      - name: Get changed files
+        id: files
+        run: |
+          git fetch origin ${{ fromJson(steps.pr.outputs.result).branch }}
+          FILES=$(git diff --name-status ${{ fromJson(steps.pr.outputs.result).base }}..${{ fromJson(steps.pr.outputs.result).head }})
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Generate summary with Gemini
+        id: summary
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$GEMINI_API_KEY" \
+            -H 'Content-Type: application/json' \
+            -d @- <<PAYLOAD
+          {
+            "contents": [{
+              "parts": [{
+                "text": "以下のPull Request情報から、簡潔で分かりやすいサマリーを日本語で作成してください。\n\n## 出力形式\n### 概要\n（1-2文で変更の目的を説明）\n\n### 主な変更点\n- 箇条書きで主要な変更を列挙\n\n### 影響範囲\n- 影響を受けるコンポーネントや機能\n\n### レビューポイント\n- レビュアーが特に確認すべき点\n\n---\n\n## PR情報\nタイトル: ${{ fromJson(steps.pr.outputs.result).title }}\n\n説明:\n${{ fromJson(steps.pr.outputs.result).body }}\n\nコミット:\n${{ fromJson(steps.pr.outputs.result).commits }}\n\n変更ファイル:\n${{ steps.files.outputs.files }}"
+              }]
+            }],
+            "generationConfig": {
+              "temperature": 0.3,
+              "maxOutputTokens": 2048
+            }
+          }
+          PAYLOAD
+          )
+
+          SUMMARY=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // "サマリーを生成できませんでした"')
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          echo "$SUMMARY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post summary comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const summary = `## 📋 PR Summary (Gemini)\n\n${{ steps.summary.outputs.summary }}\n\n---\n*Powered by Gemini 1.5 Flash*`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: summary
+            });
+
+  # /fix コマンドで修正提案
+  fix:
+    if: |
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/fix')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          gh pr diff ${{ github.event.issue.number }} > diff.txt
+          DIFF=$(cat diff.txt | head -c 25000)
+          echo "diff<<EOF" >> $GITHUB_OUTPUT
+          echo "$DIFF" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate fix suggestions with Gemini
+        id: fix
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$GEMINI_API_KEY" \
+            -H 'Content-Type: application/json' \
+            -d @- <<PAYLOAD
+          {
+            "contents": [{
+              "parts": [{
+                "text": "以下のコード差分を分析し、具体的な修正提案を行ってください。\n\n## 出力形式\n各問題について以下の形式で出力:\n\n### 問題 1: [問題のタイトル]\n**ファイル**: \`path/to/file.ts\`\n**問題点**: 問題の説明\n**修正前**:\n\`\`\`typescript\n// 現在のコード\n\`\`\`\n**修正後**:\n\`\`\`typescript\n// 修正したコード\n\`\`\`\n\n---\n\n## コード差分\n\`\`\`diff\n${{ steps.diff.outputs.diff }}\n\`\`\`"
+              }]
+            }],
+            "generationConfig": {
+              "temperature": 0.2,
+              "maxOutputTokens": 4096
+            }
+          }
+          PAYLOAD
+          )
+
+          FIX=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // "修正提案を生成できませんでした"')
+          echo "fix<<EOF" >> $GITHUB_OUTPUT
+          echo "$FIX" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post fix suggestions
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fix = `## 🔧 Fix Suggestions (Gemini)\n\n${{ steps.fix.outputs.fix }}\n\n---\n*Powered by Gemini 1.5 Flash*`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: fix
+            });
