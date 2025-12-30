@@ -88,6 +88,11 @@ export async function POST(request: NextRequest) {
     return apiError('name is required and must be a string', 400)
   }
 
+  // 型チェック
+  if ('color' in body && typeof body.color !== 'string') {
+    return apiError('color must be a string', 400)
+  }
+
   const newTag = {
     user_id: auth.userId,
     name: body.name,

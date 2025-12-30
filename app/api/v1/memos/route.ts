@@ -89,6 +89,15 @@ export async function POST(request: NextRequest) {
     return apiError('Invalid JSON body', 400)
   }
 
+  // 型チェック
+  if ('title' in body && typeof body.title !== 'string') {
+    return apiError('title must be a string', 400)
+  }
+
+  if ('content' in body && typeof body.content !== 'string') {
+    return apiError('content must be a string', 400)
+  }
+
   const newMemo = {
     user_id: auth.userId,
     title: body.title ?? '',
