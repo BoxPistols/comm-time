@@ -463,7 +463,7 @@ export function MemoSwiper({
         </div>
       ) : (
         // スワイパービュー
-        <div className="mt-3 flex-1 min-h-0 flex items-center justify-between gap-1 overflow-hidden">
+        <div className="min-h-0 flex items-start justify-between gap-1 overflow-hidden pt-2">
           {/* 前のメモボタン */}
           {memos.length > 1 && (
             <button
@@ -483,7 +483,7 @@ export function MemoSwiper({
           )}
 
           {/* メモコンテンツエリア */}
-          <div className="flex-1 min-h-0 max-h-full overflow-hidden">
+          <div className="w-full min-h-0 overflow-hidden">
             <Swiper
               modules={[Navigation, Pagination, Keyboard, Mousewheel]}
               spaceBetween={16}
@@ -502,7 +502,7 @@ export function MemoSwiper({
               }}
               onSwiper={setSwiperInstance}
               onSlideChange={handleSlideChange}
-              className="h-full max-h-full px-2"
+              className="!h-auto max-h-full px-2 pb-6"
               style={
                 {
                   "--swiper-pagination-color": darkMode ? "#3b82f6" : "#2563eb",
@@ -514,8 +514,8 @@ export function MemoSwiper({
               }
             >
               {memos.map((memo, index) => (
-                <SwiperSlide key={memo.id} className="!h-full">
-                  <div className="h-full min-h-0 flex flex-col">
+                <SwiperSlide key={memo.id} className="!h-auto">
+                  <div className="min-h-0 flex flex-col">
                     <MarkdownMemo
                       memo={memo}
                       onUpdate={onUpdateMemo}
