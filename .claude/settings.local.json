@@ -27,7 +27,8 @@
       "Bash(kill:*)",
       "Bash(npm run dev:*)",
       "Bash(pkill:*)",
-      "Bash(pnpm run dev:*)"
+      "Bash(pnpm run dev:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
