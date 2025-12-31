@@ -36,6 +36,8 @@ interface MemoSwiperProps {
   onDeleteMemo: (id: string) => void;
   onReorderMemos?: (memos: MemoData[]) => void;
   darkMode: boolean;
+  initialIndex?: number;
+  onIndexChange?: (index: number) => void;
 }
 
 export function MemoSwiper({
@@ -45,9 +47,11 @@ export function MemoSwiper({
   onDeleteMemo,
   onReorderMemos,
   darkMode,
+  initialIndex = 0,
+  onIndexChange,
 }: MemoSwiperProps) {
   const [swiperInstance, setSwiperInstance] = useState<SwiperType | null>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [isBeginning, setIsBeginning] = useState(true);
   const [isEnd, setIsEnd] = useState(false);
   const [isShortcutsDropdownOpen, setIsShortcutsDropdownOpen] = useState(false);
@@ -142,8 +146,10 @@ export function MemoSwiper({
     if (isFullscreen) {
       setIsFullscreen(false);
     }
+    // 親コンポーネントにインデックス変更を通知
+    onIndexChange?.(swiper.activeIndex);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [onIndexChange]);
 
   // 編集モード開始時のコールバック（Swiperの位置を維持するため）
   const handleStartEditing = useCallback(() => {
@@ -217,10 +223,10 @@ export function MemoSwiper({
   };
 
   return (
-    <div ref={containerRef} className="flex h-full min-h-0 w-full flex-col">
+    <div ref={containerRef} className="flex h-full w-full flex-col overflow-hidden">
       {/* ヘッダー */}
       <div
-        className={`flex items-center justify-between px-5 py-3.5 border-b ${
+        className={`flex-shrink-0 flex items-center justify-between px-5 py-3.5 border-b ${
           darkMode ? "border-gray-700" : "border-gray-200"
         }`}
       >
@@ -463,13 +469,13 @@ export function MemoSwiper({
         </div>
       ) : (
         // スワイパービュー
-        <div className="min-h-0 flex items-start justify-between gap-1 overflow-hidden pt-2">
+        <div className="mt-3 flex-1 min-h-0 flex items-stretch justify-between gap-1 overflow-hidden">
           {/* 前のメモボタン */}
           {memos.length > 1 && (
             <button
               onClick={handlePrev}
               disabled={isBeginning}
-              className={`flex-shrink-0 p-1.5 rounded-full transition-all ${
+              className={`flex-shrink-0 self-center p-1.5 rounded-full transition-all ${
                 isBeginning
                   ? "opacity-30 cursor-not-allowed"
                   : darkMode
@@ -483,11 +489,13 @@ export function MemoSwiper({
           )}
 
           {/* メモコンテンツエリア */}
-          <div className="w-full min-h-0 overflow-hidden">
+          <div className="flex-1 h-full min-h-0 overflow-hidden">
             <Swiper
               modules={[Navigation, Pagination, Keyboard, Mousewheel]}
               spaceBetween={16}
               slidesPerView={1}
+              initialSlide={Math.min(initialIndex, memos.length - 1)}
+              autoHeight={false}
               keyboard={{ enabled: true }}
               mousewheel={{
                 enabled: !isFullscreen,
@@ -502,20 +510,19 @@ export function MemoSwiper({
               }}
               onSwiper={setSwiperInstance}
               onSlideChange={handleSlideChange}
-              className="!h-auto max-h-full px-2 pb-6"
-              style={
-                {
-                  "--swiper-pagination-color": darkMode ? "#3b82f6" : "#2563eb",
-                  "--swiper-pagination-bullet-inactive-color": darkMode
-                    ? "#4b5563"
-                    : "#d1d5db",
-                  "--swiper-pagination-bullet-inactive-opacity": "1",
-                } as React.CSSProperties
-              }
+              className="h-full max-h-full px-2"
+              style={{
+                "--swiper-pagination-color": darkMode ? "#3b82f6" : "#2563eb",
+                "--swiper-pagination-bullet-inactive-color": darkMode
+                  ? "#4b5563"
+                  : "#d1d5db",
+                "--swiper-pagination-bullet-inactive-opacity": "1",
+                height: "100%",
+              } as React.CSSProperties}
             >
               {memos.map((memo, index) => (
-                <SwiperSlide key={memo.id} className="!h-auto">
-                  <div className="min-h-0 flex flex-col">
+                <SwiperSlide key={memo.id} style={{ height: '100%', overflow: 'hidden' }}>
+                  <div className="h-full flex flex-col overflow-hidden">
                     <MarkdownMemo
                       memo={memo}
                       onUpdate={onUpdateMemo}
@@ -545,7 +552,7 @@ export function MemoSwiper({
             <button
               onClick={handleNext}
               disabled={isEnd}
-              className={`flex-shrink-0 p-1.5 rounded-full transition-all ${
+              className={`flex-shrink-0 self-center p-1.5 rounded-full transition-all ${
                 isEnd
                   ? "opacity-30 cursor-not-allowed"
                   : darkMode

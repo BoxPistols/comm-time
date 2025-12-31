@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -17,6 +17,57 @@ import {
 
 // Markdownのチェックボックスパターン: - [ ] または - [x] (*, + も対応)
 const CHECKBOX_PATTERN = /^(\s*[-*+]\s*)\[([ xX])\]/;
+
+// チェックボックス付きMarkdownレンダラー
+function CheckboxMarkdown({
+  content,
+  darkMode,
+  onToggle,
+}: {
+  content: string;
+  darkMode: boolean;
+  onToggle: (lineText: string) => void;
+}) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        // inputコンポーネントをオーバーライドしてクリック可能にする
+        input: ({ checked, ...props }) => {
+          if (props.type !== "checkbox") {
+            return <input {...props} />;
+          }
+
+          return (
+            <input
+              type="checkbox"
+              checked={checked || false}
+              disabled={false}
+              className={`w-4 h-4 rounded border-2 cursor-pointer mr-1.5 align-middle relative -top-[1px] transition-colors ${
+                darkMode
+                  ? "border-gray-500 checked:bg-blue-600 checked:border-blue-600 hover:border-gray-400"
+                  : "border-gray-300 checked:bg-blue-500 checked:border-blue-500 hover:border-gray-400"
+              }`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // 親のliからテキストを取得
+                const li = (e.target as HTMLElement).closest("li");
+                if (li) {
+                  const text = li.textContent?.trim() || "";
+                  onToggle(text);
+                }
+              }}
+              onChange={() => {}}
+            />
+          );
+        },
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+}
 
 export interface MemoData {
   id: string;
@@ -273,32 +324,30 @@ export function MarkdownMemo({
     });
   };
 
-  // チェックボックスの行番号を事前に計算（安定したマッピング）
-  const checkboxLineNumbers = useMemo(() => {
-    const lineNumbers: number[] = [];
-    const lines = content.split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      if (CHECKBOX_PATTERN.test(lines[i])) {
-        lineNumbers.push(i);
-      }
-    }
-    return lineNumbers;
-  }, [content]);
-
-  // チェックボックスをトグルする関数（行番号ベース）
-  const toggleCheckboxByLine = useCallback(
-    (lineIndex: number) => {
+// チェックボックスをトグルする関数（ラベルテキストで検索）
+  const toggleCheckbox = useCallback(
+    (labelText: string) => {
       const lines = content.split("\n");
+      let targetLineIndex = -1;
 
-      if (lineIndex < 0 || lineIndex >= lines.length) {
+      // ラベルテキストを含むチェックボックス行を見つける
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (CHECKBOX_PATTERN.test(line)) {
+          // チェックボックス後のテキストを抽出
+          const textAfterCheckbox = line.replace(CHECKBOX_PATTERN, "").trim();
+          if (textAfterCheckbox === labelText) {
+            targetLineIndex = i;
+            break;
+          }
+        }
+      }
+
+      if (targetLineIndex === -1) {
         return;
       }
 
-      const line = lines[lineIndex];
-      if (!CHECKBOX_PATTERN.test(line)) {
-        return;
-      }
-
+      const line = lines[targetLineIndex];
       const newLine = line.replace(
         CHECKBOX_PATTERN,
         (match: string, prefix: string, checked: string) => {
@@ -309,7 +358,7 @@ export function MarkdownMemo({
       );
 
       if (line !== newLine) {
-        lines[lineIndex] = newLine;
+        lines[targetLineIndex] = newLine;
         const newContent = lines.join("\n");
 
         // コンテンツを更新して保存
@@ -455,48 +504,11 @@ export function MarkdownMemo({
             }}
           >
             {content ? (
-              (() => {
-                // チェックボックスのインデックスを追跡するためのカウンター
-                let checkboxCounter = 0;
-                return (
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      input: (props) => {
-                        if (props.type === "checkbox") {
-                          // 事前計算した行番号を使用
-                          const lineNumber = checkboxLineNumbers[checkboxCounter];
-                          checkboxCounter++;
-
-                          return (
-                            <input
-                              type="checkbox"
-                              checked={props.checked || false}
-                              className={`w-4 h-4 rounded border-2 cursor-pointer mr-1.5 align-middle relative -top-[1px] transition-colors ${
-                                darkMode
-                                  ? "border-gray-500 checked:bg-blue-600 checked:border-blue-600 hover:border-gray-400"
-                                  : "border-gray-300 checked:bg-blue-500 checked:border-blue-500 hover:border-gray-400"
-                              }`}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (lineNumber !== undefined) {
-                                  toggleCheckboxByLine(lineNumber);
-                                }
-                              }}
-                              onChange={() => {}} // コントロールドコンポーネント
-                              disabled={false}
-                            />
-                          );
-                        }
-                        return <input {...props} />;
-                      },
-                    }}
-                  >
-                    {content}
-                  </ReactMarkdown>
-                );
-              })()
+              <CheckboxMarkdown
+                content={content}
+                darkMode={darkMode}
+                onToggle={toggleCheckbox}
+              />
             ) : (
               <p
                 className={`italic ${
@@ -665,7 +677,7 @@ export function MarkdownMemo({
 
           {/* メモコンテンツ */}
           <div
-            className={`flex-1 w-full md:w-auto flex flex-col rounded-xl shadow-2xl overflow-hidden min-h-0 max-h-[80vh] max-h-[80dvh] ${
+            className={`flex-1 w-full md:w-auto flex flex-col rounded-xl shadow-2xl overflow-hidden min-h-0 max-h-[88vh] max-h-[88dvh] ${
               darkMode ? "bg-gray-900" : "bg-gray-50"
             }`}
           >
