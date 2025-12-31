@@ -511,19 +511,18 @@ export function MemoSwiper({
               onSwiper={setSwiperInstance}
               onSlideChange={handleSlideChange}
               className="h-full max-h-full px-2"
-              style={
-                {
-                  "--swiper-pagination-color": darkMode ? "#3b82f6" : "#2563eb",
-                  "--swiper-pagination-bullet-inactive-color": darkMode
-                    ? "#4b5563"
-                    : "#d1d5db",
-                  "--swiper-pagination-bullet-inactive-opacity": "1",
-                } as React.CSSProperties
-              }
+              style={{
+                "--swiper-pagination-color": darkMode ? "#3b82f6" : "#2563eb",
+                "--swiper-pagination-bullet-inactive-color": darkMode
+                  ? "#4b5563"
+                  : "#d1d5db",
+                "--swiper-pagination-bullet-inactive-opacity": "1",
+                height: "100%",
+              } as React.CSSProperties}
             >
               {memos.map((memo, index) => (
-                <SwiperSlide key={memo.id} className="!h-full !overflow-hidden">
-                  <div className="h-full min-h-0 flex flex-col overflow-hidden">
+                <SwiperSlide key={memo.id} className="!h-auto" style={{ height: '100%' }}>
+                  <div className="h-full flex flex-col overflow-hidden">
                     <MarkdownMemo
                       memo={memo}
                       onUpdate={onUpdateMemo}
