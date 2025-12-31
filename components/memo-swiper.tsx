@@ -495,6 +495,7 @@ export function MemoSwiper({
               spaceBetween={16}
               slidesPerView={1}
               initialSlide={Math.min(initialIndex, memos.length - 1)}
+              autoHeight={false}
               keyboard={{ enabled: true }}
               mousewheel={{
                 enabled: !isFullscreen,
@@ -521,8 +522,8 @@ export function MemoSwiper({
               }
             >
               {memos.map((memo, index) => (
-                <SwiperSlide key={memo.id} className="!h-full">
-                  <div className="h-full min-h-0 flex flex-col">
+                <SwiperSlide key={memo.id} className="!h-full !overflow-hidden">
+                  <div className="h-full min-h-0 flex flex-col overflow-hidden">
                     <MarkdownMemo
                       memo={memo}
                       onUpdate={onUpdateMemo}
