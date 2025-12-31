@@ -324,7 +324,7 @@ export function MarkdownMemo({
     });
   };
 
-  // チェックボックスをトグルする関数（ラベルテキストで検索）
+// チェックボックスをトグルする関数（ラベルテキストで検索）
   const toggleCheckbox = useCallback(
     (labelText: string) => {
       const lines = content.split("\n");
@@ -372,7 +372,7 @@ export function MarkdownMemo({
   // 全画面モード用のコンテンツ
   const memoContent = (
     <div
-      className={`flex flex-col h-full min-h-0 rounded-lg border ${
+      className={`flex flex-col max-h-[400px] rounded-lg border ${
         darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
       }`}
     >
@@ -659,7 +659,7 @@ export function MarkdownMemo({
         tabIndex={0}
       >
         <div
-          className="w-[98vw] sm:w-[95vw] md:w-[90vw] m-auto flex flex-col md:flex-row items-center gap-2 py-4 pb-safe"
+          className="w-[98vw] sm:w-[95vw] md:w-[90vw] max-w-[960px] m-auto flex flex-col md:flex-row items-center gap-2 py-4 pb-safe"
           onClick={(e) => e.stopPropagation()}
         >
           {/* 左矢印（デスクトップのみ表示） */}
@@ -684,7 +684,7 @@ export function MarkdownMemo({
             {memoContent}
           </div>
 
-          {/* ナビゲーションボタン（モバイルのみ下部に横並び） */}
+          {/* ナビゲーションボタン（モバイルのみ下部に横並び表示） */}
           <div className="flex md:hidden items-center justify-center gap-4 py-2 flex-shrink-0">
             <button
               onClick={onNavigatePrev}

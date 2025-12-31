@@ -312,7 +312,7 @@ export function CommTimeComponent() {
   }, [filterState]);
 
   // 表示モード（リスト / カンバン）
-  const [viewMode, _setViewMode] = useState<"list" | "kanban">(() => {
+  const [viewMode] = useState<"list" | "kanban">(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("todoViewMode");
       if (saved === "kanban" || saved === "list") {
@@ -2523,7 +2523,16 @@ export function CommTimeComponent() {
                   }`}
                 >
                   <div className="text-4xl sm:text-5xl lg:text-6xl font-bold text-center mb-3 sm:mb-4 text-white tabular-nums tracking-tight">
-                    {formatTime(pomodoroElapsedTime)}
+                    {formatTime(
+                      Math.max(
+                        0,
+                        (pomodoroState === "work"
+                          ? pomodoroSettings.workDuration
+                          : pomodoroSettings.breakDuration) *
+                          60 -
+                          pomodoroElapsedTime
+                      )
+                    )}
                   </div>
                   <div className="text-xl sm:text-2xl font-semibold text-center text-white/90 mb-2">
                     {pomodoroState === "work" ? "🎯 作業時間" : "☕ 休憩時間"}
@@ -2890,7 +2899,7 @@ export function CommTimeComponent() {
             }`}
           >
             {/* メモセクション（Markdownプレビュー対応） */}
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl border border-white/20 dark:border-gray-700/20 h-[400px] lg:h-[450px] overflow-hidden">
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl border border-white/20 dark:border-gray-700/20 max-h-[400px] lg:max-h-[450px] overflow-hidden">
               <MemoSwiper
                 memos={multipleMemos.memos}
                 onCreateMemo={multipleMemos.createMemo}
