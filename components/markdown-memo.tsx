@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -17,6 +17,57 @@ import {
 
 // Markdownのチェックボックスパターン: - [ ] または - [x] (*, + も対応)
 const CHECKBOX_PATTERN = /^(\s*[-*+]\s*)\[([ xX])\]/;
+
+// チェックボックス付きMarkdownレンダラー
+function CheckboxMarkdown({
+  content,
+  darkMode,
+  onToggle,
+}: {
+  content: string;
+  darkMode: boolean;
+  onToggle: (lineText: string) => void;
+}) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        // inputコンポーネントをオーバーライドしてクリック可能にする
+        input: ({ checked, ...props }) => {
+          if (props.type !== "checkbox") {
+            return <input {...props} />;
+          }
+
+          return (
+            <input
+              type="checkbox"
+              checked={checked || false}
+              disabled={false}
+              className={`w-4 h-4 rounded border-2 cursor-pointer mr-1.5 align-middle relative -top-[1px] transition-colors ${
+                darkMode
+                  ? "border-gray-500 checked:bg-blue-600 checked:border-blue-600 hover:border-gray-400"
+                  : "border-gray-300 checked:bg-blue-500 checked:border-blue-500 hover:border-gray-400"
+              }`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // 親のliからテキストを取得
+                const li = (e.target as HTMLElement).closest("li");
+                if (li) {
+                  const text = li.textContent?.trim() || "";
+                  onToggle(text);
+                }
+              }}
+              onChange={() => {}}
+            />
+          );
+        },
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+}
 
 export interface MemoData {
   id: string;
@@ -273,23 +324,30 @@ export function MarkdownMemo({
     });
   };
 
-  // チェックボックスをトグルする関数（行番号ベース - 1-indexed）
+  // チェックボックスをトグルする関数（ラベルテキストで検索）
   const toggleCheckbox = useCallback(
-    (lineNumber: number) => {
+    (labelText: string) => {
       const lines = content.split("\n");
-      // lineNumberは1-indexed、配列は0-indexed
-      const targetLineIndex = lineNumber - 1;
+      let targetLineIndex = -1;
 
-      if (targetLineIndex < 0 || targetLineIndex >= lines.length) {
+      // ラベルテキストを含むチェックボックス行を見つける
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (CHECKBOX_PATTERN.test(line)) {
+          // チェックボックス後のテキストを抽出
+          const textAfterCheckbox = line.replace(CHECKBOX_PATTERN, "").trim();
+          if (textAfterCheckbox === labelText) {
+            targetLineIndex = i;
+            break;
+          }
+        }
+      }
+
+      if (targetLineIndex === -1) {
         return;
       }
 
       const line = lines[targetLineIndex];
-
-      if (!CHECKBOX_PATTERN.test(line)) {
-        return;
-      }
-
       const newLine = line.replace(
         CHECKBOX_PATTERN,
         (match: string, prefix: string, checked: string) => {
@@ -446,69 +504,11 @@ export function MarkdownMemo({
             }}
           >
             {content ? (
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  li: ({ node, children, ...props }) => {
-                    // リストアイテムの行番号を取得
-                    const lineNumber = node?.position?.start?.line;
-                    // タスクリストアイテムかどうかをチェック（HAST形式）
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const firstChild = (node?.children as any)?.[0];
-                    const isTaskItem =
-                      firstChild?.type === "element" &&
-                      firstChild?.tagName === "p" &&
-                      firstChild?.children?.[0]?.type === "element" &&
-                      firstChild?.children?.[0]?.tagName === "input";
-
-                    if (isTaskItem && lineNumber) {
-                      const inputNode = firstChild?.children?.[0];
-                      const isChecked =
-                        inputNode?.properties?.checked === true;
-
-                      return (
-                        <li {...props} className="flex items-start gap-1">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            className={`w-4 h-4 mt-1 rounded border-2 cursor-pointer transition-colors flex-shrink-0 ${
-                              darkMode
-                                ? "border-gray-500 checked:bg-blue-600 checked:border-blue-600 hover:border-gray-400"
-                                : "border-gray-300 checked:bg-blue-500 checked:border-blue-500 hover:border-gray-400"
-                            }`}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              toggleCheckbox(lineNumber);
-                            }}
-                            onChange={() => {}}
-                          />
-                          <span className="flex-1">
-                            {/* childrenから最初のcheckboxを除去して残りを表示 */}
-                            {React.Children.toArray(children).map(
-                              (child, idx) => {
-                                if (idx === 0 && React.isValidElement(child)) {
-                                  // 最初の要素(paragraph)からcheckboxを除去
-                                  const pChildren = child.props.children;
-                                  if (Array.isArray(pChildren)) {
-                                    return pChildren.slice(1);
-                                  }
-                                  return pChildren;
-                                }
-                                return child;
-                              }
-                            )}
-                          </span>
-                        </li>
-                      );
-                    }
-
-                    return <li {...props}>{children}</li>;
-                  },
-                }}
-              >
-                {content}
-              </ReactMarkdown>
+              <CheckboxMarkdown
+                content={content}
+                darkMode={darkMode}
+                onToggle={toggleCheckbox}
+              />
             ) : (
               <p
                 className={`italic ${
@@ -684,8 +684,8 @@ export function MarkdownMemo({
             {memoContent}
           </div>
 
-          {/* ナビゲーションボタン（モバイルは下部に横並び、デスクトップは右矢印のみ） */}
-          <div className="flex _md:hidden items-center justify-center gap-4 py-2 flex-shrink-0">
+          {/* ナビゲーションボタン（モバイルのみ下部に横並び） */}
+          <div className="flex md:hidden items-center justify-center gap-4 py-2 flex-shrink-0">
             <button
               onClick={onNavigatePrev}
               className={`p-3 rounded-full transition-colors ${

@@ -36,6 +36,8 @@ interface MemoSwiperProps {
   onDeleteMemo: (id: string) => void;
   onReorderMemos?: (memos: MemoData[]) => void;
   darkMode: boolean;
+  initialIndex?: number;
+  onIndexChange?: (index: number) => void;
 }
 
 export function MemoSwiper({
@@ -45,9 +47,11 @@ export function MemoSwiper({
   onDeleteMemo,
   onReorderMemos,
   darkMode,
+  initialIndex = 0,
+  onIndexChange,
 }: MemoSwiperProps) {
   const [swiperInstance, setSwiperInstance] = useState<SwiperType | null>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [isBeginning, setIsBeginning] = useState(true);
   const [isEnd, setIsEnd] = useState(false);
   const [isShortcutsDropdownOpen, setIsShortcutsDropdownOpen] = useState(false);
@@ -142,8 +146,10 @@ export function MemoSwiper({
     if (isFullscreen) {
       setIsFullscreen(false);
     }
+    // 親コンポーネントにインデックス変更を通知
+    onIndexChange?.(swiper.activeIndex);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [onIndexChange]);
 
   // 編集モード開始時のコールバック（Swiperの位置を維持するため）
   const handleStartEditing = useCallback(() => {
@@ -488,6 +494,7 @@ export function MemoSwiper({
               modules={[Navigation, Pagination, Keyboard, Mousewheel]}
               spaceBetween={16}
               slidesPerView={1}
+              initialSlide={Math.min(initialIndex, memos.length - 1)}
               keyboard={{ enabled: true }}
               mousewheel={{
                 enabled: !isFullscreen,

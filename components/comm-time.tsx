@@ -236,6 +236,21 @@ export function CommTimeComponent() {
   // 複数メモ管理フック
   const multipleMemos = useMultipleMemos(user, useDatabase);
 
+  // メモの閲覧位置を保存・復元
+  const [memoActiveIndex, setMemoActiveIndex] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("memoActiveIndex");
+      return saved ? parseInt(saved, 10) : 0;
+    }
+    return 0;
+  });
+
+  // メモインデックス変更時にlocalStorageに保存
+  const handleMemoIndexChange = useCallback((index: number) => {
+    setMemoActiveIndex(index);
+    localStorage.setItem("memoActiveIndex", String(index));
+  }, []);
+
   // タグ管理フック（データベースモード用）
   const supabaseTags = useSupabaseTags(useDatabase ? user : null);
 
@@ -2883,6 +2898,8 @@ export function CommTimeComponent() {
                 onDeleteMemo={handleDeleteMemo}
                 onReorderMemos={multipleMemos.reorderMemos}
                 darkMode={darkMode}
+                initialIndex={memoActiveIndex}
+                onIndexChange={handleMemoIndexChange}
               />
             </div>
 
