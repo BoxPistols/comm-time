@@ -32,8 +32,7 @@ PR の `Add a comment` 欄で以下のコマンドを入力：
 
 ## コスト
 
-- **Gemini 1.5 Flash**: 無料枠あり（1分あたり15リクエスト）
-- 有料プランでも非常に安価（$0.075 / 1M tokens）
+- **Gemini 1.5 Flash**: 無料枠があります。最新の料金体系については、[Google AIの公式料金ページ](https://ai.google.dev/pricing)をご確認ください。
 
 ## GitHub Copilot との併用（推奨）
 
