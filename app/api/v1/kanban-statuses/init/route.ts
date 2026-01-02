@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server'
-import { supabase } from '@/lib/supabase'
 import {
   authenticateRequest,
   handleCors,
@@ -25,14 +24,14 @@ export async function POST(request: NextRequest) {
   }
 
   // 既存のステータスを確認
-  const { count } = await supabase
+  const { count } = await auth.supabase
     .from('kanban_statuses')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', auth.userId)
 
   if (count && count > 0) {
     // 既にステータスが存在する場合は既存のものを返す
-    const { data: existingStatuses } = await supabase
+    const { data: existingStatuses } = await auth.supabase
       .from('kanban_statuses')
       .select('*')
       .eq('user_id', auth.userId)
@@ -65,7 +64,7 @@ export async function POST(request: NextRequest) {
     { user_id: auth.userId, name: 'done', label: 'Done', color: 'green', bg_class: 'bg-green-500', text_class: 'text-green-600', border_class: 'border-green-300', active_class: 'bg-green-500 text-white', sort_order: 3, is_default: false },
   ]
 
-  const { data, error } = await supabase
+  const { data, error } = await auth.supabase
     .from('kanban_statuses')
     .insert(defaultStatuses)
     .select()

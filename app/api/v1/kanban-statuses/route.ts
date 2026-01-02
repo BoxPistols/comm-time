@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server'
-import { supabase } from '@/lib/supabase'
 import {
   authenticateRequest,
   handleCors,
@@ -42,7 +41,7 @@ export async function GET(request: NextRequest) {
   const orderParam = url.searchParams.get('order')
   const finalOrder = orderParam ? order : defaultOrder
 
-  const { data, error, count } = await supabase
+  const { data, error, count } = await auth.supabase
     .from('kanban_statuses')
     .select('*', { count: 'exact' })
     .eq('user_id', auth.userId)
@@ -126,7 +125,7 @@ export async function POST(request: NextRequest) {
     return apiError('label is required and must be a string', 400)
   }
 
-  const { data, error } = await supabase.rpc('create_kanban_status', {
+  const { data, error } = await auth.supabase.rpc('create_kanban_status', {
     p_name: name,
     p_label: label,
     p_color: color,

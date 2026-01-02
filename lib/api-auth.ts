@@ -1,15 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { timingSafeEqual } from 'crypto'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { supabase, isSupabaseConfigured } from './supabase'
 
 // API認証の結果型
 export type AuthResult = {
   success: true
   userId: string
+  supabase: SupabaseClient  // 認証済みのSupabaseクライアント
 } | {
   success: false
   error: string
   status: number
+}
+
+// 認証済みSupabaseクライアントを作成
+function createAuthenticatedClient(token: string): SupabaseClient {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  })
 }
 
 // CORSヘッダー
@@ -86,9 +102,13 @@ export async function authenticateRequest(request: NextRequest): Promise<AuthRes
         }
       }
 
+      // 認証済みのSupabaseクライアントを作成
+      const authenticatedSupabase = createAuthenticatedClient(token)
+
       return {
         success: true,
         userId: user.id,
+        supabase: authenticatedSupabase,
       }
     } catch {
       return {
@@ -147,9 +167,18 @@ export async function authenticateRequest(request: NextRequest): Promise<AuthRes
       }
     }
 
+    // API Key認証の場合はサービスロールキーまたはデフォルトクライアントを使用
+    // 注: RLSをバイパスするにはサービスロールキーが必要
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    const authenticatedSupabase = serviceRoleKey
+      ? createClient(supabaseUrl, serviceRoleKey)
+      : supabase
+
     return {
       success: true,
       userId,
+      supabase: authenticatedSupabase,
     }
   }
 

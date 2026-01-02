@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server'
-import { supabase } from '@/lib/supabase'
 import {
   authenticateRequest,
   handleCors,
@@ -29,7 +28,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   const { id } = await context.params
 
-  const { data, error } = await supabase
+  const { data, error } = await auth.supabase
     .from('kanban_statuses')
     .select('*')
     .eq('id', id)
@@ -103,7 +102,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     return apiError('No valid fields to update', 400)
   }
 
-  const { data, error } = await supabase.rpc('update_kanban_status', {
+  const { data, error } = await auth.supabase.rpc('update_kanban_status', {
     p_id: id,
     p_name: name,
     p_label: label,
@@ -164,7 +163,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
   const { id } = await context.params
 
-  const { error } = await supabase.rpc('delete_kanban_status', {
+  const { error } = await auth.supabase.rpc('delete_kanban_status', {
     p_id: id,
   })
 

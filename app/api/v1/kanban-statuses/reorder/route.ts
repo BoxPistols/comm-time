@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server'
-import { supabase } from '@/lib/supabase'
 import {
   authenticateRequest,
   handleCors,
@@ -39,7 +38,7 @@ export async function PATCH(request: NextRequest) {
 
   const statusIds = body.statusIds as string[]
 
-  const { error: rpcError } = await supabase.rpc('reorder_kanban_statuses', {
+  const { error: rpcError } = await auth.supabase.rpc('reorder_kanban_statuses', {
     p_status_ids: statusIds,
   })
 
@@ -48,7 +47,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   // 更新後のステータスを取得
-  const { data, error } = await supabase
+  const { data, error } = await auth.supabase
     .from('kanban_statuses')
     .select('*')
     .eq('user_id', auth.userId)
