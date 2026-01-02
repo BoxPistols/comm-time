@@ -7,13 +7,40 @@ import { type KanbanStatusColumn, DEFAULT_KANBAN_COLUMNS } from "@/types"
 
 // 認証ヘッダーを取得するヘルパー関数
 const getAuthHeaders = async (): Promise<Record<string, string>> => {
+  // まずセッションを取得
   const { data: { session } } = await supabase.auth.getSession()
+
   if (session?.access_token) {
+    // トークンの有効期限をチェック（5分前にリフレッシュ）
+    const expiresAt = session.expires_at
+    const now = Math.floor(Date.now() / 1000)
+
+    if (expiresAt && expiresAt - now < 300) {
+      // セッションをリフレッシュ
+      const { data: { session: newSession } } = await supabase.auth.refreshSession()
+      if (newSession?.access_token) {
+        return {
+          'Authorization': `Bearer ${newSession.access_token}`,
+          'Content-Type': 'application/json',
+        }
+      }
+    }
+
     return {
       'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     }
   }
+
+  // セッションがない場合、リフレッシュを試みる
+  const { data: { session: refreshedSession } } = await supabase.auth.refreshSession()
+  if (refreshedSession?.access_token) {
+    return {
+      'Authorization': `Bearer ${refreshedSession.access_token}`,
+      'Content-Type': 'application/json',
+    }
+  }
+
   return { 'Content-Type': 'application/json' }
 }
 
