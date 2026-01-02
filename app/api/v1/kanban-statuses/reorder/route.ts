@@ -18,7 +18,7 @@ export async function OPTIONS() {
  * ステータスの順序を一括更新
  *
  * Body:
- * - orders: { id: string, sortOrder: number }[]
+ * - statusIds: string[]
  */
 export async function PATCH(request: NextRequest) {
   const auth = await authenticateRequest(request)
@@ -33,35 +33,18 @@ export async function PATCH(request: NextRequest) {
     return apiError('Invalid JSON body', 400)
   }
 
-  if (!body.orders || !Array.isArray(body.orders)) {
-    return apiError('orders is required and must be an array', 400)
+  if (!body.statusIds || !Array.isArray(body.statusIds)) {
+    return apiError('statusIds is required and must be an array of strings', 400)
   }
 
-  const orders = body.orders as { id: string; sortOrder: number }[]
+  const statusIds = body.statusIds as string[]
 
-  // バリデーション
-  for (const order of orders) {
-    if (!order.id || typeof order.id !== 'string') {
-      return apiError('Each order must have an id string', 400)
-    }
-    if (typeof order.sortOrder !== 'number') {
-      return apiError('Each order must have a sortOrder number', 400)
-    }
-  }
-
-  // 一括更新
-  const updates = orders.map(async (order) => {
-    return supabase
-      .from('kanban_statuses')
-      .update({ sort_order: order.sortOrder })
-      .eq('id', order.id)
-      .eq('user_id', auth.userId)
+  const { error: rpcError } = await supabase.rpc('reorder_kanban_statuses', {
+    p_status_ids: statusIds,
   })
 
-  try {
-    await Promise.all(updates)
-  } catch {
-    return apiError('Failed to update order', 500)
+  if (rpcError) {
+    return apiError(rpcError.message, 500)
   }
 
   // 更新後のステータスを取得

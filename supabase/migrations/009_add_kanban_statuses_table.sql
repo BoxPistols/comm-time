@@ -22,6 +22,10 @@ CREATE TABLE IF NOT EXISTS kanban_statuses (
 CREATE INDEX IF NOT EXISTS idx_kanban_statuses_user ON kanban_statuses(user_id);
 CREATE INDEX IF NOT EXISTS idx_kanban_statuses_order ON kanban_statuses(user_id, sort_order);
 
+-- ユニーク制約 (user_id と name の組み合わせ)
+ALTER TABLE kanban_statuses
+ADD CONSTRAINT unique_user_status_name UNIQUE (user_id, name);
+
 -- Row Level Security (RLS) 有効化
 ALTER TABLE kanban_statuses ENABLE ROW LEVEL SECURITY;
 
@@ -79,6 +83,11 @@ CREATE TRIGGER set_default_kanban_status_trigger
 CREATE OR REPLACE FUNCTION create_default_kanban_statuses(p_user_id UUID)
 RETURNS VOID AS $$
 BEGIN
+  -- 実行ユーザーが対象ユーザーと一致するか確認
+  IF auth.uid() != p_user_id THEN
+    RAISE EXCEPTION 'User ID does not match authenticated user';
+  END IF;
+
   -- 既にステータスが存在する場合はスキップ
   IF EXISTS (SELECT 1 FROM kanban_statuses WHERE user_id = p_user_id) THEN
     RETURN;
@@ -92,4 +101,4 @@ BEGIN
     (p_user_id, 'doing', 'Doing', 'yellow', 'bg-yellow-500', 'text-yellow-600', 'border-yellow-300', 'bg-yellow-500 text-black', 2, false),
     (p_user_id, 'done', 'Done', 'green', 'bg-green-500', 'text-green-600', 'border-green-300', 'bg-green-500 text-white', 3, false);
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;

@@ -100,7 +100,6 @@ export async function GET(request: NextRequest) {
  * - name: string (required) - 内部識別子
  * - label: string (required) - 表示名
  * - color?: string (default: 'gray')
- * - sortOrder?: number (default: 0)
  */
 export async function POST(request: NextRequest) {
   const auth = await authenticateRequest(request)
@@ -115,93 +114,59 @@ export async function POST(request: NextRequest) {
     return apiError('Invalid JSON body', 400)
   }
 
-  if (!body.name || typeof body.name !== 'string') {
+  const name = body.name as string
+  const label = body.label as string
+  const color = (body.color as string) || 'gray'
+
+  if (!name || typeof name !== 'string') {
     return apiError('name is required and must be a string', 400)
   }
 
-  if (!body.label || typeof body.label !== 'string') {
+  if (!label || typeof label !== 'string') {
     return apiError('label is required and must be a string', 400)
   }
 
-  // 型チェック
-  if ('color' in body && typeof body.color !== 'string') {
-    return apiError('color must be a string', 400)
-  }
-
-  if ('sortOrder' in body && typeof body.sortOrder !== 'number') {
-    return apiError('sortOrder must be a number', 400)
-  }
-
-  // カラー設定を取得
-  const colorConfig = getColorConfig(body.color as string || 'gray')
-
-  // 既存のステータス数を取得してsort_orderを設定
-  let sortOrder = body.sortOrder as number | undefined
-  if (sortOrder === undefined) {
-    const { count } = await supabase
-      .from('kanban_statuses')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', auth.userId)
-    sortOrder = count || 0
-  }
-
-  const newStatus = {
-    user_id: auth.userId,
-    name: body.name,
-    label: body.label,
-    color: colorConfig.color,
-    bg_class: colorConfig.bgClass,
-    text_class: colorConfig.textClass,
-    border_class: colorConfig.borderClass,
-    active_class: colorConfig.activeClass,
-    sort_order: sortOrder,
-    is_default: false,
-  }
-
-  const { data, error } = await supabase
-    .from('kanban_statuses')
-    .insert(newStatus)
-    .select()
-    .single()
+  const { data, error } = await supabase.rpc('create_kanban_status', {
+    p_name: name,
+    p_label: label,
+    p_color: color,
+  })
 
   if (error) {
+    // RLSなどSupabase側で発生したエラー
+    if (error.code === 'PGRST' && error.details.includes('User ID does not match authenticated user')) {
+      return apiError('Unauthorized', 403)
+    }
+    // ユニーク制約違反
+    if (error.code === '23505') {
+      return apiError('A status with this name already exists.', 409)
+    }
     return apiError(error.message, 500)
+  }
+  
+  // rpcの返り値は配列なので、最初の要素を取得
+  const statusData = Array.isArray(data) ? data[0] : data;
+
+  if (!statusData) {
+    return apiError('Failed to create status', 500)
   }
 
   // フロントエンド用の形式に変換
   const status = {
-    id: data.id,
-    user_id: data.user_id,
-    name: data.name,
-    label: data.label,
-    color: data.color,
-    bgClass: data.bg_class,
-    textClass: data.text_class,
-    borderClass: data.border_class,
-    activeClass: data.active_class,
-    sortOrder: data.sort_order,
-    isDefault: data.is_default,
-    created_at: data.created_at,
-    updated_at: data.updated_at,
+    id: statusData.id,
+    user_id: statusData.user_id,
+    name: statusData.name,
+    label: statusData.label,
+    color: statusData.color,
+    bgClass: statusData.bg_class,
+    textClass: statusData.text_class,
+    borderClass: statusData.border_class,
+    activeClass: statusData.active_class,
+    sortOrder: statusData.sort_order,
+    isDefault: statusData.is_default,
+    created_at: statusData.created_at,
+    updated_at: statusData.updated_at,
   }
 
   return apiResponse({ status }, 201)
-}
-
-// カラー設定を取得するヘルパー関数
-function getColorConfig(color: string) {
-  const colorConfigs: Record<string, { color: string; bgClass: string; textClass: string; borderClass: string; activeClass: string }> = {
-    gray: { color: 'gray', bgClass: 'bg-gray-500', textClass: 'text-gray-600', borderClass: 'border-gray-300', activeClass: 'bg-gray-500 text-white' },
-    blue: { color: 'blue', bgClass: 'bg-blue-500', textClass: 'text-blue-600', borderClass: 'border-blue-300', activeClass: 'bg-blue-500 text-white' },
-    yellow: { color: 'yellow', bgClass: 'bg-yellow-500', textClass: 'text-yellow-600', borderClass: 'border-yellow-300', activeClass: 'bg-yellow-500 text-black' },
-    green: { color: 'green', bgClass: 'bg-green-500', textClass: 'text-green-600', borderClass: 'border-green-300', activeClass: 'bg-green-500 text-white' },
-    red: { color: 'red', bgClass: 'bg-red-500', textClass: 'text-red-600', borderClass: 'border-red-300', activeClass: 'bg-red-500 text-white' },
-    orange: { color: 'orange', bgClass: 'bg-orange-500', textClass: 'text-orange-600', borderClass: 'border-orange-300', activeClass: 'bg-orange-500 text-white' },
-    purple: { color: 'purple', bgClass: 'bg-purple-500', textClass: 'text-purple-600', borderClass: 'border-purple-300', activeClass: 'bg-purple-500 text-white' },
-    pink: { color: 'pink', bgClass: 'bg-pink-500', textClass: 'text-pink-600', borderClass: 'border-pink-300', activeClass: 'bg-pink-500 text-white' },
-    indigo: { color: 'indigo', bgClass: 'bg-indigo-500', textClass: 'text-indigo-600', borderClass: 'border-indigo-300', activeClass: 'bg-indigo-500 text-white' },
-    teal: { color: 'teal', bgClass: 'bg-teal-500', textClass: 'text-teal-600', borderClass: 'border-teal-300', activeClass: 'bg-teal-500 text-white' },
-  }
-
-  return colorConfigs[color] || colorConfigs.gray
 }
