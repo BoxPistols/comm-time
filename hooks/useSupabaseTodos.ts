@@ -7,7 +7,7 @@ import type { User } from "@supabase/supabase-js"
 // 優先度・重要度・カンバンステータスの型
 type PriorityLevel = "high" | "medium" | "low" | "none"
 type ImportanceLevel = "high" | "medium" | "low" | "none"
-type KanbanStatus = "backlog" | "todo" | "doing" | "done"
+type KanbanStatus = string // 動的ステータスに対応するため文字列型
 
 // ローカル用のTodo型（既存のcomm-time.tsxと互換性を保つ）
 export type LocalTodoItem = {

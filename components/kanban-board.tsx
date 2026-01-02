@@ -16,9 +16,10 @@ import {
 import {
   type Tag,
   type KanbanStatus,
+  type KanbanStatusColumn,
   type PriorityLevel,
   type ImportanceLevel,
-  KANBAN_COLUMNS,
+  DEFAULT_KANBAN_COLUMNS,
   PRIORITY_CONFIG,
   IMPORTANCE_CONFIG,
   TAG_COLORS,
@@ -40,6 +41,7 @@ interface TodoItem {
 interface KanbanBoardProps {
   todos: TodoItem[];
   tags: Tag[];
+  columns?: KanbanStatusColumn[];
   darkMode: boolean;
   onStatusChange: (todoId: string, newStatus: KanbanStatus) => void;
   onToggleTodo: (id: string) => void;
@@ -49,6 +51,7 @@ interface KanbanBoardProps {
 export function KanbanBoard({
   todos,
   tags,
+  columns = DEFAULT_KANBAN_COLUMNS,
   darkMode,
   onStatusChange,
   onToggleTodo,
@@ -108,38 +111,39 @@ export function KanbanBoard({
     return `${month}/${day}${time}`;
   };
 
-  const columnColors: Record<
-    KanbanStatus,
-    { bg: string; border: string; header: string }
-  > = {
-    backlog: {
-      bg: darkMode ? "bg-gray-800/50" : "bg-gray-50",
-      border: darkMode ? "border-gray-700" : "border-gray-200",
-      header: darkMode ? "bg-gray-700" : "bg-gray-200",
-    },
-    todo: {
-      bg: darkMode ? "bg-blue-900/20" : "bg-blue-50",
-      border: darkMode ? "border-blue-800" : "border-blue-200",
-      header: darkMode ? "bg-blue-800" : "bg-blue-200",
-    },
-    doing: {
-      bg: darkMode ? "bg-yellow-900/20" : "bg-yellow-50",
-      border: darkMode ? "border-yellow-800" : "border-yellow-200",
-      header: darkMode ? "bg-yellow-800" : "bg-yellow-200",
-    },
-    done: {
-      bg: darkMode ? "bg-green-900/20" : "bg-green-50",
-      border: darkMode ? "border-green-800" : "border-green-200",
-      header: darkMode ? "bg-green-800" : "bg-green-200",
-    },
+  // 動的なカラム色を生成
+  const getColumnColors = (color: string) => {
+    const colorMap: Record<string, { bg: string; border: string; header: string; bgLight: string; borderLight: string; headerLight: string }> = {
+      gray: { bg: "bg-gray-800/50", border: "border-gray-700", header: "bg-gray-700", bgLight: "bg-gray-50", borderLight: "border-gray-200", headerLight: "bg-gray-200" },
+      blue: { bg: "bg-blue-900/20", border: "border-blue-800", header: "bg-blue-800", bgLight: "bg-blue-50", borderLight: "border-blue-200", headerLight: "bg-blue-200" },
+      yellow: { bg: "bg-yellow-900/20", border: "border-yellow-800", header: "bg-yellow-800", bgLight: "bg-yellow-50", borderLight: "border-yellow-200", headerLight: "bg-yellow-200" },
+      green: { bg: "bg-green-900/20", border: "border-green-800", header: "bg-green-800", bgLight: "bg-green-50", borderLight: "border-green-200", headerLight: "bg-green-200" },
+      red: { bg: "bg-red-900/20", border: "border-red-800", header: "bg-red-800", bgLight: "bg-red-50", borderLight: "border-red-200", headerLight: "bg-red-200" },
+      orange: { bg: "bg-orange-900/20", border: "border-orange-800", header: "bg-orange-800", bgLight: "bg-orange-50", borderLight: "border-orange-200", headerLight: "bg-orange-200" },
+      purple: { bg: "bg-purple-900/20", border: "border-purple-800", header: "bg-purple-800", bgLight: "bg-purple-50", borderLight: "border-purple-200", headerLight: "bg-purple-200" },
+      pink: { bg: "bg-pink-900/20", border: "border-pink-800", header: "bg-pink-800", bgLight: "bg-pink-50", borderLight: "border-pink-200", headerLight: "bg-pink-200" },
+      indigo: { bg: "bg-indigo-900/20", border: "border-indigo-800", header: "bg-indigo-800", bgLight: "bg-indigo-50", borderLight: "border-indigo-200", headerLight: "bg-indigo-200" },
+      teal: { bg: "bg-teal-900/20", border: "border-teal-800", header: "bg-teal-800", bgLight: "bg-teal-50", borderLight: "border-teal-200", headerLight: "bg-teal-200" },
+    };
+    const config = colorMap[color] || colorMap.gray;
+    return {
+      bg: darkMode ? config.bg : config.bgLight,
+      border: darkMode ? config.border : config.borderLight,
+      header: darkMode ? config.header : config.headerLight,
+    };
   };
+
+  // ソート順でカラムを並べ替え
+  const sortedColumns = React.useMemo(() => {
+    return [...columns].sort((a, b) => a.sortOrder - b.sortOrder);
+  }, [columns]);
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
       <div className="flex gap-3 overflow-x-auto pb-2">
-        {KANBAN_COLUMNS.map((column) => {
-          const columnTodos = getColumnTodos(column.id);
-          const colors = columnColors[column.id];
+        {sortedColumns.map((column) => {
+          const columnTodos = getColumnTodos(column.name);
+          const colors = getColumnColors(column.color);
 
           return (
             <div
@@ -167,7 +171,7 @@ export function KanbanBoard({
               </div>
 
               {/* ドロップ可能エリア */}
-              <StrictModeDroppable droppableId={column.id}>
+              <StrictModeDroppable droppableId={column.name}>
                 {(provided, snapshot) => (
                   <div
                     ref={provided.innerRef}

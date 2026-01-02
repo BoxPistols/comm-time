@@ -58,8 +58,10 @@ import { type MemoData } from "@/components/markdown-memo";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { TagManager } from "@/components/tag-manager";
 import { KanbanBoard } from "@/components/kanban-board";
+import { KanbanStatusManager } from "@/components/kanban-status-manager";
 import { FilterPanel } from "@/components/filter-panel";
 import { TodoEditDialog } from "@/components/todo-edit-dialog";
+import { useKanbanStatuses } from "@/hooks/useKanbanStatuses";
 import {
   type Tag,
   type PriorityLevel,
@@ -69,7 +71,6 @@ import {
   initialFilterState,
   PRIORITY_CONFIG,
   IMPORTANCE_CONFIG,
-  KANBAN_COLUMNS,
   TAG_COLORS,
 } from "@/types";
 
@@ -254,6 +255,9 @@ export function CommTimeComponent() {
   // タグ管理フック（データベースモード用）
   const supabaseTags = useSupabaseTags(useDatabase ? user : null);
 
+  // カンバンステータス管理フック
+  const kanbanStatusesHook = useKanbanStatuses(useDatabase ? user : null);
+
   // その他の状態
   const [forceFocus, setForceFocus] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -327,6 +331,9 @@ export function CommTimeComponent() {
 
   // カンバンモーダルの表示状態
   const [showKanbanModal, setShowKanbanModal] = useState(false);
+
+  // ステータス管理モーダルの表示状態
+  const [showStatusManager, setShowStatusManager] = useState(false);
 
   // フィルターパネルの表示状態
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -3035,6 +3042,7 @@ export function CommTimeComponent() {
                 <div className="mb-4">
                   <FilterPanel
                     tags={tags}
+                    columns={kanbanStatusesHook.statuses}
                     filterState={filterState}
                     onFilterChange={setFilterState}
                     darkMode={darkMode}
@@ -3497,7 +3505,7 @@ export function CommTimeComponent() {
                                               : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
                                           }`}
                                         >
-                                          {KANBAN_COLUMNS.find((c) => c.id === todo.kanbanStatus)?.label}
+                                          {kanbanStatusesHook.statuses.find((c) => c.name === todo.kanbanStatus)?.label}
                                         </span>
                                       )}
                                     </div>
@@ -4329,22 +4337,37 @@ export function CommTimeComponent() {
                   <Columns className="w-5 h-5" />
                   カンバンボード
                 </h2>
-                <button
-                  onClick={() => setShowKanbanModal(false)}
-                  className={`p-2 rounded-full transition-colors ${
-                    darkMode
-                      ? "hover:bg-gray-700 text-gray-400"
-                      : "hover:bg-gray-100 text-gray-600"
-                  }`}
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {/* ステータス管理ボタン */}
+                  <button
+                    onClick={() => setShowStatusManager(true)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                      darkMode
+                        ? "bg-gray-700 hover:bg-gray-600 text-gray-300"
+                        : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                    }`}
+                  >
+                    <Settings className="w-4 h-4" />
+                    ステータス管理
+                  </button>
+                  <button
+                    onClick={() => setShowKanbanModal(false)}
+                    className={`p-2 rounded-full transition-colors ${
+                      darkMode
+                        ? "hover:bg-gray-700 text-gray-400"
+                        : "hover:bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
               {/* カンバンボード */}
               <div className="p-6 h-[calc(90vh-80px)] overflow-auto">
                 <KanbanBoard
                   todos={filteredTodos}
                   tags={tags}
+                  columns={kanbanStatusesHook.statuses}
                   darkMode={darkMode}
                   onStatusChange={updateTodoKanbanStatus}
                   onToggleTodo={(id) => toggleTodo(id, activeTab === "pomodoro")}
@@ -4356,6 +4379,19 @@ export function CommTimeComponent() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* ステータス管理モーダル */}
+        {showStatusManager && (
+          <KanbanStatusManager
+            statuses={kanbanStatusesHook.statuses}
+            darkMode={darkMode}
+            onStatusesChange={(_newStatuses) => {
+              // フックのリフレッシュを呼び出す
+              kanbanStatusesHook.refreshStatuses();
+            }}
+            onClose={() => setShowStatusManager(false)}
+          />
         )}
 
         {/* TODO編集ダイアログ */}
