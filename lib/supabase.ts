@@ -17,7 +17,13 @@ if (typeof window !== 'undefined' && !isConfigured) {
 
 // Supabaseクライアントのシングルトンインスタンス
 // 環境変数が設定されていない場合はプレースホルダーで初期化（実際には使用しない）
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+})
 export { isConfigured as isSupabaseConfigured }
 
 // データベース型定義

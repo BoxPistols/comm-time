@@ -7,41 +7,54 @@ import { type KanbanStatusColumn, DEFAULT_KANBAN_COLUMNS } from "@/types"
 
 // 認証ヘッダーを取得するヘルパー関数
 const getAuthHeaders = async (): Promise<Record<string, string>> => {
-  // まずセッションを取得
-  const { data: { session } } = await supabase.auth.getSession()
+  try {
+    // まずセッションを取得
+    const { data: { session }, error } = await supabase.auth.getSession()
 
-  if (session?.access_token) {
-    // トークンの有効期限をチェック（5分前にリフレッシュ）
-    const expiresAt = session.expires_at
-    const now = Math.floor(Date.now() / 1000)
+    if (error) {
+      console.warn('getSession error:', error)
+    }
 
-    if (expiresAt && expiresAt - now < 300) {
-      // セッションをリフレッシュ
-      const { data: { session: newSession } } = await supabase.auth.refreshSession()
-      if (newSession?.access_token) {
+    if (session?.access_token) {
+      return {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      }
+    }
+
+    // セッションがない場合、refreshSessionを試みる
+    const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
+
+    if (refreshError) {
+      console.warn('refreshSession error:', refreshError)
+    }
+
+    if (refreshedSession?.access_token) {
+      return {
+        'Authorization': `Bearer ${refreshedSession.access_token}`,
+        'Content-Type': 'application/json',
+      }
+    }
+
+    // 最後の手段: getUser経由でセッション情報を取得
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      // ユーザーは存在するがセッションがない - 再度getSessionを試みる
+      const { data: { session: retrySession } } = await supabase.auth.getSession()
+      if (retrySession?.access_token) {
         return {
-          'Authorization': `Bearer ${newSession.access_token}`,
+          'Authorization': `Bearer ${retrySession.access_token}`,
           'Content-Type': 'application/json',
         }
       }
     }
 
-    return {
-      'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json',
-    }
+    console.warn('No session available for API request')
+    return { 'Content-Type': 'application/json' }
+  } catch (err) {
+    console.error('Error getting auth headers:', err)
+    return { 'Content-Type': 'application/json' }
   }
-
-  // セッションがない場合、リフレッシュを試みる
-  const { data: { session: refreshedSession } } = await supabase.auth.refreshSession()
-  if (refreshedSession?.access_token) {
-    return {
-      'Authorization': `Bearer ${refreshedSession.access_token}`,
-      'Content-Type': 'application/json',
-    }
-  }
-
-  return { 'Content-Type': 'application/json' }
 }
 
 // DBの型からローカル型に変換
