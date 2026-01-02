@@ -378,7 +378,7 @@ export function MarkdownMemo({
     >
       {/* ヘッダー */}
       <div
-        className={`flex-shrink-0 flex items-center justify-between px-4 py-3 border-b ${
+        className={`flex-shrink-0 flex items-center justify-between px-4 py-3 md:px-6 lg:px-8 border-b ${
           darkMode ? "border-gray-700" : "border-gray-200"
         }`}
       >
@@ -476,7 +476,7 @@ export function MarkdownMemo({
       </div>
 
       {/* コンテンツエリア */}
-      <div className="flex-1 min-h-0 overflow-auto px-3 py-3">
+      <div className="flex-1 min-h-0 overflow-auto px-3 py-3 md:px-6 lg:px-8">
         {isEditing ? (
           <textarea
             ref={textareaRef}
@@ -526,7 +526,7 @@ export function MarkdownMemo({
 
       {/* フッター（更新日時） - 常に最下部に配置 */}
       <div
-        className={`flex-shrink-0 px-4 py-2.5 text-xs border-t ${
+        className={`flex-shrink-0 px-4 py-2.5 md:px-6 lg:px-8 text-xs border-t ${
           darkMode
             ? "border-gray-700 text-gray-500"
             : "border-gray-200 text-gray-400"
