@@ -4341,10 +4341,16 @@ export function CommTimeComponent() {
                   {/* ステータス管理ボタン */}
                   <button
                     onClick={() => setShowStatusManager(true)}
+                    disabled={!isAuthenticated || !isSupabaseConfigured}
+                    title={!isAuthenticated || !isSupabaseConfigured ? "ログインするとカスタムステータスを作成できます" : "ステータスを追加・編集・削除できます"}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
-                      darkMode
-                        ? "bg-gray-700 hover:bg-gray-600 text-gray-300"
-                        : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                      !isAuthenticated || !isSupabaseConfigured
+                        ? darkMode
+                          ? "bg-gray-800 text-gray-500 cursor-not-allowed"
+                          : "bg-gray-50 text-gray-400 cursor-not-allowed"
+                        : darkMode
+                          ? "bg-gray-700 hover:bg-gray-600 text-gray-300"
+                          : "bg-gray-100 hover:bg-gray-200 text-gray-700"
                     }`}
                   >
                     <Settings className="w-4 h-4" />
@@ -4381,8 +4387,8 @@ export function CommTimeComponent() {
           </div>
         )}
 
-        {/* ステータス管理モーダル */}
-        {showStatusManager && (
+        {/* ステータス管理モーダル（ログイン時のみ表示） */}
+        {showStatusManager && isAuthenticated && isSupabaseConfigured && (
           <KanbanStatusManager
             statuses={kanbanStatusesHook.statuses}
             darkMode={darkMode}
