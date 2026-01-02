@@ -8,14 +8,16 @@ import {
   type PriorityLevel,
   type ImportanceLevel,
   type KanbanStatus,
+  type KanbanStatusColumn,
   PRIORITY_CONFIG,
   IMPORTANCE_CONFIG,
-  KANBAN_COLUMNS,
+  DEFAULT_KANBAN_COLUMNS,
   TAG_COLORS,
 } from "@/types";
 
 interface FilterPanelProps {
   tags: Tag[];
+  columns?: KanbanStatusColumn[];
   filterState: FilterState;
   onFilterChange: (newFilter: FilterState) => void;
   darkMode: boolean;
@@ -24,6 +26,7 @@ interface FilterPanelProps {
 
 export function FilterPanel({
   tags,
+  columns = DEFAULT_KANBAN_COLUMNS,
   filterState,
   onFilterChange,
   darkMode,
@@ -249,12 +252,12 @@ export function FilterPanel({
           >
             すべて
           </button>
-          {KANBAN_COLUMNS.map((col) => (
+          {columns.map((col) => (
             <button
               key={col.id}
-              onClick={() => handleKanbanStatusChange(col.id)}
+              onClick={() => handleKanbanStatusChange(col.name)}
               className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${
-                filterState.kanbanStatus === col.id
+                filterState.kanbanStatus === col.name
                   ? col.activeClass
                   : darkMode
                   ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
