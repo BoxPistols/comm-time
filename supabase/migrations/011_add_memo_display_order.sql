@@ -19,6 +19,13 @@ WHERE memos.id = ordered_memos.id;
 ALTER TABLE memos
 ALTER COLUMN display_order SET NOT NULL;
 
+-- レースコンディション防止のためユニーク制約を追加
+-- DEFERRABLE INITIALLY DEFERREDでトランザクション終了時にチェック（reorder時の中間状態を許可）
+ALTER TABLE memos
+ADD CONSTRAINT memos_user_id_display_order_key
+UNIQUE (user_id, display_order)
+DEFERRABLE INITIALLY DEFERRED;
+
 -- display_orderにデフォルト値を設定（新規作成時に自動で最大値+1を設定するためのトリガー）
 CREATE OR REPLACE FUNCTION set_memo_display_order()
 RETURNS TRIGGER AS $$
@@ -38,7 +45,7 @@ CREATE TRIGGER set_memo_display_order_trigger
   FOR EACH ROW
   EXECUTE FUNCTION set_memo_display_order();
 
--- メモの順序を更新するRPC関数
+-- メモの順序を更新するRPC関数（unnestで単一UPDATEに最適化）
 CREATE OR REPLACE FUNCTION reorder_memos(
   p_user_id UUID,
   p_memo_ids UUID[]
@@ -47,14 +54,11 @@ RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
-DECLARE
-  i INTEGER;
 BEGIN
-  -- 各メモのdisplay_orderを更新
-  FOR i IN 1..array_length(p_memo_ids, 1) LOOP
-    UPDATE memos
-    SET display_order = i
-    WHERE id = p_memo_ids[i] AND user_id = p_user_id;
-  END LOOP;
+  -- unnest + WITH ORDINALITYで効率的に一括更新
+  UPDATE memos AS m
+  SET display_order = s.new_order
+  FROM unnest(p_memo_ids) WITH ORDINALITY AS s(memo_id, new_order)
+  WHERE m.id = s.memo_id AND m.user_id = p_user_id;
 END;
 $$;

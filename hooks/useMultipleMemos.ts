@@ -357,6 +357,7 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
     // メモの並び替え
     const reorderMemos = useCallback(
         async (reorderedMemos: MemoData[]) => {
+            const originalMemos = memos
             setMemos(reorderedMemos)
 
             if (useDatabase && user) {
@@ -371,17 +372,19 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
                         }
                     )
                     if (reorderError) {
-                        console.error('Error reordering memos:', reorderError)
+                        throw reorderError
                     }
                 } catch (err: any) {
                     console.error('Error reordering memos:', err)
+                    setError('メモの順序の保存に失敗しました。')
+                    setMemos(originalMemos)
                 }
             } else {
                 // ローカルストレージに保存
                 saveLocalMemos(reorderedMemos)
             }
         },
-        [useDatabase, user]
+        [memos, useDatabase, user]
     )
 
     return {
