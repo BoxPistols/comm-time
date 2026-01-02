@@ -4386,11 +4386,11 @@ export function CommTimeComponent() {
           <KanbanStatusManager
             statuses={kanbanStatusesHook.statuses}
             darkMode={darkMode}
-            onStatusesChange={(_newStatuses) => {
-              // フックのリフレッシュを呼び出す
-              kanbanStatusesHook.refreshStatuses();
-            }}
             onClose={() => setShowStatusManager(false)}
+            onAddStatus={kanbanStatusesHook.addStatus}
+            onUpdateStatus={kanbanStatusesHook.updateStatus}
+            onDeleteStatus={kanbanStatusesHook.deleteStatus}
+            onReorderStatuses={kanbanStatusesHook.reorderStatuses}
           />
         )}
 

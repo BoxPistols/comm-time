@@ -24,17 +24,23 @@ import {
 interface KanbanStatusManagerProps {
   statuses: KanbanStatusColumn[];
   darkMode: boolean;
-  onStatusesChange: (statuses: KanbanStatusColumn[]) => void;
   onClose: () => void;
+  // Hook functions
+  onAddStatus: (name: string, label: string, color: string) => Promise<KanbanStatusColumn | null>;
+  onUpdateStatus: (id: string, updates: Partial<Pick<KanbanStatusColumn, 'name' | 'label' | 'color'>>) => Promise<void>;
+  onDeleteStatus: (id: string) => Promise<void>;
+  onReorderStatuses: (newOrder: KanbanStatusColumn[]) => Promise<void>;
 }
 
 export function KanbanStatusManager({
-  statuses: initialStatuses,
+  statuses,
   darkMode,
-  onStatusesChange,
   onClose,
+  onAddStatus,
+  onUpdateStatus,
+  onDeleteStatus,
+  onReorderStatuses,
 }: KanbanStatusManagerProps) {
-  const [statuses, setStatuses] = useState<KanbanStatusColumn[]>(initialStatuses);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState("");
   const [editingColor, setEditingColor] = useState("");
@@ -43,10 +49,6 @@ export function KanbanStatusManager({
   const [newColor, setNewColor] = useState("gray");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setStatuses(initialStatuses);
-  }, [initialStatuses]);
 
   const handleDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
@@ -61,30 +63,11 @@ export function KanbanStatusManager({
       sortOrder: index,
     }));
 
-    setStatuses(updatedItems);
-
     try {
-      const response = await fetch("/api/v1/kanban-statuses/reorder", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orders: updatedItems.map((item) => ({
-            id: item.id,
-            sortOrder: item.sortOrder,
-          })),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to reorder statuses");
-      }
-
-      const data = await response.json();
-      setStatuses(data.statuses);
-      onStatusesChange(data.statuses);
+      setError(null);
+      await onReorderStatuses(updatedItems);
     } catch {
       setError("順序の更新に失敗しました");
-      setStatuses(initialStatuses);
     }
   };
 
@@ -96,27 +79,15 @@ export function KanbanStatusManager({
 
     try {
       const name = newLabel.toLowerCase().replace(/\s+/g, "_");
-      const response = await fetch("/api/v1/kanban-statuses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          label: newLabel.trim(),
-          color: newColor,
-        }),
-      });
+      const result = await onAddStatus(name, newLabel.trim(), newColor);
 
-      if (!response.ok) {
-        throw new Error("Failed to create status");
+      if (result) {
+        setNewLabel("");
+        setNewColor("gray");
+        setIsAddingNew(false);
+      } else {
+        setError("ステータスの作成に失敗しました");
       }
-
-      const data = await response.json();
-      const newStatuses = [...statuses, data.status];
-      setStatuses(newStatuses);
-      onStatusesChange(newStatuses);
-      setNewLabel("");
-      setNewColor("gray");
-      setIsAddingNew(false);
     } catch {
       setError("ステータスの作成に失敗しました");
     } finally {
@@ -137,25 +108,10 @@ export function KanbanStatusManager({
     setError(null);
 
     try {
-      const response = await fetch(`/api/v1/kanban-statuses/${editingId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          label: editingLabel.trim(),
-          color: editingColor,
-        }),
+      await onUpdateStatus(editingId, {
+        label: editingLabel.trim(),
+        color: editingColor,
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to update status");
-      }
-
-      const data = await response.json();
-      const updatedStatuses = statuses.map((s) =>
-        s.id === editingId ? data.status : s
-      );
-      setStatuses(updatedStatuses);
-      onStatusesChange(updatedStatuses);
       setEditingId(null);
     } catch {
       setError("ステータスの更新に失敗しました");
@@ -181,17 +137,7 @@ export function KanbanStatusManager({
     setError(null);
 
     try {
-      const response = await fetch(`/api/v1/kanban-statuses/${id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete status");
-      }
-
-      const updatedStatuses = statuses.filter((s) => s.id !== id);
-      setStatuses(updatedStatuses);
-      onStatusesChange(updatedStatuses);
+      await onDeleteStatus(id);
     } catch {
       setError("ステータスの削除に失敗しました");
     } finally {
