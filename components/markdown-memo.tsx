@@ -372,9 +372,9 @@ export function MarkdownMemo({
   // 全画面モード用のコンテンツ
   const memoContent = (
     <div
-      className={`flex flex-col max-h-[400px] rounded-lg border ${
-        darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
-      }`}
+      className={`flex flex-col rounded-lg border ${
+        isFullscreen ? "h-full" : "max-h-[400px]"
+      } ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
     >
       {/* ヘッダー */}
       <div
@@ -476,14 +476,16 @@ export function MarkdownMemo({
       </div>
 
       {/* コンテンツエリア */}
-      <div className="flex-1 min-h-0 overflow-auto px-3 py-3">
+      <div className={`flex-1 min-h-0 overflow-auto px-3 py-3 ${isFullscreen ? "min-h-[50vh]" : ""}`}>
         {isEditing ? (
           <textarea
             ref={textareaRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Markdownで記述できます..."
-            className={`w-full h-full min-h-[300px] resize-none bg-transparent border-none outline-none font-mono text-sm leading-relaxed ${
+            className={`w-full h-full resize-none bg-transparent border-none outline-none font-mono text-sm leading-relaxed ${
+              isFullscreen ? "min-h-[50vh]" : "min-h-[300px]"
+            } ${
               darkMode
                 ? "text-gray-100 placeholder-gray-500"
                 : "text-gray-800 placeholder-gray-400"
