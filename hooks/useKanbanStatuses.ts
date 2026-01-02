@@ -5,6 +5,18 @@ import { supabase } from "@/lib/supabase"
 import type { User } from "@supabase/supabase-js"
 import { type KanbanStatusColumn, DEFAULT_KANBAN_COLUMNS } from "@/types"
 
+// 認証ヘッダーを取得するヘルパー関数
+const getAuthHeaders = async (): Promise<Record<string, string>> => {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session?.access_token) {
+    return {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    }
+  }
+  return { 'Content-Type': 'application/json' }
+}
+
 // DBの型からローカル型に変換
 const convertToLocal = (dbStatus: Record<string, unknown>): KanbanStatusColumn => ({
   id: dbStatus.id as string,
@@ -39,7 +51,8 @@ export function useKanbanStatuses(user: User | null) {
     setError(null)
 
     try {
-      const response = await fetch('/api/v1/kanban-statuses')
+      const headers = await getAuthHeaders()
+      const response = await fetch('/api/v1/kanban-statuses', { headers })
       const data = await response.json()
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch statuses')
@@ -66,9 +79,10 @@ export function useKanbanStatuses(user: User | null) {
     if (!user) return
 
     try {
+      const headers = await getAuthHeaders()
       const response = await fetch("/api/v1/kanban-statuses/init", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
       })
 
       if (response.ok) {
@@ -91,9 +105,10 @@ export function useKanbanStatuses(user: User | null) {
   const addStatus = async (name: string, label: string, color: string): Promise<KanbanStatusColumn | null> => {
     if (!user) return null;
     try {
+      const headers = await getAuthHeaders()
       const response = await fetch('/api/v1/kanban-statuses', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ name, label, color }),
       });
       const data = await response.json();
@@ -114,9 +129,10 @@ export function useKanbanStatuses(user: User | null) {
     if (!user) return
 
     try {
+      const headers = await getAuthHeaders()
       const response = await fetch(`/api/v1/kanban-statuses/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(updates),
       });
       const data = await response.json();
@@ -141,8 +157,10 @@ export function useKanbanStatuses(user: User | null) {
     }
 
     try {
+      const headers = await getAuthHeaders()
       const response = await fetch(`/api/v1/kanban-statuses/${id}`, {
         method: 'DELETE',
+        headers,
       });
       if (!response.ok) {
         const data = await response.json();
@@ -163,9 +181,10 @@ export function useKanbanStatuses(user: User | null) {
     setStatuses(newOrder); // Optimistic update
     try {
       const statusIds = newOrder.map(s => s.id);
+      const headers = await getAuthHeaders()
       const response = await fetch('/api/v1/kanban-statuses/reorder', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ statusIds }),
       });
       const data = await response.json();
