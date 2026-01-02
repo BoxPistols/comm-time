@@ -476,7 +476,7 @@ export function MarkdownMemo({
       </div>
 
       {/* コンテンツエリア */}
-      <div className={`flex-1 min-h-0 overflow-auto px-3 py-3 ${isFullscreen ? "min-h-[50vh]" : ""}`}>
+      <div className="flex-1 min-h-0 overflow-auto px-3 py-3">
         {isEditing ? (
           <textarea
             ref={textareaRef}
@@ -484,7 +484,7 @@ export function MarkdownMemo({
             onChange={(e) => setContent(e.target.value)}
             placeholder="Markdownで記述できます..."
             className={`w-full h-full resize-none bg-transparent border-none outline-none font-mono text-sm leading-relaxed ${
-              isFullscreen ? "min-h-[50vh]" : "min-h-[300px]"
+              isFullscreen ? "" : "min-h-[300px]"
             } ${
               darkMode
                 ? "text-gray-100 placeholder-gray-500"
@@ -661,13 +661,13 @@ export function MarkdownMemo({
         tabIndex={0}
       >
         <div
-          className="w-[98vw] sm:w-[95vw] md:w-[90vw] max-w-[960px] m-auto flex flex-col md:flex-row items-center gap-2 py-4 pb-safe"
+          className="w-[98vw] sm:w-[95vw] md:w-[90vw] max-w-[960px] h-[94vh] h-[94dvh] mx-auto my-[3vh] flex flex-col md:flex-row items-stretch gap-2 pb-safe"
           onClick={(e) => e.stopPropagation()}
         >
           {/* 左矢印（デスクトップのみ表示） */}
           <button
             onClick={onNavigatePrev}
-            className={`hidden md:flex flex-shrink-0 p-2 rounded-full transition-colors ${
+            className={`hidden md:flex flex-shrink-0 p-2 rounded-full transition-colors self-center ${
               darkMode
                 ? "hover:bg-gray-700 text-gray-400 hover:text-gray-200"
                 : "hover:bg-gray-200 text-gray-600 hover:text-gray-800"
@@ -679,7 +679,7 @@ export function MarkdownMemo({
 
           {/* メモコンテンツ */}
           <div
-            className={`flex-1 w-full md:w-auto flex flex-col rounded-xl shadow-2xl overflow-hidden min-h-0 max-h-[88vh] max-h-[88dvh] ${
+            className={`flex-1 w-full md:w-auto flex flex-col rounded-xl shadow-2xl overflow-hidden min-h-0 ${
               darkMode ? "bg-gray-900" : "bg-gray-50"
             }`}
           >
@@ -715,7 +715,7 @@ export function MarkdownMemo({
           {/* 右矢印（デスクトップのみ表示） */}
           <button
             onClick={onNavigateNext}
-            className={`hidden md:flex flex-shrink-0 p-2 rounded-full transition-colors ${
+            className={`hidden md:flex flex-shrink-0 p-2 rounded-full transition-colors self-center ${
               darkMode
                 ? "hover:bg-gray-700 text-gray-400 hover:text-gray-200"
                 : "hover:bg-gray-200 text-gray-600 hover:text-gray-800"
