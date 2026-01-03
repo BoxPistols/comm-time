@@ -1,10 +1,8 @@
-name: AI Code Review (Gemini)
+name: AI Code Review
 
 on:
-  # PRコメントでコマンド駆動
   issue_comment:
     types: [created]
-  # PR作成時のみ自動サマリー（クォータ節約のためsynchronizeは除外）
   pull_request:
     types: [opened]
 
@@ -12,32 +10,35 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  models: read
 
 env:
-  # 軽量モデルを使用（クォータ節約）
+  # Gemini設定
   GEMINI_MODEL: gemini-1.5-flash-8b-001
   GEMINI_MODEL_DISPLAY: Gemini 1.5 Flash 8B
+  # GitHub Models設定 (Copilot経由)
+  GITHUB_MODEL: gpt-4o
+  GITHUB_MODEL_DISPLAY: GitHub Copilot (GPT-4o)
+  # Claude設定
+  CLAUDE_MODEL: claude-sonnet-4-20250514
+  CLAUDE_MODEL_DISPLAY: Claude Sonnet 4
 
 jobs:
-  # /review コマンドでコードレビュー
-  review:
+  # ============================================
+  # Gemini Commands: /review, /summary, /fix
+  # ============================================
+  gemini-review:
     if: |
       github.event_name == 'issue_comment' &&
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '/review')
+      contains(github.event.comment.body, '/review') &&
+      !contains(github.event.comment.body, '/copilot_review') &&
+      !contains(github.event.comment.body, '/claude_review')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Check API Key
-        run: |
-          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
-            echo "::error::GEMINI_API_KEY is not set. Please add it to repository secrets."
-            exit 1
-          fi
 
       - name: Get PR details
         id: pr
@@ -49,11 +50,7 @@ jobs:
               repo: context.repo.repo,
               pull_number: context.issue.number
             });
-            return {
-              base: pr.data.base.sha,
-              head: pr.data.head.sha,
-              branch: pr.data.head.ref
-            };
+            return { base: pr.data.base.sha, head: pr.data.head.sha, branch: pr.data.head.ref };
 
       - name: Get diff
         id: diff
@@ -69,69 +66,52 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "result=⚠️ GEMINI_API_KEY が設定されていません" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           RESPONSE=$(curl -s -w "\n%{http_code}" "https://generativelanguage.googleapis.com/v1beta/models/${{ env.GEMINI_MODEL }}:generateContent?key=$GEMINI_API_KEY" \
             -H 'Content-Type: application/json' \
             -d @- <<'PAYLOAD'
-          {
-            "contents": [{
-              "parts": [{
-                "text": "あなたは経験豊富なシニアエンジニアです。以下のコード差分をレビューしてください。\n\n## レビュー観点\n1. バグや潜在的な問題\n2. セキュリティリスク\n3. パフォーマンス改善点\n4. コードの可読性・保守性\n5. ベストプラクティスへの準拠\n\n## 出力形式\n- 問題がある場合は具体的なファイル名と行を示してください\n- 改善案があれば具体的なコード例を提示してください\n- 問題がなければ「LGTM」と回答してください\n\n## コード差分\n```diff\n${{ steps.diff.outputs.diff }}\n```"
-              }]
-            }],
-            "generationConfig": {
-              "temperature": 0.2,
-              "maxOutputTokens": 4096
-            }
-          }
+          {"contents":[{"parts":[{"text":"あなたは経験豊富なシニアエンジニアです。以下のコード差分をレビューしてください。\n\n## レビュー観点\n1. バグや潜在的な問題\n2. セキュリティリスク\n3. パフォーマンス改善点\n4. コードの可読性・保守性\n5. ベストプラクティスへの準拠\n\n## 出力形式\n- 問題がある場合は具体的なファイル名と行を示してください\n- 改善案があれば具体的なコード例を提示してください\n- 問題がなければ「LGTM」と回答してください\n\n## コード差分\n```diff\n${{ steps.diff.outputs.diff }}\n```"}]}],"generationConfig":{"temperature":0.2,"maxOutputTokens":4096}}
           PAYLOAD
           )
-
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
-
           if [ "$HTTP_CODE" != "200" ]; then
             ERROR=$(echo "$BODY" | jq -r '.error.message // "Unknown error"')
-            echo "review<<EOF" >> $GITHUB_OUTPUT
-            echo "⚠️ API Error (HTTP $HTTP_CODE): $ERROR" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            echo "result=⚠️ API Error (HTTP $HTTP_CODE): $ERROR" >> $GITHUB_OUTPUT
           else
-            REVIEW=$(echo "$BODY" | jq -r '.candidates[0].content.parts[0].text // "レビューを生成できませんでした"')
-            echo "review<<EOF" >> $GITHUB_OUTPUT
-            echo "$REVIEW" >> $GITHUB_OUTPUT
+            RESULT=$(echo "$BODY" | jq -r '.candidates[0].content.parts[0].text // "レビューを生成できませんでした"')
+            echo "result<<EOF" >> $GITHUB_OUTPUT
+            echo "$RESULT" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
           fi
 
-      - name: Post review comment
+      - name: Post comment
         uses: actions/github-script@v7
         with:
           script: |
-            const review = `## 🤖 AI Code Review (Gemini)\n\n${{ steps.review.outputs.review }}\n\n---\n*Powered by ${{ env.GEMINI_MODEL_DISPLAY }}*`;
+            const body = `## 🤖 AI Code Review\n\n${{ steps.review.outputs.result }}\n\n---\n*Powered by ${{ env.GEMINI_MODEL_DISPLAY }}*`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: review
+              body
             });
 
-  # /summary コマンドでPRサマリー生成
-  summary:
+  gemini-summary:
     if: |
       github.event_name == 'issue_comment' &&
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '/summary')
+      contains(github.event.comment.body, '/summary') &&
+      !contains(github.event.comment.body, '/copilot_summary') &&
+      !contains(github.event.comment.body, '/claude_summary')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Check API Key
-        run: |
-          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
-            echo "::error::GEMINI_API_KEY is not set. Please add it to repository secrets."
-            exit 1
-          fi
 
       - name: Get PR details
         id: pr
@@ -171,174 +151,52 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "result=⚠️ GEMINI_API_KEY が設定されていません" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           RESPONSE=$(curl -s -w "\n%{http_code}" "https://generativelanguage.googleapis.com/v1beta/models/${{ env.GEMINI_MODEL }}:generateContent?key=$GEMINI_API_KEY" \
             -H 'Content-Type: application/json' \
             -d @- <<'PAYLOAD'
-          {
-            "contents": [{
-              "parts": [{
-                "text": "以下のPull Request情報から、簡潔で分かりやすいサマリーを日本語で作成してください。\n\n## 出力形式\n### 概要\n（1-2文で変更の目的を説明）\n\n### 主な変更点\n- 箇条書きで主要な変更を列挙\n\n### 影響範囲\n- 影響を受けるコンポーネントや機能\n\n### レビューポイント\n- レビュアーが特に確認すべき点\n\n---\n\n## PR情報\nタイトル: ${{ fromJson(steps.pr.outputs.result).title }}\n\n説明:\n${{ fromJson(steps.pr.outputs.result).body }}\n\nコミット:\n${{ fromJson(steps.pr.outputs.result).commits }}\n\n変更ファイル:\n${{ steps.files.outputs.files }}"
-              }]
-            }],
-            "generationConfig": {
-              "temperature": 0.3,
-              "maxOutputTokens": 2048
-            }
-          }
+          {"contents":[{"parts":[{"text":"以下のPull Request情報から、簡潔で分かりやすいサマリーを日本語で作成してください。\n\n## 出力形式\n### 概要\n（1-2文で変更の目的を説明）\n\n### 主な変更点\n- 箇条書きで主要な変更を列挙\n\n### 影響範囲\n- 影響を受けるコンポーネントや機能\n\n### レビューポイント\n- レビュアーが特に確認すべき点\n\n---\n\n## PR情報\nタイトル: ${{ fromJson(steps.pr.outputs.result).title }}\n\n説明:\n${{ fromJson(steps.pr.outputs.result).body }}\n\nコミット:\n${{ fromJson(steps.pr.outputs.result).commits }}\n\n変更ファイル:\n${{ steps.files.outputs.files }}"}]}],"generationConfig":{"temperature":0.3,"maxOutputTokens":2048}}
           PAYLOAD
           )
-
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
-
           if [ "$HTTP_CODE" != "200" ]; then
             ERROR=$(echo "$BODY" | jq -r '.error.message // "Unknown error"')
-            echo "summary<<EOF" >> $GITHUB_OUTPUT
-            echo "⚠️ API Error (HTTP $HTTP_CODE): $ERROR" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            echo "result=⚠️ API Error (HTTP $HTTP_CODE): $ERROR" >> $GITHUB_OUTPUT
           else
-            SUMMARY=$(echo "$BODY" | jq -r '.candidates[0].content.parts[0].text // "サマリーを生成できませんでした"')
-            echo "summary<<EOF" >> $GITHUB_OUTPUT
-            echo "$SUMMARY" >> $GITHUB_OUTPUT
+            RESULT=$(echo "$BODY" | jq -r '.candidates[0].content.parts[0].text // "サマリーを生成できませんでした"')
+            echo "result<<EOF" >> $GITHUB_OUTPUT
+            echo "$RESULT" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
           fi
 
-      - name: Post summary comment
+      - name: Post comment
         uses: actions/github-script@v7
         with:
           script: |
-            const summary = `## 📋 PR Summary (Gemini)\n\n${{ steps.summary.outputs.summary }}\n\n---\n*Powered by ${{ env.GEMINI_MODEL_DISPLAY }}*`;
+            const body = `## 📋 PR Summary\n\n${{ steps.summary.outputs.result }}\n\n---\n*Powered by ${{ env.GEMINI_MODEL_DISPLAY }}*`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: summary
+              body
             });
 
-  # PR作成・更新時に自動サマリー生成
-  auto-summary:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check API Key
-        id: check_key
-        run: |
-          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
-            echo "has_key=false" >> $GITHUB_OUTPUT
-          else
-            echo "has_key=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Skip if no API key
-        if: steps.check_key.outputs.has_key == 'false'
-        run: |
-          echo "::warning::GEMINI_API_KEY is not set. Skipping auto-summary."
-
-      - name: Get PR details
-        if: steps.check_key.outputs.has_key == 'true'
-        id: pr
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const commits = await github.rest.pulls.listCommits({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number
-            });
-            return {
-              title: context.payload.pull_request.title,
-              body: context.payload.pull_request.body || '',
-              base: context.payload.pull_request.base.sha,
-              head: context.payload.pull_request.head.sha,
-              branch: context.payload.pull_request.head.ref,
-              commits: commits.data.map(c => c.commit.message).join('\n')
-            };
-
-      - name: Get changed files
-        if: steps.check_key.outputs.has_key == 'true'
-        id: files
-        run: |
-          git fetch origin ${{ github.event.pull_request.base.ref }}
-          FILES=$(git diff --name-status origin/${{ github.event.pull_request.base.ref }}..HEAD)
-          echo "files<<EOF" >> $GITHUB_OUTPUT
-          echo "$FILES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Generate summary with Gemini
-        if: steps.check_key.outputs.has_key == 'true'
-        id: summary
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          RESPONSE=$(curl -s -w "\n%{http_code}" "https://generativelanguage.googleapis.com/v1beta/models/${{ env.GEMINI_MODEL }}:generateContent?key=$GEMINI_API_KEY" \
-            -H 'Content-Type: application/json' \
-            -d @- <<'PAYLOAD'
-          {
-            "contents": [{
-              "parts": [{
-                "text": "以下のPull Request情報から、簡潔で分かりやすいサマリーを日本語で作成してください。\n\n## 出力形式\n### 概要\n（1-2文で変更の目的を説明）\n\n### 主な変更点\n- 箇条書きで主要な変更を列挙\n\n### 影響範囲\n- 影響を受けるコンポーネントや機能\n\n### レビューポイント\n- レビュアーが特に確認すべき点\n\n---\n\n## PR情報\nタイトル: ${{ fromJson(steps.pr.outputs.result).title }}\n\n説明:\n${{ fromJson(steps.pr.outputs.result).body }}\n\nコミット:\n${{ fromJson(steps.pr.outputs.result).commits }}\n\n変更ファイル:\n${{ steps.files.outputs.files }}"
-              }]
-            }],
-            "generationConfig": {
-              "temperature": 0.3,
-              "maxOutputTokens": 2048
-            }
-          }
-          PAYLOAD
-          )
-
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-
-          if [ "$HTTP_CODE" != "200" ]; then
-            ERROR=$(echo "$BODY" | jq -r '.error.message // "Unknown error"')
-            echo "summary<<EOF" >> $GITHUB_OUTPUT
-            echo "⚠️ API Error (HTTP $HTTP_CODE): $ERROR" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            SUMMARY=$(echo "$BODY" | jq -r '.candidates[0].content.parts[0].text // "サマリーを生成できませんでした"')
-            echo "summary<<EOF" >> $GITHUB_OUTPUT
-            echo "$SUMMARY" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Post summary comment
-        if: steps.check_key.outputs.has_key == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const summary = `## 📋 PR Summary (Gemini)\n\n${{ steps.summary.outputs.summary }}\n\n---\n*Powered by ${{ env.GEMINI_MODEL_DISPLAY }}*`;
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              body: summary
-            });
-
-  # /fix コマンドで修正提案
-  fix:
+  gemini-fix:
     if: |
       github.event_name == 'issue_comment' &&
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '/fix')
+      contains(github.event.comment.body, '/fix') &&
+      !contains(github.event.comment.body, '/copilot_fix') &&
+      !contains(github.event.comment.body, '/claude_fix')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Check API Key
-        run: |
-          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
-            echo "::error::GEMINI_API_KEY is not set. Please add it to repository secrets."
-            exit 1
-          fi
 
       - name: Get PR diff
         id: diff
@@ -351,51 +209,644 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate fix suggestions with Gemini
+      - name: Generate fix with Gemini
         id: fix
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "result=⚠️ GEMINI_API_KEY が設定されていません" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          RESPONSE=$(curl -s -w "\n%{http_code}" "https://generativelanguage.googleapis.com/v1beta/models/${{ env.GEMINI_MODEL }}:generateContent?key=$GEMINI_API_KEY" \
+            -H 'Content-Type: application/json' \
+            -d @- <<'PAYLOAD'
+          {"contents":[{"parts":[{"text":"以下のコード差分を分析し、具体的な修正提案を行ってください。\n\n## 出力形式\n各問題について以下の形式で出力:\n\n### 問題 1: [問題のタイトル]\n**ファイル**: `path/to/file.ts`\n**問題点**: 問題の説明\n**修正前**:\n```typescript\n// 現在のコード\n```\n**修正後**:\n```typescript\n// 修正したコード\n```\n\n---\n\n## コード差分\n```diff\n${{ steps.diff.outputs.diff }}\n```"}]}],"generationConfig":{"temperature":0.2,"maxOutputTokens":4096}}
+          PAYLOAD
+          )
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          if [ "$HTTP_CODE" != "200" ]; then
+            ERROR=$(echo "$BODY" | jq -r '.error.message // "Unknown error"')
+            echo "result=⚠️ API Error (HTTP $HTTP_CODE): $ERROR" >> $GITHUB_OUTPUT
+          else
+            RESULT=$(echo "$BODY" | jq -r '.candidates[0].content.parts[0].text // "修正提案を生成できませんでした"')
+            echo "result<<EOF" >> $GITHUB_OUTPUT
+            echo "$RESULT" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `## 🔧 Fix Suggestions\n\n${{ steps.fix.outputs.result }}\n\n---\n*Powered by ${{ env.GEMINI_MODEL_DISPLAY }}*`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+
+  # ============================================
+  # GitHub Copilot Commands: /copilot_review, /copilot_summary, /copilot_fix
+  # ============================================
+  copilot-review:
+    if: |
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/copilot_review')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          gh pr diff ${{ github.event.issue.number }} > diff.txt
+          DIFF=$(cat diff.txt | head -c 30000)
+          echo "diff<<EOF" >> $GITHUB_OUTPUT
+          echo "$DIFF" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Review with GitHub Models
+        id: review
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            const diff = `${{ steps.diff.outputs.diff }}`;
+            const prompt = `あなたは経験豊富なシニアエンジニアです。以下のコード差分をレビューしてください。
+
+## レビュー観点
+1. バグや潜在的な問題
+2. セキュリティリスク
+3. パフォーマンス改善点
+4. コードの可読性・保守性
+5. ベストプラクティスへの準拠
+
+## 出力形式
+- 問題がある場合は具体的なファイル名と行を示してください
+- 改善案があれば具体的なコード例を提示してください
+- 問題がなければ「LGTM」と回答してください
+
+## コード差分
+\`\`\`diff
+${diff}
+\`\`\``;
+
+            try {
+              const response = await fetch('https://models.github.ai/inference/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  model: '${{ env.GITHUB_MODEL }}',
+                  messages: [{ role: 'user', content: prompt }],
+                  max_tokens: 4096
+                })
+              });
+
+              if (!response.ok) {
+                const error = await response.text();
+                core.setOutput('result', `⚠️ API Error (HTTP ${response.status}): ${error}`);
+                return;
+              }
+
+              const data = await response.json();
+              core.setOutput('result', data.choices[0].message.content);
+            } catch (error) {
+              core.setOutput('result', `⚠️ Error: ${error.message}`);
+            }
+
+      - name: Post comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `## 🤖 AI Code Review\n\n${{ steps.review.outputs.result }}\n\n---\n*Powered by ${{ env.GITHUB_MODEL_DISPLAY }}*`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+
+  copilot-summary:
+    if: |
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/copilot_summary')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR details
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            const commits = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            return {
+              title: pr.data.title,
+              body: pr.data.body || '',
+              commits: commits.data.map(c => c.commit.message).join('\n')
+            };
+
+      - name: Get changed files
+        id: files
+        run: |
+          gh pr diff ${{ github.event.issue.number }} --name-only > files.txt
+          FILES=$(cat files.txt)
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate summary with GitHub Models
+        id: summary
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            const prInfo = ${{ steps.pr.outputs.result }};
+            const files = `${{ steps.files.outputs.files }}`;
+            const prompt = `以下のPull Request情報から、簡潔で分かりやすいサマリーを日本語で作成してください。
+
+## 出力形式
+### 概要
+（1-2文で変更の目的を説明）
+
+### 主な変更点
+- 箇条書きで主要な変更を列挙
+
+### 影響範囲
+- 影響を受けるコンポーネントや機能
+
+### レビューポイント
+- レビュアーが特に確認すべき点
+
+---
+
+## PR情報
+タイトル: ${prInfo.title}
+
+説明:
+${prInfo.body}
+
+コミット:
+${prInfo.commits}
+
+変更ファイル:
+${files}`;
+
+            try {
+              const response = await fetch('https://models.github.ai/inference/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  model: '${{ env.GITHUB_MODEL }}',
+                  messages: [{ role: 'user', content: prompt }],
+                  max_tokens: 2048
+                })
+              });
+
+              if (!response.ok) {
+                const error = await response.text();
+                core.setOutput('result', `⚠️ API Error (HTTP ${response.status}): ${error}`);
+                return;
+              }
+
+              const data = await response.json();
+              core.setOutput('result', data.choices[0].message.content);
+            } catch (error) {
+              core.setOutput('result', `⚠️ Error: ${error.message}`);
+            }
+
+      - name: Post comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `## 📋 PR Summary\n\n${{ steps.summary.outputs.result }}\n\n---\n*Powered by ${{ env.GITHUB_MODEL_DISPLAY }}*`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+
+  copilot-fix:
+    if: |
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/copilot_fix')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          gh pr diff ${{ github.event.issue.number }} > diff.txt
+          DIFF=$(cat diff.txt | head -c 25000)
+          echo "diff<<EOF" >> $GITHUB_OUTPUT
+          echo "$DIFF" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate fix with GitHub Models
+        id: fix
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            const diff = `${{ steps.diff.outputs.diff }}`;
+            const prompt = `以下のコード差分を分析し、具体的な修正提案を行ってください。
+
+## 出力形式
+各問題について以下の形式で出力:
+
+### 問題 1: [問題のタイトル]
+**ファイル**: \`path/to/file.ts\`
+**問題点**: 問題の説明
+**修正前**:
+\`\`\`typescript
+// 現在のコード
+\`\`\`
+**修正後**:
+\`\`\`typescript
+// 修正したコード
+\`\`\`
+
+---
+
+## コード差分
+\`\`\`diff
+${diff}
+\`\`\``;
+
+            try {
+              const response = await fetch('https://models.github.ai/inference/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  model: '${{ env.GITHUB_MODEL }}',
+                  messages: [{ role: 'user', content: prompt }],
+                  max_tokens: 4096
+                })
+              });
+
+              if (!response.ok) {
+                const error = await response.text();
+                core.setOutput('result', `⚠️ API Error (HTTP ${response.status}): ${error}`);
+                return;
+              }
+
+              const data = await response.json();
+              core.setOutput('result', data.choices[0].message.content);
+            } catch (error) {
+              core.setOutput('result', `⚠️ Error: ${error.message}`);
+            }
+
+      - name: Post comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `## 🔧 Fix Suggestions\n\n${{ steps.fix.outputs.result }}\n\n---\n*Powered by ${{ env.GITHUB_MODEL_DISPLAY }}*`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+
+  # ============================================
+  # Claude Commands: /claude_review, /claude_summary, /claude_fix
+  # ============================================
+  claude-review:
+    if: |
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/claude_review')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            このPRのコード変更をレビューしてください。
+
+            ## レビュー観点
+            1. バグや潜在的な問題
+            2. セキュリティリスク
+            3. パフォーマンス改善点
+            4. コードの可読性・保守性
+            5. ベストプラクティスへの準拠
+
+            ## 出力形式
+            - 問題がある場合は具体的なファイル名と行を示してください
+            - 改善案があれば具体的なコード例を提示してください
+            - 問題がなければ「LGTM」と回答してください
+            - 日本語で回答してください
+          model: ${{ env.CLAUDE_MODEL }}
+          timeout_minutes: 10
+
+  claude-summary:
+    if: |
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/claude_summary')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude PR Summary
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            このPRの変更内容を要約してください。
+
+            ## 出力形式
+            ### 概要
+            （1-2文で変更の目的を説明）
+
+            ### 主な変更点
+            - 箇条書きで主要な変更を列挙
+
+            ### 影響範囲
+            - 影響を受けるコンポーネントや機能
+
+            ### レビューポイント
+            - レビュアーが特に確認すべき点
+
+            日本語で回答してください。
+          model: ${{ env.CLAUDE_MODEL }}
+          timeout_minutes: 10
+
+  claude-fix:
+    if: |
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/claude_fix')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Fix Suggestions
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            このPRのコード変更を分析し、具体的な修正提案を行ってください。
+
+            ## 出力形式
+            各問題について以下の形式で出力:
+
+            ### 問題 1: [問題のタイトル]
+            **ファイル**: `path/to/file.ts`
+            **問題点**: 問題の説明
+            **修正前**:
+            ```typescript
+            // 現在のコード
+            ```
+            **修正後**:
+            ```typescript
+            // 修正したコード
+            ```
+
+            日本語で回答してください。
+          model: ${{ env.CLAUDE_MODEL }}
+          timeout_minutes: 10
+
+  # ============================================
+  # PR作成時の自動サマリー（フォールバック付き）
+  # Gemini → GitHub Copilot → Claude の順で試行
+  # ============================================
+  auto-summary:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR details
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commits = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number
+            });
+            return {
+              title: context.payload.pull_request.title,
+              body: context.payload.pull_request.body || '',
+              commits: commits.data.map(c => c.commit.message).join('\n')
+            };
+
+      - name: Get changed files
+        id: files
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          FILES=$(git diff --name-status origin/${{ github.event.pull_request.base.ref }}..HEAD)
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # Step 1: Try Gemini
+      - name: Try Gemini
+        id: gemini
+        if: ${{ secrets.GEMINI_API_KEY != '' }}
+        continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           RESPONSE=$(curl -s -w "\n%{http_code}" "https://generativelanguage.googleapis.com/v1beta/models/${{ env.GEMINI_MODEL }}:generateContent?key=$GEMINI_API_KEY" \
             -H 'Content-Type: application/json' \
             -d @- <<'PAYLOAD'
-          {
-            "contents": [{
-              "parts": [{
-                "text": "以下のコード差分を分析し、具体的な修正提案を行ってください。\n\n## 出力形式\n各問題について以下の形式で出力:\n\n### 問題 1: [問題のタイトル]\n**ファイル**: `path/to/file.ts`\n**問題点**: 問題の説明\n**修正前**:\n```typescript\n// 現在のコード\n```\n**修正後**:\n```typescript\n// 修正したコード\n```\n\n---\n\n## コード差分\n```diff\n${{ steps.diff.outputs.diff }}\n```"
-              }]
-            }],
-            "generationConfig": {
-              "temperature": 0.2,
-              "maxOutputTokens": 4096
-            }
-          }
+          {"contents":[{"parts":[{"text":"以下のPull Request情報から、簡潔で分かりやすいサマリーを日本語で作成してください。\n\n## 出力形式\n### 概要\n（1-2文で変更の目的を説明）\n\n### 主な変更点\n- 箇条書きで主要な変更を列挙\n\n### 影響範囲\n- 影響を受けるコンポーネントや機能\n\n### レビューポイント\n- レビュアーが特に確認すべき点\n\n---\n\n## PR情報\nタイトル: ${{ fromJson(steps.pr.outputs.result).title }}\n\n説明:\n${{ fromJson(steps.pr.outputs.result).body }}\n\nコミット:\n${{ fromJson(steps.pr.outputs.result).commits }}\n\n変更ファイル:\n${{ steps.files.outputs.files }}"}]}],"generationConfig":{"temperature":0.3,"maxOutputTokens":2048}}
           PAYLOAD
           )
-
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
-
-          if [ "$HTTP_CODE" != "200" ]; then
-            ERROR=$(echo "$BODY" | jq -r '.error.message // "Unknown error"')
-            echo "fix<<EOF" >> $GITHUB_OUTPUT
-            echo "⚠️ API Error (HTTP $HTTP_CODE): $ERROR" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            FIX=$(echo "$BODY" | jq -r '.candidates[0].content.parts[0].text // "修正提案を生成できませんでした"')
-            echo "fix<<EOF" >> $GITHUB_OUTPUT
-            echo "$FIX" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+          if [ "$HTTP_CODE" = "200" ]; then
+            RESULT=$(echo "$BODY" | jq -r '.candidates[0].content.parts[0].text // ""')
+            if [ -n "$RESULT" ] && [ "$RESULT" != "null" ]; then
+              echo "success=true" >> $GITHUB_OUTPUT
+              echo "result<<EOF" >> $GITHUB_OUTPUT
+              echo "$RESULT" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+              echo "provider=${{ env.GEMINI_MODEL_DISPLAY }}" >> $GITHUB_OUTPUT
+              exit 0
+            fi
           fi
+          echo "success=false" >> $GITHUB_OUTPUT
 
-      - name: Post fix suggestions
+      # Step 2: Try GitHub Models (if Gemini failed)
+      - name: Try GitHub Models
+        id: github_models
+        if: steps.gemini.outputs.success != 'true'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            const prInfo = ${{ steps.pr.outputs.result }};
+            const files = `${{ steps.files.outputs.files }}`;
+            const prompt = `以下のPull Request情報から、簡潔で分かりやすいサマリーを日本語で作成してください。
+
+## 出力形式
+### 概要
+（1-2文で変更の目的を説明）
+
+### 主な変更点
+- 箇条書きで主要な変更を列挙
+
+### 影響範囲
+- 影響を受けるコンポーネントや機能
+
+### レビューポイント
+- レビュアーが特に確認すべき点
+
+---
+
+## PR情報
+タイトル: ${prInfo.title}
+
+説明:
+${prInfo.body}
+
+コミット:
+${prInfo.commits}
+
+変更ファイル:
+${files}`;
+
+            try {
+              const response = await fetch('https://models.github.ai/inference/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  model: '${{ env.GITHUB_MODEL }}',
+                  messages: [{ role: 'user', content: prompt }],
+                  max_tokens: 2048
+                })
+              });
+
+              if (response.ok) {
+                const data = await response.json();
+                core.setOutput('success', 'true');
+                core.setOutput('result', data.choices[0].message.content);
+                core.setOutput('provider', '${{ env.GITHUB_MODEL_DISPLAY }}');
+                return;
+              }
+            } catch (error) {
+              console.log('GitHub Models failed:', error.message);
+            }
+            core.setOutput('success', 'false');
+
+      # Step 3: Try Claude (if both failed)
+      - name: Try Claude
+        id: claude
+        if: steps.gemini.outputs.success != 'true' && steps.github_models.outputs.success != 'true' && secrets.ANTHROPIC_API_KEY != ''
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" "https://api.anthropic.com/v1/messages" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -d @- <<'PAYLOAD'
+          {"model":"${{ env.CLAUDE_MODEL }}","max_tokens":2048,"messages":[{"role":"user","content":"以下のPull Request情報から、簡潔で分かりやすいサマリーを日本語で作成してください。\n\n## 出力形式\n### 概要\n（1-2文で変更の目的を説明）\n\n### 主な変更点\n- 箇条書きで主要な変更を列挙\n\n### 影響範囲\n- 影響を受けるコンポーネントや機能\n\n### レビューポイント\n- レビュアーが特に確認すべき点\n\n---\n\n## PR情報\nタイトル: ${{ fromJson(steps.pr.outputs.result).title }}\n\n説明:\n${{ fromJson(steps.pr.outputs.result).body }}\n\nコミット:\n${{ fromJson(steps.pr.outputs.result).commits }}\n\n変更ファイル:\n${{ steps.files.outputs.files }}"}]}
+          PAYLOAD
+          )
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          if [ "$HTTP_CODE" = "200" ]; then
+            RESULT=$(echo "$BODY" | jq -r '.content[0].text // ""')
+            if [ -n "$RESULT" ] && [ "$RESULT" != "null" ]; then
+              echo "success=true" >> $GITHUB_OUTPUT
+              echo "result<<EOF" >> $GITHUB_OUTPUT
+              echo "$RESULT" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+              echo "provider=${{ env.CLAUDE_MODEL_DISPLAY }}" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+          echo "success=false" >> $GITHUB_OUTPUT
+
+      # Post the result
+      - name: Post summary comment
         uses: actions/github-script@v7
         with:
           script: |
-            const fix = `## 🔧 Fix Suggestions (Gemini)\n\n${{ steps.fix.outputs.fix }}\n\n---\n*Powered by ${{ env.GEMINI_MODEL_DISPLAY }}*`;
+            let result = '';
+            let provider = '';
+
+            if ('${{ steps.gemini.outputs.success }}' === 'true') {
+              result = `${{ steps.gemini.outputs.result }}`;
+              provider = '${{ steps.gemini.outputs.provider }}';
+            } else if ('${{ steps.github_models.outputs.success }}' === 'true') {
+              result = `${{ steps.github_models.outputs.result }}`;
+              provider = '${{ steps.github_models.outputs.provider }}';
+            } else if ('${{ steps.claude.outputs.success }}' === 'true') {
+              result = `${{ steps.claude.outputs.result }}`;
+              provider = '${{ steps.claude.outputs.provider }}';
+            } else {
+              result = '⚠️ すべてのAIプロバイダーでサマリー生成に失敗しました。\n\n以下のシークレットが設定されているか確認してください:\n- `GEMINI_API_KEY`\n- `ANTHROPIC_API_KEY`\n\nGitHub Modelsは `GITHUB_TOKEN` で自動的に利用可能です。';
+              provider = 'N/A';
+            }
+
+            const body = `## 📋 PR Summary\n\n${result}\n\n---\n*Powered by ${provider}*`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: fix
+              issue_number: context.payload.pull_request.number,
+              body
             });
