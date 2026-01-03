@@ -63,12 +63,12 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
 
         try {
             if (useDatabase && user) {
-                // Supabaseから取得（作成日時の昇順で取得、古いものが左、新しいものが右）
+                // Supabaseから取得（display_orderの昇順で取得）
                 const { data, error: fetchError } = await supabase
                     .from('memos')
                     .select('*')
                     .eq('user_id', user.id)
-                    .order('created_at', { ascending: true })
+                    .order('display_order', { ascending: true })
 
                 if (fetchError) throw fetchError
 
@@ -356,17 +356,35 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
 
     // メモの並び替え
     const reorderMemos = useCallback(
-        (reorderedMemos: MemoData[]) => {
+        async (reorderedMemos: MemoData[]) => {
+            const originalMemos = memos
             setMemos(reorderedMemos)
 
-            // ローカルストレージに保存
-            if (!useDatabase || !user) {
+            if (useDatabase && user) {
+                // Supabaseに順序を保存
+                try {
+                    const memoIds = reorderedMemos.map((memo) => memo.id)
+                    const { error: reorderError } = await supabase.rpc(
+                        'reorder_memos',
+                        {
+                            p_user_id: user.id,
+                            p_memo_ids: memoIds,
+                        }
+                    )
+                    if (reorderError) {
+                        throw reorderError
+                    }
+                } catch (err: any) {
+                    console.error('Error reordering memos:', err)
+                    setError('メモの順序の保存に失敗しました。')
+                    setMemos(originalMemos)
+                }
+            } else {
+                // ローカルストレージに保存
                 saveLocalMemos(reorderedMemos)
             }
-            // Note: Supabaseモードでは順序はcreated_atで決まるため、
-            // 順序の永続化が必要な場合はorder_indexカラムを追加する必要があります
         },
-        [useDatabase, user]
+        [memos, useDatabase, user]
     )
 
     return {
