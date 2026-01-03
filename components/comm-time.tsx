@@ -53,6 +53,7 @@ import { AuthDialog } from "@/components/auth-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useSupabaseTodos } from "@/hooks/useSupabaseTodos";
 import { useSupabaseTags } from "@/hooks/useSupabaseTags";
+import { useSupabasePomodoroTask } from "@/hooks/useSupabasePomodoroTask";
 // import { useSupabaseMemos } from "@/hooks/useSupabaseMemos";
 import { useMultipleMemos } from "@/hooks/useMultipleMemos";
 import { MemoSwiper } from "@/components/memo-swiper";
@@ -236,6 +237,7 @@ export function CommTimeComponent() {
   // メモ・TODOは共通化されているため、meeting/pomodoroの区別なし
   const sharedSupabaseTodos = useSupabaseTodos(useDatabase ? user : null);
   // const sharedSupabaseMemos = useSupabaseMemos(useDatabase ? user : null);
+  const supabasePomodoroTask = useSupabasePomodoroTask(useDatabase ? user : null);
 
   // 複数メモ管理フック
   const multipleMemos = useMultipleMemos(user, useDatabase);
@@ -468,7 +470,9 @@ export function CommTimeComponent() {
 
   // ポモドーロで取り組む現在のタスク
   const [currentPomodoroTask, setCurrentPomodoroTask] = useState("");
+  const [currentPomodoroTaskId, setCurrentPomodoroTaskId] = useState<string | null>(null);
   const [isEditingPomodoroTask, setIsEditingPomodoroTask] = useState(false);
+  const [showTodoPicker, setShowTodoPicker] = useState(false);
   const pomodoroTaskInputRef = useRef<HTMLInputElement>(null);
 
   // 初期値設定用のstate
@@ -734,6 +738,19 @@ export function CommTimeComponent() {
     user,
     sharedSupabaseTodos.todos,
     sharedSupabaseTodos.loading,
+  ]);
+
+  // ポモドーロタスクのSupabase同期
+  useEffect(() => {
+    if (useDatabase && user && !supabasePomodoroTask.loading) {
+      setCurrentPomodoroTask(supabasePomodoroTask.task.taskText);
+      setCurrentPomodoroTaskId(supabasePomodoroTask.task.todoId);
+    }
+  }, [
+    useDatabase,
+    user,
+    supabasePomodoroTask.task,
+    supabasePomodoroTask.loading,
   ]);
 
   /*
@@ -1576,6 +1593,27 @@ export function CommTimeComponent() {
     },
     [useDatabase, user, sharedSupabaseTodos]
   );
+
+  // ポモドーロタスク更新関数（Supabase連携対応）
+  const updatePomodoroTask = useCallback(
+    (taskText: string, todoId: string | null = null) => {
+      setCurrentPomodoroTask(taskText);
+      setCurrentPomodoroTaskId(todoId);
+      if (useDatabase && user) {
+        supabasePomodoroTask.updateTask(taskText, todoId);
+      }
+    },
+    [useDatabase, user, supabasePomodoroTask]
+  );
+
+  // ポモドーロタスククリア関数
+  const clearPomodoroTask = useCallback(() => {
+    setCurrentPomodoroTask("");
+    setCurrentPomodoroTaskId(null);
+    if (useDatabase && user) {
+      supabasePomodoroTask.clearTask();
+    }
+  }, [useDatabase, user, supabasePomodoroTask]);
 
   // フィルタリングされたTODOを取得
   const filteredTodos = React.useMemo(() => {
@@ -2685,7 +2723,7 @@ export function CommTimeComponent() {
                                 (e as React.KeyboardEvent & { keyCode?: number }).keyCode === 229
                               ) return;
                               if (e.key === 'Enter') {
-                                setCurrentPomodoroTask(pomodoroTaskInputRef.current?.value || '');
+                                updatePomodoroTask(pomodoroTaskInputRef.current?.value || '', null);
                                 setIsEditingPomodoroTask(false);
                               } else if (e.key === 'Escape') {
                                 setIsEditingPomodoroTask(false);
@@ -2693,14 +2731,14 @@ export function CommTimeComponent() {
                             }}
                             autoFocus
                             onBlur={() => {
-                              setCurrentPomodoroTask(pomodoroTaskInputRef.current?.value || '');
+                              updatePomodoroTask(pomodoroTaskInputRef.current?.value || '', null);
                               setIsEditingPomodoroTask(false);
                             }}
                           />
                           <button
                             type="button"
                             onClick={() => {
-                              setCurrentPomodoroTask(pomodoroTaskInputRef.current?.value || '');
+                              updatePomodoroTask(pomodoroTaskInputRef.current?.value || '', null);
                               setIsEditingPomodoroTask(false);
                             }}
                             className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
@@ -2710,14 +2748,38 @@ export function CommTimeComponent() {
                           </button>
                         </div>
                       ) : (
-                        <div
-                          className="cursor-pointer group p-2 rounded-lg hover:bg-white/10 transition-colors w-full"
-                          onClick={() => setIsEditingPomodoroTask(true)}
-                        >
-                          <h3 className="text-lg font-semibold text-white/90 break-words min-h-[28px]">
-                            {currentPomodoroTask || "集中するタスクを設定..."}
-                            <Edit className="w-4 h-4 inline-block ml-2 text-white/50 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </h3>
+                        <div className="flex flex-col items-center gap-2 w-full">
+                          <div
+                            className="cursor-pointer group p-2 rounded-lg hover:bg-white/10 transition-colors w-full"
+                            onClick={() => setIsEditingPomodoroTask(true)}
+                          >
+                            <h3 className="text-lg font-semibold text-white/90 break-words min-h-[28px]">
+                              {currentPomodoroTask || "集中するタスクを設定..."}
+                              <Edit className="w-4 h-4 inline-block ml-2 text-white/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </h3>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowTodoPicker(true)}
+                              className="px-3 py-1 text-xs bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors flex items-center gap-1"
+                              title="TODOから選択"
+                            >
+                              <List className="w-3 h-3" />
+                              TODO選択
+                            </button>
+                            {currentPomodoroTask && (
+                              <button
+                                type="button"
+                                onClick={clearPomodoroTask}
+                                className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 text-white/70 rounded-lg transition-colors flex items-center gap-1"
+                                title="タスクをクリア"
+                              >
+                                <X className="w-3 h-3" />
+                                クリア
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )
                     ) : (
@@ -3757,7 +3819,7 @@ export function CommTimeComponent() {
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        setCurrentPomodoroTask(todo.text);
+                                        updatePomodoroTask(todo.text, todo.id);
                                         setActiveTab("pomodoro");
                                         if (!isPomodoroRunning || pomodoroState !== 'work') {
                                           setPomodoroState('work');
@@ -4515,6 +4577,80 @@ export function CommTimeComponent() {
             setUseDatabase(true);
           }}
         />
+
+        {/* ポモドーロTODO選択モーダル */}
+        {showTodoPicker && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={() => setShowTodoPicker(false)}
+            />
+            <div
+              className={`relative w-full max-w-md max-h-[70vh] rounded-2xl shadow-2xl overflow-hidden ${
+                darkMode ? "bg-gray-800" : "bg-white"
+              }`}
+            >
+              <div
+                className={`flex items-center justify-between px-4 py-3 border-b ${
+                  darkMode ? "border-gray-700" : "border-gray-200"
+                }`}
+              >
+                <h3 className={`font-semibold ${darkMode ? "text-white" : "text-gray-800"}`}>
+                  集中するTODOを選択
+                </h3>
+                <button
+                  onClick={() => setShowTodoPicker(false)}
+                  className={`p-1 rounded-full transition-colors ${
+                    darkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="overflow-y-auto max-h-[50vh] p-2">
+                {sharedTodos.filter(t => !t.isCompleted).length === 0 ? (
+                  <p className={`text-center py-8 text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                    未完了のTODOがありません
+                  </p>
+                ) : (
+                  <div className="space-y-1">
+                    {sharedTodos
+                      .filter(t => !t.isCompleted)
+                      .map((todo) => (
+                        <button
+                          key={todo.id}
+                          onClick={() => {
+                            updatePomodoroTask(todo.text, todo.id);
+                            setShowTodoPicker(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                            currentPomodoroTaskId === todo.id
+                              ? darkMode
+                                ? "bg-indigo-600 text-white"
+                                : "bg-indigo-500 text-white"
+                              : darkMode
+                              ? "hover:bg-gray-700 text-gray-200"
+                              : "hover:bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          <p className="text-sm truncate">{todo.text}</p>
+                          {todo.dueDate && (
+                            <p className={`text-xs mt-0.5 ${
+                              currentPomodoroTaskId === todo.id
+                                ? "text-white/70"
+                                : darkMode ? "text-gray-400" : "text-gray-500"
+                            }`}>
+                              締切: {todo.dueDate} {todo.dueTime || ""}
+                            </p>
+                          )}
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* カンバンモーダル */}
         {showKanbanModal && (
