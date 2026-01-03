@@ -714,6 +714,7 @@ export function CommTimeComponent() {
     trashedMemos,
     localTags,
     viewMode,
+    currentPomodoroTask,
   ]);
 
   // Supabaseデータの同期（データベースモード有効時）
@@ -1032,46 +1033,36 @@ export function CommTimeComponent() {
     localStorage.setItem("deadlineAlertMinutes", String(deadlineAlertMinutes));
   }, [deadlineAlertEnabled, deadlineAlertMinutes, mounted]);
 
-  // 締切アラートのチェック（1分ごと）
+  // 締切アラートのチェック（currentTimeの分が変わった時のみ実行）
+  const lastCheckedMinuteRef = useRef<number>(-1);
   useEffect(() => {
-    if (!deadlineAlertEnabled) return;
+    if (!deadlineAlertEnabled || !currentTime) return;
 
-    const checkDeadlines = () => {
-      const now = new Date();
-      const alertThreshold = deadlineAlertMinutes * 60 * 1000; // ミリ秒に変換
+    const currentMinute = currentTime.getMinutes();
+    // 分が変わっていなければスキップ
+    if (lastCheckedMinuteRef.current === currentMinute) return;
+    lastCheckedMinuteRef.current = currentMinute;
 
-      sharedTodos.forEach((todo) => {
-        // 完了済み、期限なし、既にアラート済みはスキップ
-        if (todo.isCompleted || !todo.dueDate || alertedTodoIdsRef.current.has(todo.id)) {
-          return;
-        }
+    const alertThreshold = deadlineAlertMinutes * 60 * 1000;
 
-        const deadline = new Date(
-          `${todo.dueDate}T${todo.dueTime || "23:59"}`
-        );
-        const timeUntilDeadline = deadline.getTime() - now.getTime();
+    sharedTodos.forEach((todo) => {
+      if (todo.isCompleted || !todo.dueDate || alertedTodoIdsRef.current.has(todo.id)) {
+        return;
+      }
 
-        // 締切を過ぎている場合はスキップ
-        if (timeUntilDeadline < 0) return;
+      const deadline = new Date(`${todo.dueDate}T${todo.dueTime || "23:59"}`);
+      const timeUntilDeadline = deadline.getTime() - currentTime.getTime();
 
-        // アラート時間内の場合、アラームを鳴らす
-        if (timeUntilDeadline <= alertThreshold) {
-          const minutesLeft = Math.ceil(timeUntilDeadline / (60 * 1000));
-          const message = `「${todo.text.slice(0, 20)}${todo.text.length > 20 ? "..." : ""}」の締切まであと${minutesLeft}分です`;
+      if (timeUntilDeadline < 0) return;
 
-          playAlarm(meetingAlarmSettings, message);
-          alertedTodoIdsRef.current.add(todo.id);
-        }
-      });
-    };
-
-    // 初回チェック
-    checkDeadlines();
-
-    // 1分ごとにチェック
-    const timer = setInterval(checkDeadlines, 60000);
-    return () => clearInterval(timer);
-  }, [deadlineAlertEnabled, deadlineAlertMinutes, sharedTodos, playAlarm, meetingAlarmSettings]);
+      if (timeUntilDeadline <= alertThreshold) {
+        const minutesLeft = Math.ceil(timeUntilDeadline / (60 * 1000));
+        const message = `「${todo.text.slice(0, 20)}${todo.text.length > 20 ? "..." : ""}」の締切まであと${minutesLeft}分です`;
+        playAlarm(meetingAlarmSettings, message);
+        alertedTodoIdsRef.current.add(todo.id);
+      }
+    });
+  }, [deadlineAlertEnabled, deadlineAlertMinutes, sharedTodos, currentTime, playAlarm, meetingAlarmSettings]);
 
   // チクタク音を再生する関数（モバイル対応）
   const playTickSound = useCallback(async () => {
@@ -2638,7 +2629,7 @@ export function CommTimeComponent() {
             )}
 
             {activeTab === "pomodoro" && (
-              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 border border-white/20 dark:border-gray-700/20">
+              <div id="pomodoro-timer-section" className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl p-4 sm:p-6 lg:p-8 border border-white/20 dark:border-gray-700/20">
                 <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                   ポモドーロタイマー
                 </h2>
@@ -2666,6 +2657,62 @@ export function CommTimeComponent() {
                   <div className="text-xl sm:text-2xl font-semibold text-center text-white/90 mb-2">
                     {pomodoroState === "work" ? "🎯 作業時間" : "☕ 休憩時間"}
                   </div>
+
+                  {/* 現在のタスク表示 */}
+                  <div className="mt-4 text-center h-14 flex items-center justify-center">
+                    {pomodoroState === 'work' ? (
+                      isEditingPomodoroTask ? (
+                        <div className="flex gap-2 justify-center items-center">
+                          <input
+                            ref={pomodoroTaskInputRef}
+                            type="text"
+                            defaultValue={currentPomodoroTask}
+                            className="px-3 py-1 border border-gray-300 dark:border-gray-600 bg-white/80 dark:bg-gray-800/80 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-400 w-64"
+                            placeholder="現在のタスクを入力..."
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                setCurrentPomodoroTask(pomodoroTaskInputRef.current?.value || '');
+                                setIsEditingPomodoroTask(false);
+                              } else if (e.key === 'Escape') {
+                                setIsEditingPomodoroTask(false);
+                              }
+                            }}
+                            autoFocus
+                            onBlur={() => {
+                              setCurrentPomodoroTask(pomodoroTaskInputRef.current?.value || '');
+                              setIsEditingPomodoroTask(false);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCurrentPomodoroTask(pomodoroTaskInputRef.current?.value || '');
+                              setIsEditingPomodoroTask(false);
+                            }}
+                            className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                            aria-label="保存"
+                          >
+                            <Save className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div
+                          className="cursor-pointer group p-2 rounded-lg hover:bg-white/10 transition-colors w-full"
+                          onClick={() => setIsEditingPomodoroTask(true)}
+                        >
+                          <h3 className="text-lg font-semibold text-white/90 break-words min-h-[28px]">
+                            {currentPomodoroTask || "集中するタスクを設定..."}
+                            <Edit className="w-4 h-4 inline-block ml-2 text-white/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </h3>
+                        </div>
+                      )
+                    ) : (
+                      <h3 className="text-lg font-semibold text-white/90">
+                        リフレッシュしましょう！
+                      </h3>
+                    )}
+                  </div>
+                  
                   <div className="text-base sm:text-lg text-center text-white/80 font-medium">
                     サイクル: {pomodoroCycles} /{" "}
                     {pomodoroSettings.infiniteMode
@@ -3316,15 +3363,16 @@ export function CommTimeComponent() {
                                     }}
                                     onCompositionEnd={() => {
                                       // IME変換確定後のEnterキーによる誤送信を防ぐため、遅延してフラグをリセット
-                                      requestAnimationFrame(() => {
+                                      setTimeout(() => {
                                         isComposingRef.current = false;
-                                      });
+                                      }, 50);
                                     }}
                                     onKeyDown={(e) => {
                                       if (
                                         isComposingRef.current ||
                                         e.nativeEvent.isComposing ||
-                                        e.key === "Process"
+                                        e.key === "Process" ||
+                                        (e as React.KeyboardEvent & { keyCode?: number }).keyCode === 229
                                       )
                                         return;
                                       if (e.key === "Enter") {
@@ -3694,6 +3742,28 @@ export function CommTimeComponent() {
                                     </button>
                                     <button
                                       type="button"
+                                      onClick={() => {
+                                        setCurrentPomodoroTask(todo.text);
+                                        setActiveTab("pomodoro");
+                                        if (!isPomodoroRunning || pomodoroState !== 'work') {
+                                          setPomodoroState('work');
+                                          setPomodoroElapsedTime(0);
+                                          setPomodoroStartTime(new Date());
+                                          setIsPomodoroRunning(true);
+                                        }
+                                        // スムーズスクロールでタイマー表示位置へ
+                                        const timerElement = document.getElementById('pomodoro-timer-section');
+                                        if (timerElement) {
+                                          timerElement.scrollIntoView({ behavior: 'smooth' });
+                                        }
+                                      }}
+                                      className="p-1 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/50 rounded transition-colors"
+                                      title="このタスクでポモドーロを開始"
+                                    >
+                                      <Timer className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
                                       onClick={() =>
                                         removeTodo(
                                           todo.id,
@@ -3728,16 +3798,17 @@ export function CommTimeComponent() {
                   }}
                   onCompositionEnd={() => {
                     // IME変換確定後のEnterキーによる誤送信を防ぐため、遅延してフラグをリセット
-                    requestAnimationFrame(() => {
+                    setTimeout(() => {
                       isComposingRef.current = false;
-                    });
+                    }, 50);
                   }}
                   onKeyDown={(e) => {
                     // 日本語入力（IME）の変換中はスキップ
                     if (
                       isComposingRef.current ||
                       e.nativeEvent.isComposing ||
-                      e.key === "Process"
+                      e.key === "Process" ||
+                      (e as React.KeyboardEvent & { keyCode?: number }).keyCode === 229
                     )
                       return;
                     if (e.key === "Enter") {
