@@ -45,6 +45,7 @@ export function SearchModal({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const isComposingRef = useRef(false); // IME変換中フラグ
 
   // モーダルが開いたらフォーカス
   useEffect(() => {
@@ -134,6 +135,15 @@ export function SearchModal({
 
   // キーボードナビゲーション
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // IME変換中は無視
+    if (
+      isComposingRef.current ||
+      e.nativeEvent.isComposing ||
+      (e as React.KeyboardEvent & { keyCode?: number }).keyCode === 229
+    ) {
+      return;
+    }
+
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setSelectedIndex((prev) => Math.min(prev + 1, results.length - 1));
@@ -203,6 +213,14 @@ export function SearchModal({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
+            onCompositionStart={() => {
+              isComposingRef.current = true;
+            }}
+            onCompositionEnd={() => {
+              setTimeout(() => {
+                isComposingRef.current = false;
+              }, 50);
+            }}
             placeholder="TODO・メモを検索..."
             className={`flex-1 bg-transparent outline-none text-base ${
               darkMode ? "text-white placeholder-gray-500" : "text-gray-900 placeholder-gray-400"
