@@ -65,6 +65,7 @@ import { KanbanStatusManager } from "@/components/kanban-status-manager";
 import { FilterPanel } from "@/components/filter-panel";
 import { TodoEditDialog } from "@/components/todo-edit-dialog";
 import { AIChat } from "@/components/ai-chat";
+import { SearchModal, type SearchResult } from "@/components/search-modal";
 import { useKanbanStatuses } from "@/hooks/useKanbanStatuses";
 import {
   type Tag,
@@ -473,6 +474,8 @@ export function CommTimeComponent() {
   const [currentPomodoroTaskId, setCurrentPomodoroTaskId] = useState<string | null>(null);
   const [isEditingPomodoroTask, setIsEditingPomodoroTask] = useState(false);
   const [showTodoPicker, setShowTodoPicker] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [highlightedTodoId, setHighlightedTodoId] = useState<string | null>(null);
   const pomodoroTaskInputRef = useRef<HTMLInputElement>(null);
 
   // 初期値設定用のstate
@@ -1042,6 +1045,47 @@ export function CommTimeComponent() {
     window.addEventListener("keydown", handleEscKey);
     return () => window.removeEventListener("keydown", handleEscKey);
   }, [showKanbanModal]);
+
+  // Cmd+K / Ctrl+K で検索モーダルを開く
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setShowSearchModal(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // 検索結果選択時のハンドラ
+  const handleSearchResultSelect = useCallback(
+    (result: SearchResult) => {
+      if (result.type === "todo") {
+        // TODOタブに移動し、該当TODOをハイライト
+        setActiveTab("meeting");
+        setHighlightedTodoId(result.id);
+        // 3秒後にハイライト解除
+        setTimeout(() => setHighlightedTodoId(null), 3000);
+        // 該当TODOにスクロール
+        setTimeout(() => {
+          const todoElement = document.getElementById(`todo-${result.id}`);
+          if (todoElement) {
+            todoElement.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }, 100);
+      } else if (result.type === "memo") {
+        // メモタブに移動
+        setActiveTab("meeting");
+        if (result.memoIndex !== undefined) {
+          // メモのインデックスに移動
+          handleMemoIndexChange(result.memoIndex);
+        }
+      }
+    },
+    [handleMemoIndexChange]
+  );
 
   // 締切アラート設定の保存
   useEffect(() => {
@@ -3514,6 +3558,7 @@ export function CommTimeComponent() {
                         >
                           {(provided, snapshot) => (
                             <li
+                              id={`todo-${todo.id}`}
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
@@ -3525,6 +3570,10 @@ export function CommTimeComponent() {
                                 snapshot.isDragging
                                   ? "shadow-2xl scale-105"
                                   : "shadow-sm hover:shadow-md"
+                              } ${
+                                highlightedTodoId === todo.id
+                                  ? "ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-gray-800 animate-pulse"
+                                  : ""
                               }`}
                             >
                               {editingTodoId === todo.id ? (
@@ -4887,6 +4936,16 @@ export function CommTimeComponent() {
             <MessageSquare size={28} />
           </button>
         )}
+
+        {/* 検索モーダル (Cmd+K) */}
+        <SearchModal
+          isOpen={showSearchModal}
+          onClose={() => setShowSearchModal(false)}
+          darkMode={darkMode}
+          todos={sharedTodos}
+          memos={multipleMemos.memos}
+          onSelectResult={handleSearchResultSelect}
+        />
       </div>
     </div>
   );
