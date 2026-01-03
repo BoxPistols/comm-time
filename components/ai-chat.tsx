@@ -564,7 +564,7 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
                             value={customEndpoint}
                             onChange={(e) => setCustomEndpoint(e.target.value)}
                             placeholder="http://localhost:1234/v1"
-                            className={`w-full mt-1 px-2 py-1 text-xs rounded border ${
+                            className={`w-full mt-1 px-2 py-1 text-base rounded border ${
                               darkMode
                                 ? "bg-gray-700 border-gray-600 text-white"
                                 : "bg-gray-50 border-gray-300 text-gray-900"
@@ -580,7 +580,7 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
                             value={customModelName}
                             onChange={(e) => setCustomModelName(e.target.value)}
                             placeholder="local-model"
-                            className={`w-full mt-1 px-2 py-1 text-xs rounded border ${
+                            className={`w-full mt-1 px-2 py-1 text-base rounded border ${
                               darkMode
                                 ? "bg-gray-700 border-gray-600 text-white"
                                 : "bg-gray-50 border-gray-300 text-gray-900"
@@ -618,7 +618,7 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
               onCompositionEnd={handleCompositionEnd}
               placeholder="メッセージを入力..."
               rows={1}
-              className={`flex-1 resize-none rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+              className={`flex-1 resize-none rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 ${
                 darkMode
                   ? "bg-gray-800 text-white placeholder-gray-500 focus:ring-indigo-500 border border-gray-700"
                   : "bg-gray-100 text-gray-900 placeholder-gray-500 focus:ring-indigo-400 border border-gray-200"
