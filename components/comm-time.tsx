@@ -2072,22 +2072,34 @@ export function CommTimeComponent() {
   );
 
   // SSR時はローディング表示（Hydration error回避）
+  // CSSが読み込まれる前でも正しく表示されるようinline styleを使用
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
-        <div className="text-center">
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(to bottom right, #eef2ff, #faf5ff, #fdf2f8)',
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
           {/* タイマー風ローディングアニメーション */}
-          <div className="relative w-24 h-24 mx-auto mb-6">
-            {/* 外側の円（プログレスリング） */}
-            <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+          <div style={{ position: 'relative', width: 96, height: 96, margin: '0 auto 24px' }}>
+            <svg
+              width="96"
+              height="96"
+              viewBox="0 0 100 100"
+              style={{ transform: 'rotate(-90deg)' }}
+            >
               <circle
                 cx="50"
                 cy="50"
                 r="45"
                 fill="none"
-                stroke="currentColor"
+                stroke="#e5e7eb"
                 strokeWidth="4"
-                className="text-gray-200 dark:text-gray-700"
               />
               <circle
                 cx="50"
@@ -2099,7 +2111,10 @@ export function CommTimeComponent() {
                 strokeLinecap="round"
                 strokeDasharray="283"
                 strokeDashoffset="70"
-                className="animate-[spin_2s_linear_infinite] origin-center"
+                style={{
+                  animation: 'spin 2s linear infinite',
+                  transformOrigin: 'center',
+                }}
               />
               <defs>
                 <linearGradient id="loadingGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -2109,25 +2124,60 @@ export function CommTimeComponent() {
                 </linearGradient>
               </defs>
             </svg>
-            {/* 中央のタイマーアイコン */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Timer className="w-10 h-10 text-indigo-600 dark:text-indigo-400 animate-pulse" />
+            {/* 中央のタイマーアイコン（インラインSVG） */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <svg
+                width="40"
+                height="40"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#6366f1"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ animation: 'pulse 2s ease-in-out infinite' }}
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
             </div>
           </div>
           {/* アプリ名 */}
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
+          <h1
+            style={{
+              fontSize: 24,
+              fontWeight: 'bold',
+              background: 'linear-gradient(to right, #6366f1, #a855f7, #ec4899)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              marginBottom: 8,
+            }}
+          >
             Comm Time
           </h1>
-          {/* ローディングドット */}
-          <div className="flex items-center justify-center gap-1.5 text-gray-500 dark:text-gray-400">
-            <span className="text-sm">Loading</span>
-            <span className="flex gap-0.5">
-              <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="w-1.5 h-1.5 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            </span>
-          </div>
+          {/* ローディングテキスト */}
+          <p style={{ color: '#6b7280', fontSize: 14 }}>Loading...</p>
         </div>
+        {/* アニメーション用のstyleタグ */}
+        <style>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+          }
+        `}</style>
       </div>
     );
   }
