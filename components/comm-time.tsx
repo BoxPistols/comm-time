@@ -2669,7 +2669,21 @@ export function CommTimeComponent() {
                             defaultValue={currentPomodoroTask}
                             className="px-3 py-1 border border-gray-300 dark:border-gray-600 bg-white/80 dark:bg-gray-800/80 rounded-lg text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-400 w-64"
                             placeholder="現在のタスクを入力..."
+                            onCompositionStart={() => {
+                              isComposingRef.current = true;
+                            }}
+                            onCompositionEnd={() => {
+                              setTimeout(() => {
+                                isComposingRef.current = false;
+                              }, 50);
+                            }}
                             onKeyDown={(e) => {
+                              if (
+                                isComposingRef.current ||
+                                e.nativeEvent.isComposing ||
+                                e.key === 'Process' ||
+                                (e as React.KeyboardEvent & { keyCode?: number }).keyCode === 229
+                              ) return;
                               if (e.key === 'Enter') {
                                 setCurrentPomodoroTask(pomodoroTaskInputRef.current?.value || '');
                                 setIsEditingPomodoroTask(false);

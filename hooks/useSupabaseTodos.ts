@@ -73,7 +73,6 @@ export function useSupabaseTodos(user: User | null) {
         .select("*")
         .eq("user_id", user.id)
         .order("order_index", { ascending: true })
-        .order("created_at", { ascending: false })
 
       if (error) throw error
 

@@ -11,9 +11,14 @@ const customJestConfig = {
   testEnvironment: 'jest-environment-jsdom',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
+    // Mock CSS and markdown packages
+    '\\.(css|less|scss|sass)$': '<rootDir>/__mocks__/styleMock.js',
+    'react-markdown': '<rootDir>/__mocks__/react-markdown.js',
+    'remark-gfm': '<rootDir>/__mocks__/remark-gfm.js',
   },
+  // Add ESM packages to the transform ignore pattern
   transformIgnorePatterns: [
-    '/node_modules/(?!swiper|ssr-window).+\\.(js|jsx|ts|tsx)$',
+    'node_modules/(?!(swiper|ssr-window|react-beautiful-dnd|@react-dnd|dnd-core)/)',
   ],
   testPathIgnorePatterns: ['/node_modules/', '/.next/', '/e2e/'],
   collectCoverageFrom: [
