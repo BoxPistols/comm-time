@@ -45,6 +45,10 @@ CREATE TRIGGER set_memo_display_order_trigger
   FOR EACH ROW
   EXECUTE FUNCTION set_memo_display_order();
 
+-- ソートパフォーマンス向上のためインデックスを追加
+CREATE INDEX IF NOT EXISTS idx_memos_user_display_order
+ON memos (user_id, display_order);
+
 -- メモの順序を更新するRPC関数（unnestで単一UPDATEに最適化）
 CREATE OR REPLACE FUNCTION reorder_memos(
   p_user_id UUID,
@@ -55,6 +59,11 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
+  -- セキュリティチェック: 呼び出し元のユーザーIDと一致することを確認
+  IF p_user_id != auth.uid() THEN
+    RAISE EXCEPTION 'Unauthorized: user_id does not match authenticated user';
+  END IF;
+
   -- unnest + WITH ORDINALITYで効率的に一括更新
   UPDATE memos AS m
   SET display_order = s.new_order
