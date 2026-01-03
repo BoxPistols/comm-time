@@ -2796,7 +2796,7 @@ export function CommTimeComponent() {
                   </div>
 
                   {/* 現在のタスク表示 */}
-                  <div className="mt-4 text-center h-14 flex items-center justify-center">
+                  <div className="mt-4 text-center min-h-14 flex flex-col items-center justify-center">
                     {pomodoroState === 'work' ? (
                       isEditingPomodoroTask ? (
                         <div className="flex gap-2 justify-center items-center">
@@ -2887,8 +2887,8 @@ export function CommTimeComponent() {
                       </h3>
                     )}
                   </div>
-                  
-                  <div className="text-base sm:text-lg text-center text-white/80 font-medium">
+
+                  <div className="mt-3 text-base sm:text-lg text-center text-white/80 font-medium">
                     サイクル: {pomodoroCycles} /{" "}
                     {pomodoroSettings.infiniteMode
                       ? "∞"
@@ -4694,9 +4694,17 @@ export function CommTimeComponent() {
                   darkMode ? "border-gray-700" : "border-gray-200"
                 }`}
               >
-                <h3 className={`font-semibold ${darkMode ? "text-white" : "text-gray-800"}`}>
-                  集中するTODOを選択
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className={`font-semibold ${darkMode ? "text-white" : "text-gray-800"}`}>
+                    集中するTODOを選択
+                  </h3>
+                  {(filterState.tags.length > 0 || filterState.priority !== "all" || filterState.importance !== "all" || filterState.kanbanStatus !== "all") && (
+                    <span className="px-2 py-0.5 text-xs bg-indigo-500 text-white rounded-full flex items-center gap-1">
+                      <Filter className="w-3 h-3" />
+                      絞込中
+                    </span>
+                  )}
+                </div>
                 <button
                   onClick={() => setShowTodoPicker(false)}
                   className={`p-1 rounded-full transition-colors ${
@@ -4707,13 +4715,15 @@ export function CommTimeComponent() {
                 </button>
               </div>
               <div className="overflow-y-auto max-h-[50vh] p-2">
-                {sharedTodos.filter(t => !t.isCompleted).length === 0 ? (
+                {filteredTodos.filter(t => !t.isCompleted).length === 0 ? (
                   <p className={`text-center py-8 text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
-                    未完了のTODOがありません
+                    {filterState.tags.length > 0 || filterState.priority !== "all" || filterState.importance !== "all" || filterState.kanbanStatus !== "all"
+                      ? "フィルター条件に一致するTODOがありません"
+                      : "未完了のTODOがありません"}
                   </p>
                 ) : (
                   <div className="space-y-1">
-                    {sharedTodos
+                    {filteredTodos
                       .filter(t => !t.isCompleted)
                       .map((todo) => (
                         <button
