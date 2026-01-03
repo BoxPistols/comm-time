@@ -4,7 +4,7 @@ on:
   # PRコメントでコマンド駆動
   issue_comment:
     types: [created]
-  # PR作成時に自動サマリー（オプション）
+  # PR作成時に自動サマリー
   pull_request:
     types: [opened, synchronize]
 
@@ -12,6 +12,9 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+
+env:
+  GEMINI_MODEL: gemini-2.0-flash
 
 jobs:
   # /review コマンドでコードレビュー
@@ -26,6 +29,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Check API Key
+        run: |
+          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
+            echo "::error::GEMINI_API_KEY is not set. Please add it to repository secrets."
+            exit 1
+          fi
 
       - name: Get PR details
         id: pr
@@ -57,13 +67,13 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$GEMINI_API_KEY" \
+          RESPONSE=$(curl -s -w "\n%{http_code}" "https://generativelanguage.googleapis.com/v1beta/models/${{ env.GEMINI_MODEL }}:generateContent?key=$GEMINI_API_KEY" \
             -H 'Content-Type: application/json' \
-            -d @- <<PAYLOAD
+            -d @- <<'PAYLOAD'
           {
             "contents": [{
               "parts": [{
-                "text": "あなたは経験豊富なシニアエンジニアです。以下のコード差分をレビューしてください。\n\n## レビュー観点\n1. バグや潜在的な問題\n2. セキュリティリスク\n3. パフォーマンス改善点\n4. コードの可読性・保守性\n5. ベストプラクティスへの準拠\n\n## 出力形式\n- 問題がある場合は具体的なファイル名と行を示してください\n- 改善案があれば具体的なコード例を提示してください\n- 問題がなければ「LGTM」と回答してください\n\n## コード差分\n\`\`\`diff\n${{ steps.diff.outputs.diff }}\n\`\`\`"
+                "text": "あなたは経験豊富なシニアエンジニアです。以下のコード差分をレビューしてください。\n\n## レビュー観点\n1. バグや潜在的な問題\n2. セキュリティリスク\n3. パフォーマンス改善点\n4. コードの可読性・保守性\n5. ベストプラクティスへの準拠\n\n## 出力形式\n- 問題がある場合は具体的なファイル名と行を示してください\n- 改善案があれば具体的なコード例を提示してください\n- 問題がなければ「LGTM」と回答してください\n\n## コード差分\n```diff\n${{ steps.diff.outputs.diff }}\n```"
               }]
             }],
             "generationConfig": {
@@ -74,16 +84,26 @@ jobs:
           PAYLOAD
           )
 
-          REVIEW=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // "レビューを生成できませんでした"')
-          echo "review<<EOF" >> $GITHUB_OUTPUT
-          echo "$REVIEW" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            ERROR=$(echo "$BODY" | jq -r '.error.message // "Unknown error"')
+            echo "review<<EOF" >> $GITHUB_OUTPUT
+            echo "⚠️ API Error (HTTP $HTTP_CODE): $ERROR" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            REVIEW=$(echo "$BODY" | jq -r '.candidates[0].content.parts[0].text // "レビューを生成できませんでした"')
+            echo "review<<EOF" >> $GITHUB_OUTPUT
+            echo "$REVIEW" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
 
       - name: Post review comment
         uses: actions/github-script@v7
         with:
           script: |
-            const review = `## 🤖 AI Code Review (Gemini)\n\n${{ steps.review.outputs.review }}\n\n---\n*Powered by Gemini 1.5 Flash*`;
+            const review = `## 🤖 AI Code Review (Gemini)\n\n${{ steps.review.outputs.review }}\n\n---\n*Powered by Gemini 2.0 Flash*`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -103,6 +123,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Check API Key
+        run: |
+          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
+            echo "::error::GEMINI_API_KEY is not set. Please add it to repository secrets."
+            exit 1
+          fi
 
       - name: Get PR details
         id: pr
@@ -142,9 +169,9 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$GEMINI_API_KEY" \
+          RESPONSE=$(curl -s -w "\n%{http_code}" "https://generativelanguage.googleapis.com/v1beta/models/${{ env.GEMINI_MODEL }}:generateContent?key=$GEMINI_API_KEY" \
             -H 'Content-Type: application/json' \
-            -d @- <<PAYLOAD
+            -d @- <<'PAYLOAD'
           {
             "contents": [{
               "parts": [{
@@ -159,16 +186,26 @@ jobs:
           PAYLOAD
           )
 
-          SUMMARY=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // "サマリーを生成できませんでした"')
-          echo "summary<<EOF" >> $GITHUB_OUTPUT
-          echo "$SUMMARY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            ERROR=$(echo "$BODY" | jq -r '.error.message // "Unknown error"')
+            echo "summary<<EOF" >> $GITHUB_OUTPUT
+            echo "⚠️ API Error (HTTP $HTTP_CODE): $ERROR" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            SUMMARY=$(echo "$BODY" | jq -r '.candidates[0].content.parts[0].text // "サマリーを生成できませんでした"')
+            echo "summary<<EOF" >> $GITHUB_OUTPUT
+            echo "$SUMMARY" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
 
       - name: Post summary comment
         uses: actions/github-script@v7
         with:
           script: |
-            const summary = `## 📋 PR Summary (Gemini)\n\n${{ steps.summary.outputs.summary }}\n\n---\n*Powered by Gemini 1.5 Flash*`;
+            const summary = `## 📋 PR Summary (Gemini)\n\n${{ steps.summary.outputs.summary }}\n\n---\n*Powered by Gemini 2.0 Flash*`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -186,7 +223,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check API Key
+        id: check_key
+        run: |
+          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
+            echo "has_key=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_key=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skip if no API key
+        if: steps.check_key.outputs.has_key == 'false'
+        run: |
+          echo "::warning::GEMINI_API_KEY is not set. Skipping auto-summary."
+
       - name: Get PR details
+        if: steps.check_key.outputs.has_key == 'true'
         id: pr
         uses: actions/github-script@v7
         with:
@@ -206,6 +258,7 @@ jobs:
             };
 
       - name: Get changed files
+        if: steps.check_key.outputs.has_key == 'true'
         id: files
         run: |
           git fetch origin ${{ github.event.pull_request.base.ref }}
@@ -215,13 +268,14 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Generate summary with Gemini
+        if: steps.check_key.outputs.has_key == 'true'
         id: summary
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$GEMINI_API_KEY" \
+          RESPONSE=$(curl -s -w "\n%{http_code}" "https://generativelanguage.googleapis.com/v1beta/models/${{ env.GEMINI_MODEL }}:generateContent?key=$GEMINI_API_KEY" \
             -H 'Content-Type: application/json' \
-            -d @- <<PAYLOAD
+            -d @- <<'PAYLOAD'
           {
             "contents": [{
               "parts": [{
@@ -236,16 +290,27 @@ jobs:
           PAYLOAD
           )
 
-          SUMMARY=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // "サマリーを生成できませんでした"')
-          echo "summary<<EOF" >> $GITHUB_OUTPUT
-          echo "$SUMMARY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            ERROR=$(echo "$BODY" | jq -r '.error.message // "Unknown error"')
+            echo "summary<<EOF" >> $GITHUB_OUTPUT
+            echo "⚠️ API Error (HTTP $HTTP_CODE): $ERROR" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            SUMMARY=$(echo "$BODY" | jq -r '.candidates[0].content.parts[0].text // "サマリーを生成できませんでした"')
+            echo "summary<<EOF" >> $GITHUB_OUTPUT
+            echo "$SUMMARY" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
 
       - name: Post summary comment
+        if: steps.check_key.outputs.has_key == 'true'
         uses: actions/github-script@v7
         with:
           script: |
-            const summary = `## 📋 PR Summary (Gemini)\n\n${{ steps.summary.outputs.summary }}\n\n---\n*Powered by Gemini 1.5 Flash*`;
+            const summary = `## 📋 PR Summary (Gemini)\n\n${{ steps.summary.outputs.summary }}\n\n---\n*Powered by Gemini 2.0 Flash*`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -266,6 +331,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check API Key
+        run: |
+          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
+            echo "::error::GEMINI_API_KEY is not set. Please add it to repository secrets."
+            exit 1
+          fi
+
       - name: Get PR diff
         id: diff
         run: |
@@ -282,13 +354,13 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$GEMINI_API_KEY" \
+          RESPONSE=$(curl -s -w "\n%{http_code}" "https://generativelanguage.googleapis.com/v1beta/models/${{ env.GEMINI_MODEL }}:generateContent?key=$GEMINI_API_KEY" \
             -H 'Content-Type: application/json' \
-            -d @- <<PAYLOAD
+            -d @- <<'PAYLOAD'
           {
             "contents": [{
               "parts": [{
-                "text": "以下のコード差分を分析し、具体的な修正提案を行ってください。\n\n## 出力形式\n各問題について以下の形式で出力:\n\n### 問題 1: [問題のタイトル]\n**ファイル**: \`path/to/file.ts\`\n**問題点**: 問題の説明\n**修正前**:\n\`\`\`typescript\n// 現在のコード\n\`\`\`\n**修正後**:\n\`\`\`typescript\n// 修正したコード\n\`\`\`\n\n---\n\n## コード差分\n\`\`\`diff\n${{ steps.diff.outputs.diff }}\n\`\`\`"
+                "text": "以下のコード差分を分析し、具体的な修正提案を行ってください。\n\n## 出力形式\n各問題について以下の形式で出力:\n\n### 問題 1: [問題のタイトル]\n**ファイル**: `path/to/file.ts`\n**問題点**: 問題の説明\n**修正前**:\n```typescript\n// 現在のコード\n```\n**修正後**:\n```typescript\n// 修正したコード\n```\n\n---\n\n## コード差分\n```diff\n${{ steps.diff.outputs.diff }}\n```"
               }]
             }],
             "generationConfig": {
@@ -299,16 +371,26 @@ jobs:
           PAYLOAD
           )
 
-          FIX=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // "修正提案を生成できませんでした"')
-          echo "fix<<EOF" >> $GITHUB_OUTPUT
-          echo "$FIX" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            ERROR=$(echo "$BODY" | jq -r '.error.message // "Unknown error"')
+            echo "fix<<EOF" >> $GITHUB_OUTPUT
+            echo "⚠️ API Error (HTTP $HTTP_CODE): $ERROR" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            FIX=$(echo "$BODY" | jq -r '.candidates[0].content.parts[0].text // "修正提案を生成できませんでした"')
+            echo "fix<<EOF" >> $GITHUB_OUTPUT
+            echo "$FIX" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
 
       - name: Post fix suggestions
         uses: actions/github-script@v7
         with:
           script: |
-            const fix = `## 🔧 Fix Suggestions (Gemini)\n\n${{ steps.fix.outputs.fix }}\n\n---\n*Powered by Gemini 1.5 Flash*`;
+            const fix = `## 🔧 Fix Suggestions (Gemini)\n\n${{ steps.fix.outputs.fix }}\n\n---\n*Powered by Gemini 2.0 Flash*`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
