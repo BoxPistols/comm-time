@@ -4,9 +4,9 @@ on:
   # PRコメントでコマンド駆動
   issue_comment:
     types: [created]
-  # PR作成時に自動サマリー
+  # PR作成時のみ自動サマリー（クォータ節約のためsynchronizeは除外）
   pull_request:
-    types: [opened, synchronize]
+    types: [opened]
 
 permissions:
   contents: read
@@ -14,7 +14,8 @@ permissions:
   issues: write
 
 env:
-  GEMINI_MODEL: gemini-2.0-flash
+  # 軽量モデルを使用（クォータ節約）
+  GEMINI_MODEL: gemini-1.5-flash-8b
 
 jobs:
   # /review コマンドでコードレビュー
