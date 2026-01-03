@@ -15,7 +15,8 @@ permissions:
 
 env:
   # 軽量モデルを使用（クォータ節約）
-  GEMINI_MODEL: gemini-1.5-flash-8b
+  GEMINI_MODEL: gemini-1.5-flash-8b-001
+  GEMINI_MODEL_DISPLAY: Gemini 1.5 Flash 8B
 
 jobs:
   # /review コマンドでコードレビュー
@@ -104,7 +105,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const review = `## 🤖 AI Code Review (Gemini)\n\n${{ steps.review.outputs.review }}\n\n---\n*Powered by Gemini 2.0 Flash*`;
+            const review = `## 🤖 AI Code Review (Gemini)\n\n${{ steps.review.outputs.review }}\n\n---\n*Powered by ${{ env.GEMINI_MODEL_DISPLAY }}*`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -206,7 +207,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const summary = `## 📋 PR Summary (Gemini)\n\n${{ steps.summary.outputs.summary }}\n\n---\n*Powered by Gemini 2.0 Flash*`;
+            const summary = `## 📋 PR Summary (Gemini)\n\n${{ steps.summary.outputs.summary }}\n\n---\n*Powered by ${{ env.GEMINI_MODEL_DISPLAY }}*`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -311,7 +312,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const summary = `## 📋 PR Summary (Gemini)\n\n${{ steps.summary.outputs.summary }}\n\n---\n*Powered by Gemini 2.0 Flash*`;
+            const summary = `## 📋 PR Summary (Gemini)\n\n${{ steps.summary.outputs.summary }}\n\n---\n*Powered by ${{ env.GEMINI_MODEL_DISPLAY }}*`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -391,7 +392,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const fix = `## 🔧 Fix Suggestions (Gemini)\n\n${{ steps.fix.outputs.fix }}\n\n---\n*Powered by Gemini 2.0 Flash*`;
+            const fix = `## 🔧 Fix Suggestions (Gemini)\n\n${{ steps.fix.outputs.fix }}\n\n---\n*Powered by ${{ env.GEMINI_MODEL_DISPLAY }}*`;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
