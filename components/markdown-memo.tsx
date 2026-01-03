@@ -13,6 +13,7 @@ import {
   Minimize2,
   ChevronLeft,
   ChevronRight,
+  X,
 } from "lucide-react";
 
 // Markdownのチェックボックスパターン: - [ ] または - [x] (*, + も対応)
@@ -88,6 +89,7 @@ interface MarkdownMemoProps {
   isFullscreenMode?: boolean; // 親から制御される全画面状態
   onNavigatePrev?: () => void; // 全画面モードで前のメモへ
   onNavigateNext?: () => void; // 全画面モードで次のメモへ
+  isHighlighted?: boolean; // 検索結果でハイライト表示
 }
 
 export function MarkdownMemo({
@@ -101,6 +103,7 @@ export function MarkdownMemo({
   isFullscreenMode,
   onNavigatePrev,
   onNavigateNext,
+  isHighlighted,
 }: MarkdownMemoProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(memo.title);
@@ -254,8 +257,8 @@ export function MarkdownMemo({
         toggleFullscreen();
         return;
       }
-      // Ctrl+Esc で編集キャンセル
-      if (e.ctrlKey && e.key === "Escape") {
+      // ESC で編集キャンセル
+      if (e.key === "Escape") {
         e.preventDefault();
         handleCancel();
         return;
@@ -372,9 +375,14 @@ export function MarkdownMemo({
   // 全画面モード用のコンテンツ
   const memoContent = (
     <div
-      className={`flex flex-col rounded-lg border ${
+      className={`flex flex-col rounded-lg border transition-all duration-500 ${
         isFullscreen ? "h-full" : "max-h-[400px]"
-      } ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
+      } ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} ${
+        isHighlighted
+          ? "ring-2 ring-indigo-500 ring-offset-2 " +
+            (darkMode ? "ring-offset-gray-900 bg-indigo-900/20" : "ring-offset-white bg-indigo-50")
+          : ""
+      }`}
     >
       {/* ヘッダー */}
       <div
@@ -427,8 +435,10 @@ export function MarkdownMemo({
                     ? "hover:bg-gray-700 text-gray-400"
                     : "hover:bg-gray-100 text-gray-500"
                 }`}
+                title="キャンセル (ESC)"
               >
-                キャンセル
+                <X size={18} className="sm:hidden" />
+                <span className="hidden sm:inline">キャンセル</span>
               </button>
             </>
           ) : (
@@ -640,16 +650,16 @@ export function MarkdownMemo({
             return;
           }
 
-          // Ctrl+Esc で編集キャンセル（Escapeチェックより先に処理する必要あり）
+          // ESC で編集キャンセル（編集中の場合）
           // ただしinputやtextarea内のときは handleKeyDown に任せる
-          if (e.ctrlKey && e.key === "Escape" && !isInputFocused) {
+          if (e.key === "Escape" && isEditing && !isInputFocused) {
             e.preventDefault();
             handleCancel();
             return;
           }
 
-          // Escape で全画面を閉じる（inputやtextarea内のときは何もしない）
-          if (e.key === "Escape" && !isInputFocused) {
+          // Escape で全画面を閉じる（編集中でない、かつinputやtextarea内でないとき）
+          if (e.key === "Escape" && !isEditing && !isInputFocused) {
             e.preventDefault();
             onToggleFullscreen?.();
             return;

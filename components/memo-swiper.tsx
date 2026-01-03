@@ -38,6 +38,7 @@ interface MemoSwiperProps {
   darkMode: boolean;
   initialIndex?: number;
   onIndexChange?: (index: number) => void;
+  highlightedMemoId?: string | null;
 }
 
 export function MemoSwiper({
@@ -49,6 +50,7 @@ export function MemoSwiper({
   darkMode,
   initialIndex = 0,
   onIndexChange,
+  highlightedMemoId,
 }: MemoSwiperProps) {
   const [swiperInstance, setSwiperInstance] = useState<SwiperType | null>(null);
   const [activeIndex, setActiveIndex] = useState(initialIndex);
@@ -78,6 +80,16 @@ export function MemoSwiper({
     }
     prevMemosLengthRef.current = memos.length;
   }, [memos.length, swiperInstance]);
+
+  // 外部からのインデックス変更（検索結果からのナビゲーション）
+  useEffect(() => {
+    if (swiperInstance && initialIndex >= 0 && initialIndex < memos.length) {
+      // 現在のインデックスと異なる場合のみナビゲート
+      if (swiperInstance.activeIndex !== initialIndex) {
+        swiperInstance.slideTo(initialIndex, 300);
+      }
+    }
+  }, [swiperInstance, initialIndex, memos.length]);
 
   // IME変換状態の監視
   useEffect(() => {
@@ -540,6 +552,7 @@ export function MemoSwiper({
                       }
                       onNavigatePrev={handlePrev}
                       onNavigateNext={handleNext}
+                      isHighlighted={highlightedMemoId === memo.id}
                     />
                   </div>
                 </SwiperSlide>

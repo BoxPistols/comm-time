@@ -262,27 +262,29 @@ export function TodoEditDialog({
               ステータス
             </h4>
             <div className="flex flex-wrap gap-2">
-              {KANBAN_COLUMNS.map((col) => (
-                <button
-                  key={col.id}
-                  onClick={() => setKanbanStatus(col.id)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    kanbanStatus === col.id
-                      ? col.id === "backlog"
-                        ? "bg-gray-500 text-white"
-                        : col.id === "todo"
-                        ? "bg-blue-500 text-white"
-                        : col.id === "doing"
-                        ? "bg-yellow-500 text-black"
-                        : "bg-green-500 text-white"
-                      : darkMode
-                      ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {col.label}
-                </button>
-              ))}
+              {KANBAN_COLUMNS.map((col) => {
+                const colorClass = col.id === "backlog"
+                  ? "bg-gray-500 text-white"
+                  : col.id === "todo"
+                  ? "bg-blue-500 text-white"
+                  : col.id === "doing"
+                  ? "bg-yellow-500 text-black"
+                  : "bg-green-500 text-white";
+                const isSelected = kanbanStatus === col.id;
+                return (
+                  <button
+                    key={col.id}
+                    onClick={() => setKanbanStatus(col.id)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${colorClass} ${
+                      isSelected
+                        ? "ring-2 ring-offset-2 ring-blue-500 opacity-100"
+                        : "opacity-60 hover:opacity-80"
+                    } ${darkMode ? "ring-offset-gray-800" : "ring-offset-white"}`}
+                  >
+                    {col.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -295,13 +297,14 @@ export function TodoEditDialog({
         >
           <button
             onClick={onClose}
-            className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+            className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors flex items-center gap-1 ${
               darkMode
                 ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
-            キャンセル
+            <X className="w-4 h-4 sm:hidden" />
+            <span className="hidden sm:inline">キャンセル</span>
           </button>
           <button
             onClick={handleSave}

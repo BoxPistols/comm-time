@@ -41,9 +41,7 @@ type ModelOption = {
 const MODEL_OPTIONS: ModelOption[] = [
   { id: "gpt-4.1-nano", name: "gpt-4.1-nano", description: "高速・軽量" },
   { id: "gpt-4o-mini", name: "gpt-4o-mini", description: "推奨・高速" },
-  { id: "gpt-5-nano", name: "gpt-5-nano", description: "次世代・軽量" },
-  { id: "gpt-5-mini", name: "gpt-5-mini", description: "次世代・高性能" },
-  { id: "custom", name: "カスタム...", description: "Local LLM等", isCustom: true },
+  { id: "custom", name: "ローカルLLM（無料）", description: "LM Studio等", isCustom: true },
 ];
 
 // 認証ヘッダーを取得
@@ -68,7 +66,15 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
   const [customSize, setCustomSize] = useState<{ width: number; height: number } | null>(null);
   const [isResizing, setIsResizing] = useState(false);
   const [isComposing, setIsComposing] = useState(false); // IME変換中フラグ
-  const [selectedModel, setSelectedModel] = useState("gpt-4o-mini");
+  const [selectedModel, setSelectedModel] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("aiChatSelectedModel");
+      // 保存されたモデルが選択肢にあるかチェック（GPT-5系削除対応）
+      const isValidModel = saved && MODEL_OPTIONS.some(m => m.id === saved);
+      return isValidModel ? saved : "gpt-4o-mini";
+    }
+    return "gpt-4o-mini";
+  });
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [customEndpoint, setCustomEndpoint] = useState("http://localhost:1234/v1");
   const [customModelName, setCustomModelName] = useState("");
@@ -107,6 +113,13 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showModelMenu]);
+
+  // モデル選択をlocalStorageに保存
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("aiChatSelectedModel", selectedModel);
+    }
+  }, [selectedModel]);
 
   // メッセージ送信
   const sendMessage = async () => {
