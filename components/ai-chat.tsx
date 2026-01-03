@@ -39,10 +39,9 @@ type ModelOption = {
 };
 
 const MODEL_OPTIONS: ModelOption[] = [
+  { id: "gpt-4.1-nano", name: "gpt-4.1-nano", description: "高速・軽量" },
   { id: "gpt-4o-mini", name: "gpt-4o-mini", description: "推奨・高速" },
-  { id: "gpt-4o", name: "gpt-4o", description: "高性能" },
-  { id: "gpt-4-turbo", name: "gpt-4-turbo", description: "大規模コンテキスト" },
-  { id: "custom", name: "カスタム...", description: "Local LLM等", isCustom: true },
+  { id: "custom", name: "ローカルLLM（無料）", description: "LM Studio等", isCustom: true },
 ];
 
 // 認証ヘッダーを取得

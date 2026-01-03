@@ -242,8 +242,6 @@ export function isOpenAIConfigured(): boolean {
  * Note: GPT-5系は現時点でtemperature等のパラメータ制限があるため除外
  */
 export const AVAILABLE_MODELS = [
-  // GPT-4系
-  { id: 'gpt-4o', name: 'GPT-4o', description: '最新の高性能モデル' },
-  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: '高速・低コスト' },
-  { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', description: '大規模コンテキスト対応' },
+  { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano', description: '高速・軽量' },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: '推奨・高速' },
 ] as const;
