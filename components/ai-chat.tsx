@@ -39,10 +39,9 @@ type ModelOption = {
 };
 
 const MODEL_OPTIONS: ModelOption[] = [
-  { id: "gpt-4.1-nano", name: "gpt-4.1-nano", description: "高速・軽量" },
   { id: "gpt-4o-mini", name: "gpt-4o-mini", description: "推奨・高速" },
-  { id: "gpt-5-nano", name: "gpt-5-nano", description: "次世代・軽量" },
-  { id: "gpt-5-mini", name: "gpt-5-mini", description: "次世代・高性能" },
+  { id: "gpt-4o", name: "gpt-4o", description: "高性能" },
+  { id: "gpt-4-turbo", name: "gpt-4-turbo", description: "大規模コンテキスト" },
   { id: "custom", name: "カスタム...", description: "Local LLM等", isCustom: true },
 ];
 
@@ -70,7 +69,10 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
   const [isComposing, setIsComposing] = useState(false); // IME変換中フラグ
   const [selectedModel, setSelectedModel] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("aiChatSelectedModel") || "gpt-4o-mini";
+      const saved = localStorage.getItem("aiChatSelectedModel");
+      // 保存されたモデルが選択肢にあるかチェック（GPT-5系削除対応）
+      const isValidModel = saved && MODEL_OPTIONS.some(m => m.id === saved);
+      return isValidModel ? saved : "gpt-4o-mini";
     }
     return "gpt-4o-mini";
   });

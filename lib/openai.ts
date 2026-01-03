@@ -56,15 +56,15 @@ export function requiresMaxCompletionTokens(modelId: string): boolean {
 
 /**
  * モデルがtemperatureパラメータをサポートしないかを判定
- * o1系、o3系のreasoningモデルのみtemperatureをサポートしない
- * GPT-5系、GPT-4.1系はtemperatureをサポートする
+ * GPT-5系、o1系、o3系はカスタムtemperatureをサポートしない（デフォルト値1のみ）
  */
 export function doesNotSupportTemperature(modelId: string): boolean {
+  // GPT-5系 - temperatureはデフォルト(1)のみサポート
+  if (modelId.startsWith('gpt-5')) return true;
   // o1系モデル（reasoning models）- temperatureサポートなし
   if (modelId.startsWith('o1')) return true;
   // o3系モデル（reasoning models）- temperatureサポートなし
   if (modelId.startsWith('o3')) return true;
-  // GPT-5系、GPT-4.1系はtemperatureをサポート
   return false;
 }
 
@@ -239,16 +239,11 @@ export function isOpenAIConfigured(): boolean {
 
 /**
  * 利用可能なモデルのリスト（UIで選択用）
+ * Note: GPT-5系は現時点でtemperature等のパラメータ制限があるため除外
  */
 export const AVAILABLE_MODELS = [
   // GPT-4系
   { id: 'gpt-4o', name: 'GPT-4o', description: '最新の高性能モデル' },
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: '高速・低コスト' },
   { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', description: '大規模コンテキスト対応' },
-  // GPT-5系（将来用）
-  { id: 'gpt-5-mini', name: 'GPT-5 Mini', description: 'GPT-5系の軽量版' },
-  { id: 'gpt-5', name: 'GPT-5', description: 'GPT-5標準モデル' },
-  // Reasoningモデル
-  { id: 'o1-mini', name: 'o1 Mini', description: '推論特化モデル' },
-  { id: 'o1', name: 'o1', description: '高度な推論モデル' },
 ] as const;

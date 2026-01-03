@@ -89,6 +89,7 @@ interface MarkdownMemoProps {
   isFullscreenMode?: boolean; // 親から制御される全画面状態
   onNavigatePrev?: () => void; // 全画面モードで前のメモへ
   onNavigateNext?: () => void; // 全画面モードで次のメモへ
+  isHighlighted?: boolean; // 検索結果でハイライト表示
 }
 
 export function MarkdownMemo({
@@ -102,6 +103,7 @@ export function MarkdownMemo({
   isFullscreenMode,
   onNavigatePrev,
   onNavigateNext,
+  isHighlighted,
 }: MarkdownMemoProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(memo.title);
@@ -373,9 +375,14 @@ export function MarkdownMemo({
   // 全画面モード用のコンテンツ
   const memoContent = (
     <div
-      className={`flex flex-col rounded-lg border ${
+      className={`flex flex-col rounded-lg border transition-all duration-500 ${
         isFullscreen ? "h-full" : "max-h-[400px]"
-      } ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
+      } ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} ${
+        isHighlighted
+          ? "ring-2 ring-indigo-500 ring-offset-2 " +
+            (darkMode ? "ring-offset-gray-900 bg-indigo-900/20" : "ring-offset-white bg-indigo-50")
+          : ""
+      }`}
     >
       {/* ヘッダー */}
       <div

@@ -476,6 +476,7 @@ export function CommTimeComponent() {
   const [showTodoPicker, setShowTodoPicker] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [highlightedTodoId, setHighlightedTodoId] = useState<string | null>(null);
+  const [highlightedMemoId, setHighlightedMemoId] = useState<string | null>(null);
   const pomodoroTaskInputRef = useRef<HTMLInputElement>(null);
 
   // 初期値設定用のstate
@@ -1076,8 +1077,11 @@ export function CommTimeComponent() {
           }
         }, 100);
       } else if (result.type === "memo") {
-        // メモタブに移動
+        // メモタブに移動し、該当メモをハイライト
         setActiveTab("meeting");
+        setHighlightedMemoId(result.id);
+        // 3秒後にハイライト解除
+        setTimeout(() => setHighlightedMemoId(null), 3000);
         if (result.memoIndex !== undefined) {
           // メモのインデックスに移動
           handleMemoIndexChange(result.memoIndex);
@@ -3304,6 +3308,7 @@ export function CommTimeComponent() {
                 darkMode={darkMode}
                 initialIndex={memoActiveIndex}
                 onIndexChange={handleMemoIndexChange}
+                highlightedMemoId={highlightedMemoId}
               />
             </div>
 
@@ -3572,7 +3577,7 @@ export function CommTimeComponent() {
                                   : "shadow-sm hover:shadow-md"
                               } ${
                                 highlightedTodoId === todo.id
-                                  ? "ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-gray-800 animate-pulse"
+                                  ? "ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-gray-800 bg-indigo-50 dark:bg-indigo-900/30 transition-all duration-500"
                                   : ""
                               }`}
                             >
