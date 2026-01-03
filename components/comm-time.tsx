@@ -2873,14 +2873,11 @@ export function CommTimeComponent() {
                                 updatePomodoroTask(pomodoroTaskInputRef.current?.value || '', null);
                                 setIsEditingPomodoroTask(false);
                               } else if (e.key === 'Escape') {
+                                // キャンセル時は保存しない
                                 setIsEditingPomodoroTask(false);
                               }
                             }}
                             autoFocus
-                            onBlur={() => {
-                              updatePomodoroTask(pomodoroTaskInputRef.current?.value || '', null);
-                              setIsEditingPomodoroTask(false);
-                            }}
                           />
                           <button
                             type="button"
