@@ -123,6 +123,7 @@ body {
 
 /* iOS Safari フォーム入力時の自動ズーム防止 */
 /* iOSではフォントサイズが16px未満のフォームフィールドにフォーカスすると自動ズームが発生する */
+/* !importantでTailwindのユーティリティクラス（text-sm, text-xs等）を上書き */
 @supports (-webkit-touch-callout: none) {
   input:is([type="text"],
            [type="email"],
@@ -136,6 +137,6 @@ body {
            [type="datetime-local"]),
   textarea,
   select {
-    font-size: 16px;
+    font-size: 16px !important;
   }
 }
