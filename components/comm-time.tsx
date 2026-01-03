@@ -33,6 +33,7 @@ import {
   Columns,
   Flag,
   Star,
+  MessageSquare,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -61,6 +62,7 @@ import { KanbanBoard } from "@/components/kanban-board";
 import { KanbanStatusManager } from "@/components/kanban-status-manager";
 import { FilterPanel } from "@/components/filter-panel";
 import { TodoEditDialog } from "@/components/todo-edit-dialog";
+import { AIChat } from "@/components/ai-chat";
 import { useKanbanStatuses } from "@/hooks/useKanbanStatuses";
 import {
   type Tag,
@@ -334,6 +336,9 @@ export function CommTimeComponent() {
 
   // ステータス管理モーダルの表示状態
   const [showStatusManager, setShowStatusManager] = useState(false);
+
+  // AIチャットの表示状態
+  const [showAIChat, setShowAIChat] = useState(false);
 
   // フィルターパネルの表示状態
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -4409,6 +4414,30 @@ export function CommTimeComponent() {
             onSave={handleSaveTodoDetails}
             onClose={() => setEditDialogTodoId(null)}
           />
+        )}
+
+        {/* AIチャット（ログイン時のみ表示） */}
+        {isAuthenticated && (
+          <AIChat
+            darkMode={darkMode}
+            isOpen={showAIChat}
+            onClose={() => setShowAIChat(false)}
+          />
+        )}
+
+        {/* AIチャットボタン（ログイン時のみ表示、チャット非表示時のみ） */}
+        {isAuthenticated && !showAIChat && (
+          <button
+            onClick={() => setShowAIChat(true)}
+            className={`fixed bottom-6 right-6 z-[9999] p-4 rounded-full shadow-xl transition-all duration-200 ${
+              darkMode
+                ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                : "bg-indigo-500 hover:bg-indigo-600 text-white"
+            }`}
+            aria-label="AIアシスタントを開く"
+          >
+            <MessageSquare size={28} />
+          </button>
         )}
       </div>
     </div>
