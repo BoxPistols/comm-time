@@ -2074,10 +2074,59 @@ export function CommTimeComponent() {
   // SSR時はローディング表示（Hydration error回避）
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-4 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-300">Loading...</p>
+          {/* タイマー風ローディングアニメーション */}
+          <div className="relative w-24 h-24 mx-auto mb-6">
+            {/* 外側の円（プログレスリング） */}
+            <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+              <circle
+                cx="50"
+                cy="50"
+                r="45"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="4"
+                className="text-gray-200 dark:text-gray-700"
+              />
+              <circle
+                cx="50"
+                cy="50"
+                r="45"
+                fill="none"
+                stroke="url(#loadingGradient)"
+                strokeWidth="4"
+                strokeLinecap="round"
+                strokeDasharray="283"
+                strokeDashoffset="70"
+                className="animate-[spin_2s_linear_infinite] origin-center"
+              />
+              <defs>
+                <linearGradient id="loadingGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#6366f1" />
+                  <stop offset="50%" stopColor="#a855f7" />
+                  <stop offset="100%" stopColor="#ec4899" />
+                </linearGradient>
+              </defs>
+            </svg>
+            {/* 中央のタイマーアイコン */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Timer className="w-10 h-10 text-indigo-600 dark:text-indigo-400 animate-pulse" />
+            </div>
+          </div>
+          {/* アプリ名 */}
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
+            Comm Time
+          </h1>
+          {/* ローディングドット */}
+          <div className="flex items-center justify-center gap-1.5 text-gray-500 dark:text-gray-400">
+            <span className="text-sm">Loading</span>
+            <span className="flex gap-0.5">
+              <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-1.5 h-1.5 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </span>
+          </div>
         </div>
       </div>
     );
