@@ -68,7 +68,12 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
   const [customSize, setCustomSize] = useState<{ width: number; height: number } | null>(null);
   const [isResizing, setIsResizing] = useState(false);
   const [isComposing, setIsComposing] = useState(false); // IME変換中フラグ
-  const [selectedModel, setSelectedModel] = useState("gpt-4o-mini");
+  const [selectedModel, setSelectedModel] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("aiChatSelectedModel") || "gpt-4o-mini";
+    }
+    return "gpt-4o-mini";
+  });
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [customEndpoint, setCustomEndpoint] = useState("http://localhost:1234/v1");
   const [customModelName, setCustomModelName] = useState("");
@@ -107,6 +112,13 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showModelMenu]);
+
+  // モデル選択をlocalStorageに保存
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("aiChatSelectedModel", selectedModel);
+    }
+  }, [selectedModel]);
 
   // メッセージ送信
   const sendMessage = async () => {

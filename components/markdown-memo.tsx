@@ -13,6 +13,7 @@ import {
   Minimize2,
   ChevronLeft,
   ChevronRight,
+  X,
 } from "lucide-react";
 
 // Markdownのチェックボックスパターン: - [ ] または - [x] (*, + も対応)
@@ -254,8 +255,8 @@ export function MarkdownMemo({
         toggleFullscreen();
         return;
       }
-      // Ctrl+Esc で編集キャンセル
-      if (e.ctrlKey && e.key === "Escape") {
+      // ESC で編集キャンセル
+      if (e.key === "Escape") {
         e.preventDefault();
         handleCancel();
         return;
@@ -427,8 +428,10 @@ export function MarkdownMemo({
                     ? "hover:bg-gray-700 text-gray-400"
                     : "hover:bg-gray-100 text-gray-500"
                 }`}
+                title="キャンセル (ESC)"
               >
-                キャンセル
+                <X size={18} className="sm:hidden" />
+                <span className="hidden sm:inline">キャンセル</span>
               </button>
             </>
           ) : (
@@ -640,16 +643,16 @@ export function MarkdownMemo({
             return;
           }
 
-          // Ctrl+Esc で編集キャンセル（Escapeチェックより先に処理する必要あり）
+          // ESC で編集キャンセル（編集中の場合）
           // ただしinputやtextarea内のときは handleKeyDown に任せる
-          if (e.ctrlKey && e.key === "Escape" && !isInputFocused) {
+          if (e.key === "Escape" && isEditing && !isInputFocused) {
             e.preventDefault();
             handleCancel();
             return;
           }
 
-          // Escape で全画面を閉じる（inputやtextarea内のときは何もしない）
-          if (e.key === "Escape" && !isInputFocused) {
+          // Escape で全画面を閉じる（編集中でない、かつinputやtextarea内でないとき）
+          if (e.key === "Escape" && !isEditing && !isInputFocused) {
             e.preventDefault();
             onToggleFullscreen?.();
             return;

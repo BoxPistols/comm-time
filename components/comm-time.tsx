@@ -34,6 +34,7 @@ import {
   Flag,
   Star,
   MessageSquare,
+  AlarmClock,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -283,6 +284,22 @@ export function CommTimeComponent() {
   // TODOソート状態
   const [sortByDeadline, setSortByDeadline] = useState(false);
 
+  // 締切アラート設定
+  const [deadlineAlertEnabled, setDeadlineAlertEnabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("deadlineAlertEnabled") === "true";
+    }
+    return false;
+  });
+  const [deadlineAlertMinutes, setDeadlineAlertMinutes] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("deadlineAlertMinutes");
+      return saved ? parseInt(saved, 10) : 60;
+    }
+    return 60;
+  });
+  const alertedTodoIdsRef = useRef<Set<string>>(new Set());
+
   // タグ管理の状態（ローカルストレージ用）
   const [localTags, setLocalTags] = useState<Tag[]>(() => {
     if (typeof window !== "undefined") {
@@ -449,6 +466,11 @@ export function CommTimeComponent() {
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const titleBlinkIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ポモドーロで取り組む現在のタスク
+  const [currentPomodoroTask, setCurrentPomodoroTask] = useState("");
+  const [isEditingPomodoroTask, setIsEditingPomodoroTask] = useState(false);
+  const pomodoroTaskInputRef = useRef<HTMLInputElement>(null);
+
   // 初期値設定用のstate
   const [defaultMeetingAlarmSettings, setDefaultMeetingAlarmSettings] =
     useState<AlarmSettings>(initialMeetingAlarmSettings);
@@ -537,6 +559,7 @@ export function CommTimeComponent() {
     setFlashEnabled(getStorageValue("flashEnabled", true));
     setDarkMode(getStorageValue("darkMode", false));
     setWorkMode(getStorageValue("workMode", false));
+    setCurrentPomodoroTask(getStorageValue("currentPomodoroTask", ""));
 
     // 初期値設定の読み込み
     setDefaultMeetingAlarmSettings(
@@ -620,6 +643,7 @@ export function CommTimeComponent() {
       localStorage.setItem("workMode", JSON.stringify(workMode));
       localStorage.setItem("useDatabase", JSON.stringify(useDatabase));
       localStorage.setItem("activeTab", activeTab);
+      localStorage.setItem("currentPomodoroTask", currentPomodoroTask);
 
       // 初期値設定の保存
       localStorage.setItem(
@@ -986,6 +1010,68 @@ export function CommTimeComponent() {
       return () => window.removeEventListener("click", handleClick);
     }
   }, [isAlarmRinging, isFlashing, stopAlarm]);
+
+  // カンバンモーダルのESCキーで閉じる
+  useEffect(() => {
+    if (!showKanbanModal) return;
+
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowKanbanModal(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscKey);
+    return () => window.removeEventListener("keydown", handleEscKey);
+  }, [showKanbanModal]);
+
+  // 締切アラート設定の保存
+  useEffect(() => {
+    if (!mounted) return;
+    localStorage.setItem("deadlineAlertEnabled", String(deadlineAlertEnabled));
+    localStorage.setItem("deadlineAlertMinutes", String(deadlineAlertMinutes));
+  }, [deadlineAlertEnabled, deadlineAlertMinutes, mounted]);
+
+  // 締切アラートのチェック（1分ごと）
+  useEffect(() => {
+    if (!deadlineAlertEnabled) return;
+
+    const checkDeadlines = () => {
+      const now = new Date();
+      const alertThreshold = deadlineAlertMinutes * 60 * 1000; // ミリ秒に変換
+
+      sharedTodos.forEach((todo) => {
+        // 完了済み、期限なし、既にアラート済みはスキップ
+        if (todo.isCompleted || !todo.dueDate || alertedTodoIdsRef.current.has(todo.id)) {
+          return;
+        }
+
+        const deadline = new Date(
+          `${todo.dueDate}T${todo.dueTime || "23:59"}`
+        );
+        const timeUntilDeadline = deadline.getTime() - now.getTime();
+
+        // 締切を過ぎている場合はスキップ
+        if (timeUntilDeadline < 0) return;
+
+        // アラート時間内の場合、アラームを鳴らす
+        if (timeUntilDeadline <= alertThreshold) {
+          const minutesLeft = Math.ceil(timeUntilDeadline / (60 * 1000));
+          const message = `「${todo.text.slice(0, 20)}${todo.text.length > 20 ? "..." : ""}」の締切まであと${minutesLeft}分です`;
+
+          playAlarm(meetingAlarmSettings, message);
+          alertedTodoIdsRef.current.add(todo.id);
+        }
+      });
+    };
+
+    // 初回チェック
+    checkDeadlines();
+
+    // 1分ごとにチェック
+    const timer = setInterval(checkDeadlines, 60000);
+    return () => clearInterval(timer);
+  }, [deadlineAlertEnabled, deadlineAlertMinutes, sharedTodos, playAlarm, meetingAlarmSettings]);
 
   // チクタク音を再生する関数（モバイル対応）
   const playTickSound = useCallback(async () => {
@@ -2158,6 +2244,37 @@ export function CommTimeComponent() {
                 )}
               </button>
 
+              {/* 締切アラート設定 */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setDeadlineAlertEnabled(!deadlineAlertEnabled)}
+                  className={`p-2 sm:p-2.5 rounded-xl transition-all duration-200 ${
+                    deadlineAlertEnabled
+                      ? "bg-gradient-to-br from-red-500 to-orange-500 text-white shadow-lg"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  }`}
+                  title={deadlineAlertEnabled ? `締切アラート ON (${deadlineAlertMinutes}分前)` : "締切アラート OFF"}
+                >
+                  <AlarmClock className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+                {deadlineAlertEnabled && (
+                  <select
+                    value={deadlineAlertMinutes}
+                    onChange={(e) => setDeadlineAlertMinutes(Number(e.target.value))}
+                    className="absolute top-full left-0 mt-1 px-2 py-1 text-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-lg z-10 dark:[color-scheme:dark]"
+                    title="締切何分前にアラートするか"
+                  >
+                    <option value={15}>15分前</option>
+                    <option value={30}>30分前</option>
+                    <option value={60}>1時間前</option>
+                    <option value={120}>2時間前</option>
+                    <option value={180}>3時間前</option>
+                    <option value={1440}>1日前</option>
+                  </select>
+                )}
+              </div>
+
               {/* ワークモード設定（モバイルでToDo/メモを上部に表示） */}
               <button
                 type="button"
@@ -2253,7 +2370,7 @@ export function CommTimeComponent() {
                         type="time"
                         value={targetEndTime}
                         onChange={(e) => setTargetEndTime(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-cyan-500 focus:border-transparent dark:[color-scheme:dark]"
                       />
                     </div>
                   )}
@@ -3368,7 +3485,7 @@ export function CommTimeComponent() {
                                                 activeTab === "pomodoro"
                                               )
                                             }
-                                            className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                            className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:[color-scheme:dark]"
                                             placeholder="期限日"
                                           />
                                           <input
@@ -3382,7 +3499,7 @@ export function CommTimeComponent() {
                                                 activeTab === "pomodoro"
                                               )
                                             }
-                                            className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                            className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:[color-scheme:dark]"
                                             placeholder="時刻"
                                           />
                                           {(todo.dueDate || todo.dueTime) && (
@@ -4340,9 +4457,10 @@ export function CommTimeComponent() {
                   }`}
                 >
                   <Columns className="w-5 h-5" />
-                  カンバンボード
+                  <span className="hidden sm:inline">カンバンボード</span>
+                  <span className="sm:hidden">看板</span>
                 </h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
                   {/* ステータス管理ボタン */}
                   <button
                     onClick={() => setShowStatusManager(true)}
