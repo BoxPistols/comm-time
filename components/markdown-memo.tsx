@@ -13,94 +13,11 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  ExternalLink,
 } from "lucide-react";
+import { RichLink } from "@/components/rich-text-with-links";
 
 // Markdownのチェックボックスパターン: - [ ] または - [x] (*, + も対応)
 const CHECKBOX_PATTERN = /^(\s*[-*+]\s*)\[([ xX])\]/;
-
-// URLメタデータキャッシュ
-const urlMetadataCache = new Map<string, string>();
-
-// リッチリンクコンポーネント
-function RichLink({ href, children }: { href?: string; children: React.ReactNode }) {
-  const [title, setTitle] = useState<string | null>(null);
-  const isMounted = useRef(true);
-
-  // childrenが文字列で、かつhrefと同じ場合のみメタデータ取得を行う（自動リンクまたはURLベタ書きとみなす）
-  // 注意: ReactMarkdownは自動リンクの場合、childrenを文字列として渡す
-  const shouldFetchMetadata =
-    href &&
-    typeof children === "string" &&
-    (children === href || children === decodeURI(href) || href.endsWith(children));
-
-  useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!shouldFetchMetadata || !href) return;
-
-    // キャッシュにあればそれを使う
-    if (urlMetadataCache.has(href)) {
-      setTitle(urlMetadataCache.get(href)!);
-      return;
-    }
-
-    const fetchMetadata = async () => {
-      try {
-        const res = await fetch(`/api/v1/url-metadata?url=${encodeURIComponent(href)}`);
-        if (!res.ok) throw new Error("Failed to fetch");
-        const data = await res.json();
-        
-        if (isMounted.current && data.title) {
-          setTitle(data.title);
-          urlMetadataCache.set(href, data.title);
-        }
-      } catch (e) {
-        console.error("Failed to fetch metadata", e);
-      }
-    };
-
-    fetchMetadata();
-  }, [href, shouldFetchMetadata]);
-
-  // 通常のリンク表示（メタデータ取得対象外、または取得前、または取得失敗）
-  if (!shouldFetchMetadata || !title) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-blue-500 hover:underline break-all inline-flex items-center gap-0.5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {children}
-        <ExternalLink size={12} className="inline-block opacity-50" />
-      </a>
-    );
-  }
-
-  // リッチ表示
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 hover:border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 dark:hover:bg-blue-900/50 transition-all no-underline group max-w-full"
-      title={href}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <span className="flex-shrink-0 opacity-70 group-hover:opacity-100">
-        <ExternalLink size={14} />
-      </span>
-      <span className="font-medium truncate">{title}</span>
-    </a>
-  );
-}
 
 // チェックボックス付きMarkdownレンダラー
 function CheckboxMarkdown({
@@ -117,7 +34,7 @@ function CheckboxMarkdown({
       remarkPlugins={[remarkGfm]}
       components={{
         // リンクをリッチ表示にオーバーライド
-        a: ({ href, children }) => <RichLink href={href}>{children}</RichLink>,
+        a: ({ href, children }) => <RichLink href={href || "#"} darkMode={darkMode}>{children}</RichLink>,
         // inputコンポーネントをオーバーライドしてクリック可能にする
         input: ({ checked, ...props }) => {
           if (props.type !== "checkbox") {
