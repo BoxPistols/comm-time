@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { X, Save, Tag as TagIcon, Flag, Star, Columns } from "lucide-react";
+import { RichTextWithLinks } from "@/components/rich-text-with-links";
 import {
   type Tag,
   type PriorityLevel,
@@ -129,13 +130,13 @@ export function TodoEditDialog({
               darkMode ? "bg-gray-700/50" : "bg-gray-50"
             }`}
           >
-            <p
+            <div
               className={`text-sm ${
                 darkMode ? "text-gray-200" : "text-gray-800"
               }`}
             >
-              {todo.text}
-            </p>
+              <RichTextWithLinks text={todo.text} darkMode={darkMode} />
+            </div>
           </div>
 
           {/* タグ選択 */}

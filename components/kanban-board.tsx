@@ -13,6 +13,7 @@ import {
   Star,
   Clock,
 } from "lucide-react";
+import { RichTextWithLinks } from "@/components/rich-text-with-links";
 import {
   type Tag,
   type KanbanStatus,
@@ -233,7 +234,7 @@ export function KanbanBoard({
                                     <Check className="w-3 h-3" />
                                   )}
                                 </button>
-                                <p
+                                <div
                                   className={`flex-1 text-sm leading-tight break-words ${
                                     todo.isCompleted
                                       ? "line-through"
@@ -242,10 +243,12 @@ export function KanbanBoard({
                                     darkMode ? "text-gray-200" : "text-gray-800"
                                   }`}
                                 >
-                                  {todo.text.length > 40
-                                    ? `${todo.text.slice(0, 40)}...`
-                                    : todo.text}
-                                </p>
+                                  <RichTextWithLinks
+                                    text={todo.text}
+                                    darkMode={darkMode}
+                                    maxLength={40}
+                                  />
+                                </div>
                               </div>
 
                               {/* メタ情報 */}

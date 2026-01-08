@@ -8,7 +8,6 @@ import {
   Edit,
   Eye,
   Trash2,
-  Save,
   Maximize2,
   Minimize2,
   ChevronLeft,
@@ -500,46 +499,59 @@ export function MarkdownMemo({
           </h3>
         )}
 
-        <div className="flex items-center gap-2 ml-2">
+        <div className="flex items-center gap-1 ml-2">
+          {/* 編集/プレビュー切り替えボタン */}
+          <div
+            className={`flex items-center rounded-md p-0.5 ${
+              darkMode ? "bg-gray-700" : "bg-gray-100"
+            }`}
+          >
+            <button
+              onClick={startEditing}
+              className={`p-1.5 rounded transition-colors ${
+                isEditing
+                  ? darkMode
+                    ? "bg-gray-600 text-blue-400"
+                    : "bg-white text-blue-600 shadow-sm"
+                  : darkMode
+                    ? "text-gray-400 hover:text-gray-200"
+                    : "text-gray-500 hover:text-gray-700"
+              }`}
+              title="編集 (Cmd+E)"
+            >
+              <Edit size={16} />
+            </button>
+            <button
+              onClick={handleSave}
+              className={`p-1.5 rounded transition-colors ${
+                !isEditing
+                  ? darkMode
+                    ? "bg-gray-600 text-green-400"
+                    : "bg-white text-green-600 shadow-sm"
+                  : darkMode
+                    ? "text-gray-400 hover:text-gray-200"
+                    : "text-gray-500 hover:text-gray-700"
+              }`}
+              title="プレビュー (Cmd+E)"
+            >
+              <Eye size={16} />
+            </button>
+          </div>
+
           {isEditing ? (
-            <>
-              <button
-                onClick={handleSave}
-                className={`p-1.5 rounded transition-colors ${
-                  darkMode
-                    ? "hover:bg-gray-700 text-green-400"
-                    : "hover:bg-gray-100 text-green-600"
-                }`}
-                title="保存 (Cmd+S)"
-              >
-                <Save size={18} />
-              </button>
-              <button
-                onClick={handleCancel}
-                className={`p-1.5 rounded transition-colors text-sm ${
-                  darkMode
-                    ? "hover:bg-gray-700 text-gray-400"
-                    : "hover:bg-gray-100 text-gray-500"
-                }`}
-                title="キャンセル (ESC)"
-              >
-                <X size={18} className="sm:hidden" />
-                <span className="hidden sm:inline">キャンセル</span>
-              </button>
-            </>
+            <button
+              onClick={handleCancel}
+              className={`p-1.5 rounded transition-colors ${
+                darkMode
+                  ? "hover:bg-gray-700 text-gray-400"
+                  : "hover:bg-gray-100 text-gray-500"
+              }`}
+              title="キャンセル (ESC)"
+            >
+              <X size={16} />
+            </button>
           ) : (
             <>
-              <button
-                onClick={startEditing}
-                className={`p-1.5 rounded transition-colors ${
-                  darkMode
-                    ? "hover:bg-gray-700 text-blue-400"
-                    : "hover:bg-gray-100 text-blue-600"
-                }`}
-                title="編集 (Cmd+S)"
-              >
-                <Edit size={18} />
-              </button>
               <button
                 onClick={toggleFullscreen}
                 className={`p-1.5 rounded transition-colors ${

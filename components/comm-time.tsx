@@ -66,6 +66,7 @@ import { FilterPanel } from "@/components/filter-panel";
 import { TodoEditDialog } from "@/components/todo-edit-dialog";
 import { AIChat } from "@/components/ai-chat";
 import { SearchModal, type SearchResult } from "@/components/search-modal";
+import { RichTextWithLinks } from "@/components/rich-text-with-links";
 import { useKanbanStatuses } from "@/hooks/useKanbanStatuses";
 import {
   type Tag,
@@ -3486,12 +3487,16 @@ export function CommTimeComponent() {
                             className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
                           >
                             <div className="flex-1 min-w-0">
-                              <p
+                              <div
                                 className="text-xs text-gray-700 dark:text-gray-300 truncate"
                                 title={todo.text}
                               >
-                                {todo.text}
-                              </p>
+                                <RichTextWithLinks
+                                  text={todo.text}
+                                  darkMode={darkMode}
+                                  maxLength={80}
+                                />
+                              </div>
                               <p className="text-xs text-gray-400 dark:text-gray-500">
                                 削除: {deletedDate.toLocaleDateString("ja-JP")}{" "}
                                 (残り{expiresIn}
@@ -3661,9 +3666,11 @@ export function CommTimeComponent() {
                                       {expandedTodoContentId === todo.id ? (
                                         // 展開表示
                                         <div>
-                                          <span className="whitespace-pre-wrap break-words">
-                                            {todo.text}
-                                          </span>
+                                          <RichTextWithLinks
+                                            text={todo.text}
+                                            darkMode={darkMode}
+                                            className="whitespace-pre-wrap break-words"
+                                          />
                                           {todo.text.length > 100 && (
                                             <button
                                               type="button"
@@ -3688,7 +3695,10 @@ export function CommTimeComponent() {
                                           title={todo.text}
                                         >
                                           <span className="line-clamp-3 whitespace-pre-wrap break-words">
-                                            {todo.text}
+                                            <RichTextWithLinks
+                                              text={todo.text}
+                                              darkMode={darkMode}
+                                            />
                                           </span>
                                           {todo.text.length > 100 && (
                                             <span className="text-indigo-500 dark:text-indigo-400 text-xs ml-1">
@@ -4793,7 +4803,13 @@ export function CommTimeComponent() {
                               : "hover:bg-gray-100 text-gray-800"
                           }`}
                         >
-                          <p className="text-sm truncate">{todo.text}</p>
+                          <div className="text-sm truncate">
+                            <RichTextWithLinks
+                              text={todo.text}
+                              darkMode={darkMode}
+                              maxLength={60}
+                            />
+                          </div>
                           {todo.dueDate && (
                             <p className={`text-xs mt-0.5 ${
                               currentPomodoroTaskId === todo.id
