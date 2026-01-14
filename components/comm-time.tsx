@@ -2528,7 +2528,19 @@ export function CommTimeComponent() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setCountdownMode(!countdownMode)}
+                      onClick={() => {
+                        const newMode = !countdownMode;
+                        setCountdownMode(newMode);
+                        // カウントダウンモードをONにしたとき、終了時刻が未設定なら最後のアラームポイント分後を設定
+                        if (newMode && !targetEndTime) {
+                          const now = new Date();
+                          const lastAlarmMinutes = alarmPoints[alarmPoints.length - 1]?.minutes || 60;
+                          const endTime = new Date(now.getTime() + lastAlarmMinutes * 60 * 1000);
+                          const hours = endTime.getHours().toString().padStart(2, "0");
+                          const minutes = endTime.getMinutes().toString().padStart(2, "0");
+                          setTargetEndTime(`${hours}:${minutes}`);
+                        }
+                      }}
                       className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                         countdownMode
                           ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md"
@@ -2654,15 +2666,26 @@ export function CommTimeComponent() {
                         }`}
                       >
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={point.minutes}
-                          onChange={(e) =>
-                            updateAlarmPoint(
-                              point.id,
-                              parseInt(e.target.value) || 1
-                            )
-                          }
-                          min="1"
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // 空または数字のみ許可
+                            if (value === "" || /^\d+$/.test(value)) {
+                              const numValue = parseInt(value) || 0;
+                              if (numValue > 0) {
+                                updateAlarmPoint(point.id, numValue);
+                              }
+                            }
+                          }}
+                          onBlur={(e) => {
+                            // blur時に値がない場合は1に戻す
+                            const numValue = parseInt(e.target.value) || 1;
+                            updateAlarmPoint(point.id, Math.max(1, numValue));
+                          }}
+                          onFocus={(e) => e.target.select()}
                           className="w-16 sm:w-20 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         />
                         <span className="text-sm sm:text-base font-medium text-gray-700 dark:text-gray-300">
