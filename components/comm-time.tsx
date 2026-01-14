@@ -35,6 +35,7 @@ import {
   Star,
   MessageSquare,
   AlarmClock,
+  RefreshCw,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -276,6 +277,11 @@ export function CommTimeComponent() {
   const [countdownMode, setCountdownMode] = useState(false);
   const [targetEndTime, setTargetEndTime] = useState("");
   const [countdownSeconds, setCountdownSeconds] = useState(0);
+
+  // エンド時間入力モードの状態
+  const [endTimeInputMode, setEndTimeInputMode] = useState(false);
+  const [progressPreset, setProgressPreset] = useState<number[]>([25, 50, 75, 100]);
+  const [totalMeetingMinutes, setTotalMeetingMinutes] = useState(0);
 
   // チクタク音の状態
   const [tickSoundEnabled, setTickSoundEnabled] = useState(false);
@@ -563,6 +569,8 @@ export function CommTimeComponent() {
     setVibrationEnabled(getStorageValue("vibrationEnabled", true));
     setCountdownMode(getStorageValue("countdownMode", false));
     setTargetEndTime(getStorageValue("targetEndTime", ""));
+    setEndTimeInputMode(getStorageValue("endTimeInputMode", false));
+    setProgressPreset(getStorageValue("progressPreset", [25, 50, 75, 100]));
     setTickSoundEnabled(getStorageValue("tickSoundEnabled", false));
     setTickSoundVolume(getStorageValue("tickSoundVolume", 5));
     setFlashEnabled(getStorageValue("flashEnabled", true));
@@ -642,6 +650,8 @@ export function CommTimeComponent() {
       );
       localStorage.setItem("countdownMode", JSON.stringify(countdownMode));
       localStorage.setItem("targetEndTime", targetEndTime);
+      localStorage.setItem("endTimeInputMode", JSON.stringify(endTimeInputMode));
+      localStorage.setItem("progressPreset", JSON.stringify(progressPreset));
       localStorage.setItem(
         "tickSoundEnabled",
         JSON.stringify(tickSoundEnabled)
@@ -724,6 +734,8 @@ export function CommTimeComponent() {
     localTags,
     viewMode,
     currentPomodoroTask,
+    endTimeInputMode,
+    progressPreset,
   ]);
 
   // Supabaseデータの同期（データベースモード有効時）
@@ -1271,6 +1283,34 @@ export function CommTimeComponent() {
     return () => clearInterval(timer);
   }, [isMeetingRunning, meetingAlarmSettings, playAlarm]);
 
+  // 終了時刻からの残り時間を計算（エンド時間入力モード用）
+  useEffect(() => {
+    if (!targetEndTime || !endTimeInputMode) {
+      setTotalMeetingMinutes(0);
+      return;
+    }
+
+    const calculateRemainingMinutes = () => {
+      const now = new Date();
+      const [hours, minutes] = targetEndTime.split(":").map(Number);
+      const endTime = new Date();
+      endTime.setHours(hours, minutes, 0, 0);
+
+      if (endTime <= now) {
+        endTime.setDate(endTime.getDate() + 1);
+      }
+
+      const totalMs = endTime.getTime() - now.getTime();
+      const totalMinutes = Math.floor(totalMs / 60000);
+      setTotalMeetingMinutes(Math.max(0, totalMinutes));
+    };
+
+    calculateRemainingMinutes();
+    // 1分ごとに更新
+    const interval = setInterval(calculateRemainingMinutes, 60000);
+    return () => clearInterval(interval);
+  }, [targetEndTime, endTimeInputMode]);
+
   // ポモドーロタイマーの更新
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -1449,6 +1489,47 @@ export function CommTimeComponent() {
     setAlarmPoints((prevPoints) =>
       prevPoints.filter((point) => point.id !== id)
     );
+  }, []);
+
+  // エンド時間入力モード: 終了時刻から進行率ベースでアラームポイントを自動生成
+  const generateAlarmPointsFromEndTime = useCallback((endTimeStr: string, presets: number[]) => {
+    if (!endTimeStr) return;
+
+    const now = new Date();
+    const [hours, minutes] = endTimeStr.split(":").map(Number);
+    const endTime = new Date();
+    endTime.setHours(hours, minutes, 0, 0);
+
+    // 終了時刻が過去の場合は翌日として扱う
+    if (endTime <= now) {
+      endTime.setDate(endTime.getDate() + 1);
+    }
+
+    const totalMs = endTime.getTime() - now.getTime();
+    const totalMinutes = Math.floor(totalMs / 60000);
+    setTotalMeetingMinutes(totalMinutes);
+
+    if (totalMinutes <= 0) return;
+
+    // 進行率プリセットに基づいてアラームポイントを生成
+    const newAlarmPoints: AlarmPoint[] = presets
+      .filter(percent => percent > 0 && percent <= 100)
+      .map((percent, index) => {
+        const alarmMinutes = Math.round((totalMinutes * percent) / 100);
+        return {
+          id: `auto-${Date.now()}-${index}`,
+          minutes: alarmMinutes,
+          isDone: false,
+          remainingTime: alarmMinutes * 60,
+        };
+      })
+      .filter((point, index, arr) =>
+        // 重複する分数を除去
+        arr.findIndex(p => p.minutes === point.minutes) === index
+      )
+      .sort((a, b) => a.minutes - b.minutes);
+
+    setAlarmPoints(newAlarmPoints);
   }, []);
 
   // 終了時刻の計算機能
@@ -2565,6 +2646,115 @@ export function CommTimeComponent() {
                   )}
                 </div>
 
+                {/* エンド時間入力モード */}
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950 dark:to-orange-950 rounded-xl p-4 mb-4 border border-amber-100 dark:border-amber-900">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                      <span className="text-sm sm:text-base font-semibold text-gray-800 dark:text-gray-200">
+                        終了時刻から逆算モード
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEndTimeInputMode(!endTimeInputMode)}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                        endTimeInputMode
+                          ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                      }`}
+                    >
+                      {endTimeInputMode ? "ON" : "OFF"}
+                    </button>
+                  </div>
+
+                  {endTimeInputMode && (
+                    <div className="space-y-4">
+                      {/* 終了時刻入力 */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          終了時刻:
+                        </label>
+                        <input
+                          type="time"
+                          value={targetEndTime}
+                          onChange={(e) => {
+                            setTargetEndTime(e.target.value);
+                            setCountdownMode(true);
+                          }}
+                          className="px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:[color-scheme:dark]"
+                        />
+                        {targetEndTime && totalMeetingMinutes > 0 && (
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            （残り約{totalMeetingMinutes}分）
+                          </span>
+                        )}
+                      </div>
+
+                      {/* 進行率プリセット選択 */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          アラーム進行率:
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { label: "25/50/75/100%", value: [25, 50, 75, 100] },
+                            { label: "33/66/100%", value: [33, 66, 100] },
+                            { label: "50/100%", value: [50, 100] },
+                            { label: "25/50/100%", value: [25, 50, 100] },
+                          ].map((preset) => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => setProgressPreset(preset.value)}
+                              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 ${
+                                JSON.stringify(progressPreset) === JSON.stringify(preset.value)
+                                  ? "bg-amber-500 text-white shadow-md"
+                                  : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600"
+                              }`}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* アラーム自動生成ボタン */}
+                      <button
+                        type="button"
+                        onClick={() => generateAlarmPointsFromEndTime(targetEndTime, progressPreset)}
+                        disabled={!targetEndTime}
+                        className="w-full px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        <span>アラームポイントを自動生成</span>
+                      </button>
+
+                      {/* プレビュー表示 */}
+                      {targetEndTime && totalMeetingMinutes > 0 && (
+                        <div className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-3 space-y-1">
+                          <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                            生成されるアラームポイント:
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {progressPreset.map((percent) => {
+                              const minutes = Math.round((totalMeetingMinutes * percent) / 100);
+                              return (
+                                <span
+                                  key={percent}
+                                  className="px-2 py-1 bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 rounded text-xs font-medium"
+                                >
+                                  {percent}% = {minutes}分
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* タイマー表示 */}
                 <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 sm:p-8 mb-4 sm:mb-6 shadow-2xl">
                   <div className="text-4xl sm:text-5xl lg:text-6xl font-bold text-center mb-3 sm:mb-4 text-white tabular-nums tracking-tight">
@@ -2588,6 +2778,39 @@ export function CommTimeComponent() {
                       </>
                     )}
                   </div>
+
+                  {/* プログレスバー */}
+                  {endTimeInputMode && isMeetingRunning && alarmPoints.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      <div className="relative h-3 bg-white/20 rounded-full overflow-hidden">
+                        <div
+                          className="absolute left-0 top-0 h-full bg-gradient-to-r from-green-400 to-emerald-400 transition-all duration-1000 ease-linear"
+                          style={{
+                            width: `${Math.min(100, (meetingElapsedTime / (alarmPoints[alarmPoints.length - 1]?.minutes * 60)) * 100)}%`
+                          }}
+                        />
+                        {/* アラームポイントマーカー */}
+                        {alarmPoints.map((point) => {
+                          const position = (point.minutes / alarmPoints[alarmPoints.length - 1]?.minutes) * 100;
+                          return (
+                            <div
+                              key={point.id}
+                              className={`absolute top-0 w-1 h-full ${point.isDone ? 'bg-green-300' : 'bg-white/60'}`}
+                              style={{ left: `${position}%` }}
+                              title={`${point.minutes}分 (${Math.round(position)}%)`}
+                            />
+                          );
+                        })}
+                      </div>
+                      <div className="flex justify-between text-xs text-white/70">
+                        <span>0%</span>
+                        <span className="font-medium">
+                          {Math.round((meetingElapsedTime / (alarmPoints[alarmPoints.length - 1]?.minutes * 60)) * 100)}% 経過
+                        </span>
+                        <span>100%</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* コントロールボタン */}
