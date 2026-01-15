@@ -281,7 +281,11 @@ export function CommTimeComponent() {
   // エンド時間入力モードの状態
   const [endTimeInputMode, setEndTimeInputMode] = useState(false);
   const [progressPreset, setProgressPreset] = useState<number[]>([25, 50, 75, 100]);
-  const [totalMeetingMinutes, setTotalMeetingMinutes] = useState(0);
+  const [remainingMeetingMinutes, setRemainingMeetingMinutes] = useState(0);
+  const [meetingTotalDurationMinutes, setMeetingTotalDurationMinutes] = useState(0);
+
+  // アラームポイント入力（編集中の文字列を保持）
+  const [alarmPointMinutesInput, setAlarmPointMinutesInput] = useState<Record<string, string>>({});
 
   // チクタク音の状態
   const [tickSoundEnabled, setTickSoundEnabled] = useState(false);
@@ -1286,7 +1290,7 @@ export function CommTimeComponent() {
   // 終了時刻からの残り時間を計算（エンド時間入力モード用）
   useEffect(() => {
     if (!targetEndTime || !endTimeInputMode) {
-      setTotalMeetingMinutes(0);
+      setRemainingMeetingMinutes(0);
       return;
     }
 
@@ -1302,7 +1306,7 @@ export function CommTimeComponent() {
 
       const totalMs = endTime.getTime() - now.getTime();
       const totalMinutes = Math.floor(totalMs / 60000);
-      setTotalMeetingMinutes(Math.max(0, totalMinutes));
+      setRemainingMeetingMinutes(Math.max(0, totalMinutes));
     };
 
     calculateRemainingMinutes();
@@ -1507,13 +1511,14 @@ export function CommTimeComponent() {
 
     const totalMs = endTime.getTime() - now.getTime();
     const totalMinutes = Math.floor(totalMs / 60000);
-    setTotalMeetingMinutes(totalMinutes);
+    setMeetingTotalDurationMinutes(totalMinutes);
+    setRemainingMeetingMinutes(Math.max(0, totalMinutes));
 
     if (totalMinutes <= 0) return;
 
     // 進行率プリセットに基づいてアラームポイントを生成
     const newAlarmPoints: AlarmPoint[] = presets
-      .filter(percent => percent > 0 && percent <= 100)
+      .filter((percent) => percent > 0 && percent <= 100)
       .map((percent, index) => {
         const alarmMinutes = Math.round((totalMinutes * percent) / 100);
         return {
@@ -1523,6 +1528,7 @@ export function CommTimeComponent() {
           remainingTime: alarmMinutes * 60,
         };
       })
+      .filter((point) => point.minutes > 0)
       .filter((point, index, arr) =>
         // 重複する分数を除去
         arr.findIndex(p => p.minutes === point.minutes) === index
@@ -2657,7 +2663,13 @@ export function CommTimeComponent() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setEndTimeInputMode(!endTimeInputMode)}
+                      onClick={() => {
+                        const next = !endTimeInputMode;
+                        setEndTimeInputMode(next);
+                        if (next && !countdownMode) {
+                          setCountdownMode(true);
+                        }
+                      }}
                       className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                         endTimeInputMode
                           ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md"
@@ -2680,13 +2692,13 @@ export function CommTimeComponent() {
                           value={targetEndTime}
                           onChange={(e) => {
                             setTargetEndTime(e.target.value);
-                            setCountdownMode(true);
+                            setMeetingTotalDurationMinutes(0);
                           }}
                           className="px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:[color-scheme:dark]"
                         />
-                        {targetEndTime && totalMeetingMinutes > 0 && (
+                        {targetEndTime && remainingMeetingMinutes > 0 && (
                           <span className="text-sm text-gray-600 dark:text-gray-400">
-                            （残り約{totalMeetingMinutes}分）
+                            （残り約{remainingMeetingMinutes}分）
                           </span>
                         )}
                       </div>
@@ -2731,14 +2743,15 @@ export function CommTimeComponent() {
                       </button>
 
                       {/* プレビュー表示 */}
-                      {targetEndTime && totalMeetingMinutes > 0 && (
+                      {targetEndTime && (meetingTotalDurationMinutes || remainingMeetingMinutes) > 0 && (
                         <div className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-3 space-y-1">
                           <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
                             生成されるアラームポイント:
                           </p>
                           <div className="flex flex-wrap gap-2">
                             {progressPreset.map((percent) => {
-                              const minutes = Math.round((totalMeetingMinutes * percent) / 100);
+                              const baseMinutes = meetingTotalDurationMinutes || remainingMeetingMinutes;
+                              const minutes = Math.round((baseMinutes * percent) / 100);
                               return (
                                 <span
                                   key={percent}
@@ -2780,37 +2793,47 @@ export function CommTimeComponent() {
                   </div>
 
                   {/* プログレスバー */}
-                  {endTimeInputMode && isMeetingRunning && alarmPoints.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                      <div className="relative h-3 bg-white/20 rounded-full overflow-hidden">
-                        <div
-                          className="absolute left-0 top-0 h-full bg-gradient-to-r from-green-400 to-emerald-400 transition-all duration-1000 ease-linear"
-                          style={{
-                            width: `${Math.min(100, (meetingElapsedTime / (alarmPoints[alarmPoints.length - 1]?.minutes * 60)) * 100)}%`
-                          }}
-                        />
-                        {/* アラームポイントマーカー */}
-                        {alarmPoints.map((point) => {
-                          const position = (point.minutes / alarmPoints[alarmPoints.length - 1]?.minutes) * 100;
-                          return (
-                            <div
-                              key={point.id}
-                              className={`absolute top-0 w-1 h-full ${point.isDone ? 'bg-green-300' : 'bg-white/60'}`}
-                              style={{ left: `${position}%` }}
-                              title={`${point.minutes}分 (${Math.round(position)}%)`}
-                            />
-                          );
-                        })}
+                  {endTimeInputMode && isMeetingRunning && meetingTotalDurationMinutes > 0 && (() => {
+                    const totalSeconds = meetingTotalDurationMinutes * 60;
+                    const progressPercent =
+                      totalSeconds > 0
+                        ? Math.min(100, (meetingElapsedTime / totalSeconds) * 100)
+                        : 0;
+
+                    return (
+                      <div className="mt-4 space-y-2">
+                        <div className="relative h-3 bg-white/20 rounded-full overflow-hidden">
+                          <div
+                            className="absolute left-0 top-0 h-full bg-gradient-to-r from-green-400 to-emerald-400 transition-all duration-1000 ease-linear"
+                            style={{
+                              width: `${progressPercent}%`,
+                            }}
+                          />
+                          {/* アラームポイントマーカー */}
+                          {alarmPoints.map((point) => {
+                            const position =
+                              meetingTotalDurationMinutes > 0
+                                ? (point.minutes / meetingTotalDurationMinutes) * 100
+                                : 0;
+                            const clampedPosition = Math.max(0, Math.min(100, position));
+                            return (
+                              <div
+                                key={point.id}
+                                className={`absolute top-0 w-1 h-full ${point.isDone ? "bg-green-300" : "bg-white/60"}`}
+                                style={{ left: `${clampedPosition}%` }}
+                                title={`${point.minutes}分 (${Math.round(clampedPosition)}%)`}
+                              />
+                            );
+                          })}
+                        </div>
+                        <div className="flex justify-between text-xs text-white/70">
+                          <span>0%</span>
+                          <span className="font-medium">{Math.round(progressPercent)}% 経過</span>
+                          <span>100%</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-xs text-white/70">
-                        <span>0%</span>
-                        <span className="font-medium">
-                          {Math.round((meetingElapsedTime / (alarmPoints[alarmPoints.length - 1]?.minutes * 60)) * 100)}% 経過
-                        </span>
-                        <span>100%</span>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
 
                 {/* コントロールボタン */}
@@ -2892,21 +2915,36 @@ export function CommTimeComponent() {
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
-                          value={point.minutes}
+                          value={alarmPointMinutesInput[point.id] ?? String(point.minutes)}
                           onChange={(e) => {
                             const value = e.target.value;
-                            // 空または数字のみ許可
+                            // 空 or 数字のみ許可（編集途中の文字列は保持して、確定はblurで行う）
                             if (value === "" || /^\d+$/.test(value)) {
-                              const numValue = parseInt(value) || 0;
-                              if (numValue > 0) {
-                                updateAlarmPoint(point.id, numValue);
+                              setAlarmPointMinutesInput((prev) => ({
+                                ...prev,
+                                [point.id]: value,
+                              }));
+
+                              if (value !== "") {
+                                const numValue = parseInt(value, 10);
+                                if (!Number.isNaN(numValue) && numValue > 0) {
+                                  updateAlarmPoint(point.id, numValue);
+                                }
                               }
                             }
                           }}
                           onBlur={(e) => {
-                            // blur時に値がない場合は1に戻す
-                            const numValue = parseInt(e.target.value) || 1;
-                            updateAlarmPoint(point.id, Math.max(1, numValue));
+                            const raw = e.target.value;
+                            const numValue = parseInt(raw, 10);
+                            const normalized =
+                              Number.isNaN(numValue) || numValue <= 0 ? 1 : numValue;
+
+                            updateAlarmPoint(point.id, normalized);
+                            setAlarmPointMinutesInput((prev) => {
+                              const next = { ...prev };
+                              delete next[point.id];
+                              return next;
+                            });
                           }}
                           onFocus={(e) => e.target.select()}
                           className="w-16 sm:w-20 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg text-sm sm:text-base font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
