@@ -102,6 +102,7 @@ export function useSupabaseTags(user: User | null) {
       const message = err instanceof Error ? err.message : "Unknown error"
       setError(message)
       console.error("Error updating tag:", err)
+      throw err
     }
   }
 

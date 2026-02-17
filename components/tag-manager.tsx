@@ -6,8 +6,8 @@ import { type Tag, TAG_COLORS } from "@/types";
 
 interface TagManagerProps {
   tags: Tag[];
-  onAddTag: (name: string, color: string) => Tag | Promise<Tag>;
-  onUpdateTag: (id: string, name: string, color: string) => void;
+  onAddTag: (name: string, color: string) => Tag | null | Promise<Tag | null>;
+  onUpdateTag: (id: string, name: string, color: string) => void | Promise<void>;
   onDeleteTag: (id: string) => void;
   darkMode: boolean;
   onClose: () => void;
@@ -42,9 +42,13 @@ export function TagManager({
     }
 
     setAddError(null);
-    await onAddTag(trimmed, newTagColor);
-    setNewTagName("");
-    setNewTagColor(TAG_COLORS[0].value);
+    const result = await onAddTag(trimmed, newTagColor);
+    if (result) {
+      setNewTagName("");
+      setNewTagColor(TAG_COLORS[0].value);
+    } else {
+      setAddError("タグの追加に失敗しました。既に存在する可能性があります。");
+    }
   };
 
   const handleStartEdit = (tag: Tag) => {
@@ -54,7 +58,7 @@ export function TagManager({
     setEditError(null);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     const trimmed = editingName.trim();
     if (!editingTagId || !trimmed) return;
 
@@ -67,10 +71,14 @@ export function TagManager({
     }
 
     setEditError(null);
-    onUpdateTag(editingTagId, trimmed, editingColor);
-    setEditingTagId(null);
-    setEditingName("");
-    setEditingColor("");
+    try {
+      await onUpdateTag(editingTagId, trimmed, editingColor);
+      setEditingTagId(null);
+      setEditingName("");
+      setEditingColor("");
+    } catch {
+      setEditError("タグの更新に失敗しました");
+    }
   };
 
   const handleCancelEdit = () => {
