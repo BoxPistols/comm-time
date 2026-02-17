@@ -1,0 +1,47 @@
+name: Supabase Keep Alive
+
+on:
+  # 毎週月曜日 9:00 (JST) = 日曜日 24:00 UTC
+  schedule:
+    - cron: '0 0 * * 1'
+  # 手動実行も可能
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "⚠️ SUPABASE_URL または SUPABASE_ANON_KEY が設定されていません"
+            echo "GitHubリポジトリの Settings > Secrets and variables > Actions で設定してください"
+            exit 1
+          fi
+
+          echo "🔄 Supabaseにpingを送信中..."
+
+          # ヘルスチェック: REST APIエンドポイントにリクエスト
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            "${SUPABASE_URL}/rest/v1/" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Supabase is alive! (HTTP $HTTP_CODE)"
+            echo "📅 実行時刻: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          else
+            echo "❌ Supabase ping failed (HTTP $HTTP_CODE)"
+            echo "Response: $(echo "$RESPONSE" | head -n -1)"
+            exit 1
+          fi
+
+      - name: Log success
+        run: |
+          echo "🎉 Supabase keep-alive completed successfully"
+          echo "次回実行: 1週間後"
