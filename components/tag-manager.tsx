@@ -42,12 +42,16 @@ export function TagManager({
     }
 
     setAddError(null);
-    const result = await onAddTag(trimmed, newTagColor);
-    if (result) {
-      setNewTagName("");
-      setNewTagColor(TAG_COLORS[0].value);
-    } else {
-      setAddError("タグの追加に失敗しました。既に存在する可能性があります。");
+    try {
+      const result = await onAddTag(trimmed, newTagColor);
+      if (result) {
+        setNewTagName("");
+        setNewTagColor(TAG_COLORS[0].value);
+      } else {
+        setAddError("タグの追加に失敗しました。既に存在する可能性があります。");
+      }
+    } catch {
+      setAddError("タグの追加に失敗しました");
     }
   };
 
