@@ -102,6 +102,7 @@ export function useSupabaseTags(user: User | null) {
       const message = err instanceof Error ? err.message : "Unknown error"
       setError(message)
       console.error("Error updating tag:", err)
+      throw err
     }
   }
 
@@ -166,7 +167,11 @@ export function useSupabaseTags(user: User | null) {
           switch (payload.eventType) {
             case 'INSERT':
               if (payload.new) {
-                setTags((prev) => [...prev, convertToLocal(payload.new as SupabaseTag)])
+                // 楽観的更新で既に追加済みの場合は重複追加を防ぐ
+                setTags((prev) => {
+                  if (prev.some((t) => t.id === payload.new.id)) return prev
+                  return [...prev, convertToLocal(payload.new as SupabaseTag)]
+                })
               }
               break
             case 'UPDATE':
