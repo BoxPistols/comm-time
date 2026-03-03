@@ -69,7 +69,11 @@ import { AIChat } from "@/components/ai-chat";
 import { SearchModal, type SearchResult } from "@/components/search-modal";
 import { RichTextWithLinks } from "@/components/rich-text-with-links";
 import { useKanbanStatuses } from "@/hooks/useKanbanStatuses";
-import { useHapticFeedback } from "@/hooks/useHapticFeedback";
+import {
+  useHapticFeedback,
+  VIBRATION_PATTERNS,
+  VibrationPatternKey,
+} from "@/hooks/useHapticFeedback";
 import {
   type Tag,
   type PriorityLevel,
@@ -274,6 +278,8 @@ export function CommTimeComponent() {
   const [forceFocus, setForceFocus] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
+  const [vibrationPattern, setVibrationPattern] =
+    useState<VibrationPatternKey>("standard");
   const [notificationPermission, setNotificationPermission] =
     useState<NotificationPermission>("default");
 
@@ -575,6 +581,7 @@ export function CommTimeComponent() {
     }
     setNotificationsEnabled(getStorageValue("notificationsEnabled", false));
     setVibrationEnabled(getStorageValue("vibrationEnabled", true));
+    setVibrationPattern(getStorageValue("vibrationPattern", "standard"));
     setCountdownMode(getStorageValue("countdownMode", false));
     setTargetEndTime(getStorageValue("targetEndTime", ""));
     setEndTimeInputMode(getStorageValue("endTimeInputMode", false));
@@ -656,6 +663,10 @@ export function CommTimeComponent() {
         "vibrationEnabled",
         JSON.stringify(vibrationEnabled)
       );
+      localStorage.setItem(
+        "vibrationPattern",
+        JSON.stringify(vibrationPattern)
+      );
       localStorage.setItem("countdownMode", JSON.stringify(countdownMode));
       localStorage.setItem("targetEndTime", targetEndTime);
       localStorage.setItem("endTimeInputMode", JSON.stringify(endTimeInputMode));
@@ -720,6 +731,7 @@ export function CommTimeComponent() {
     sharedTodos,
     notificationsEnabled,
     vibrationEnabled,
+    vibrationPattern,
     countdownMode,
     targetEndTime,
     tickSoundEnabled,
@@ -971,14 +983,14 @@ export function CommTimeComponent() {
 
           // バイブレーション（毎回・iOS Safari対応）
           if (vibrationEnabled) {
-            triggerAlarmVibration();
+            triggerAlarmVibration(vibrationPattern);
           }
         }
       }, 5000);
 
       // 強力なバイブレーション（iOS Safari対応）
       if (vibrationEnabled) {
-        triggerAlarmVibration();
+        triggerAlarmVibration(vibrationPattern);
       }
 
       // フラッシュエフェクト（長めに）
@@ -1015,6 +1027,7 @@ export function CommTimeComponent() {
     [
       forceFocus,
       vibrationEnabled,
+      vibrationPattern,
       notificationsEnabled,
       notificationPermission,
       flashEnabled,
@@ -4546,6 +4559,53 @@ export function CommTimeComponent() {
                         {vibrationEnabled ? "ON" : "OFF"}
                       </button>
                     </div>
+
+                    {/* 振動パターン選択 */}
+                    {vibrationEnabled && (
+                      <div className="bg-white dark:bg-gray-700 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Vibrate className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            振動パターン
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(
+                            Object.entries(VIBRATION_PATTERNS) as [
+                              VibrationPatternKey,
+                              (typeof VIBRATION_PATTERNS)[VibrationPatternKey],
+                            ][]
+                          ).map(([key, pattern]) => (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => {
+                                setVibrationPattern(key);
+                                triggerAlarmVibration(key);
+                              }}
+                              className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 text-left ${
+                                vibrationPattern === key
+                                  ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md ring-2 ring-purple-300 dark:ring-purple-700"
+                                  : "bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-500"
+                              }`}
+                            >
+                              <div className="font-semibold">
+                                {pattern.label}
+                              </div>
+                              <div
+                                className={`text-[10px] mt-0.5 ${
+                                  vibrationPattern === key
+                                    ? "text-purple-100"
+                                    : "text-gray-500 dark:text-gray-400"
+                                }`}
+                              >
+                                {pattern.description}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between bg-white dark:bg-gray-700 rounded-lg p-3">
                       <div className="flex items-center gap-2">
