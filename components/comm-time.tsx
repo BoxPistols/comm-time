@@ -75,6 +75,7 @@ import {
   VIBRATION_PATTERN_KEYS,
   VibrationPatternKey,
 } from "@/hooks/useHapticFeedback";
+import { useServiceWorker } from "@/hooks/useServiceWorker";
 import {
   type Tag,
   type PriorityLevel,
@@ -274,6 +275,13 @@ export function CommTimeComponent() {
 
   // ハプティックフィードバック（iOS Safari対応）
   const { triggerAlarmVibration, cancelVibration } = useHapticFeedback();
+
+  // Service Worker（iOS PWA通知対応）
+  const {
+    showNotification: swShowNotification,
+    scheduleAlarm,
+    cancelNotifications,
+  } = useServiceWorker();
 
   // その他の状態
   const [forceFocus, setForceFocus] = useState(false);
@@ -939,6 +947,7 @@ export function CommTimeComponent() {
     setIsAlarmRinging(false);
     setIsFlashing(false);
     cancelVibration();
+    cancelNotifications();
     if (alarmIntervalRef.current) {
       clearInterval(alarmIntervalRef.current);
       alarmIntervalRef.current = null;
@@ -948,7 +957,7 @@ export function CommTimeComponent() {
       titleBlinkIntervalRef.current = null;
     }
     document.title = "Comm Time";
-  }, [cancelVibration]);
+  }, [cancelVibration, cancelNotifications]);
 
   // アラーム再生機能（Safari対応・繰り返し対応）
   const playAlarm = useCallback(
@@ -999,15 +1008,9 @@ export function CommTimeComponent() {
         setTimeout(() => setIsFlashing(false), 30000); // 30秒間点滅
       }
 
-      // 通知（バックグラウンドでユーザーに知らせる）
+      // 通知（Service Worker経由でiOS PWAにも対応）
       if (notificationsEnabled && notificationPermission === "granted") {
-        new Notification("Comm Time", {
-          body: message,
-          icon: "/favicon.svg",
-          badge: "/favicon.svg",
-          tag: "comm-time-alarm",
-          requireInteraction: true,
-        });
+        swShowNotification("Comm Time", message, "comm-time-alarm");
       }
 
       // タイトル点滅（目立つように）
@@ -1033,6 +1036,7 @@ export function CommTimeComponent() {
       createAlarmAudio,
       stopAlarm,
       triggerAlarmVibration,
+      swShowNotification,
     ]
   );
 
@@ -1392,6 +1396,60 @@ export function CommTimeComponent() {
     playAlarm,
   ]);
 
+  // バックグラウンド復帰時のタイマー補正
+  // iOSではバックグラウンドでsetIntervalが停止するため、
+  // 復帰時にアラームポイントの残り時間を再計算する
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) return;
+
+      // ミーティングタイマーのアラームポイント補正
+      if (isMeetingRunning && meetingStartTime) {
+        const now = new Date();
+        const currentElapsed = Math.floor(
+          (now.getTime() - meetingStartTime.getTime()) / 1000
+        );
+        setMeetingElapsedTime(currentElapsed);
+
+        // アラームポイントの残り時間を再計算＆未発火アラームを発火
+        setAlarmPoints((prevPoints) =>
+          prevPoints.map((point) => {
+            if (point.isDone) return point;
+            const targetSeconds = point.minutes * 60;
+            const remaining = Math.max(0, targetSeconds - currentElapsed);
+            if (remaining === 0) {
+              playAlarm(
+                meetingAlarmSettings,
+                `${point.minutes}分経過しました`
+              );
+              return { ...point, isDone: true, remainingTime: 0 };
+            }
+            return { ...point, remainingTime: remaining };
+          })
+        );
+      }
+
+      // ポモドーロタイマーの補正（絶対時間ベースだが念のため更新）
+      if (isPomodoroRunning && pomodoroStartTime) {
+        const now = new Date();
+        setPomodoroElapsedTime(
+          Math.floor((now.getTime() - pomodoroStartTime.getTime()) / 1000)
+        );
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [
+    isMeetingRunning,
+    meetingStartTime,
+    isPomodoroRunning,
+    pomodoroStartTime,
+    meetingAlarmSettings,
+    playAlarm,
+  ]);
+
   // タイマーの制御機能
   const toggleMeetingTimer = useCallback(async () => {
     if (isMeetingRunning) {
@@ -1408,22 +1466,46 @@ export function CommTimeComponent() {
         }
       }
 
+      const startTime =
+        meetingStartTime === null
+          ? new Date()
+          : new Date(
+              new Date().getTime() -
+                (new Date().getTime() -
+                  (meetingStartTime.getTime() + meetingElapsedTime * 1000))
+            );
+
       if (meetingStartTime === null) {
-        setMeetingStartTime(new Date());
+        setMeetingStartTime(startTime);
       } else {
-        const now = new Date();
-        const pausedDuration =
-          now.getTime() -
-          (meetingStartTime.getTime() + meetingElapsedTime * 1000);
-        setMeetingStartTime(new Date(now.getTime() - pausedDuration));
+        setMeetingStartTime(startTime);
       }
       setIsMeetingRunning(true);
+
+      // Service Workerにアラームポイントをスケジュール（バックグラウンド通知用）
+      if (notificationsEnabled && notificationPermission === "granted") {
+        alarmPoints.forEach((point) => {
+          if (!point.isDone) {
+            const fireAt = startTime.getTime() + point.minutes * 60 * 1000;
+            scheduleAlarm(
+              fireAt,
+              "Comm Time",
+              `${point.minutes}分経過しました`,
+              `alarm-point-${point.id}`
+            );
+          }
+        });
+      }
     }
   }, [
     isMeetingRunning,
     meetingStartTime,
     meetingElapsedTime,
     tickSoundEnabled,
+    notificationsEnabled,
+    notificationPermission,
+    alarmPoints,
+    scheduleAlarm,
   ]);
 
   const resetMeetingTimer = useCallback(() => {
@@ -1581,7 +1663,6 @@ export function CommTimeComponent() {
 
     // iOS Safariなど、一部のブラウザでは通知がサポートされていない
     if (!("Notification" in window) || !window.Notification) {
-      // 通知が使えない場合は、何もせずに戻る（エラーメッセージを出さない）
       console.log("このブラウザでは通知機能が利用できません");
       return;
     }
@@ -1591,22 +1672,15 @@ export function CommTimeComponent() {
       setNotificationPermission(permission);
       if (permission === "granted") {
         setNotificationsEnabled(true);
-        // テスト通知を送信
-        try {
-          new Notification("Comm Time", {
-            body: "通知が有効になりました！",
-            icon: "/favicon.svg",
-          });
-        } catch (e) {
-          console.log("通知の送信に失敗しました:", e);
-        }
+        // テスト通知を送信（Service Worker経由でiOS PWA対応）
+        swShowNotification("Comm Time", "通知が有効になりました！", "comm-time-test");
       } else if (permission === "denied") {
         console.log("通知が拒否されました");
       }
     } catch (error) {
       console.error("通知権限のリクエストに失敗しました:", error);
     }
-  }, []);
+  }, [swShowNotification]);
 
   // 通知トグル
   const toggleNotifications = useCallback(() => {
