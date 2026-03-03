@@ -69,6 +69,7 @@ import { AIChat } from "@/components/ai-chat";
 import { SearchModal, type SearchResult } from "@/components/search-modal";
 import { RichTextWithLinks } from "@/components/rich-text-with-links";
 import { useKanbanStatuses } from "@/hooks/useKanbanStatuses";
+import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 import {
   type Tag,
   type PriorityLevel,
@@ -265,6 +266,9 @@ export function CommTimeComponent() {
 
   // カンバンステータス管理フック
   const kanbanStatusesHook = useKanbanStatuses(useDatabase ? user : null);
+
+  // ハプティックフィードバック（iOS Safari対応）
+  const { triggerAlarmVibration, cancelVibration } = useHapticFeedback();
 
   // その他の状態
   const [forceFocus, setForceFocus] = useState(false);
@@ -922,6 +926,7 @@ export function CommTimeComponent() {
   const stopAlarm = useCallback(() => {
     setIsAlarmRinging(false);
     setIsFlashing(false);
+    cancelVibration();
     if (alarmIntervalRef.current) {
       clearInterval(alarmIntervalRef.current);
       alarmIntervalRef.current = null;
@@ -931,7 +936,7 @@ export function CommTimeComponent() {
       titleBlinkIntervalRef.current = null;
     }
     document.title = "Comm Time";
-  }, []);
+  }, [cancelVibration]);
 
   // アラーム再生機能（Safari対応・繰り返し対応）
   const playAlarm = useCallback(
@@ -964,16 +969,16 @@ export function CommTimeComponent() {
         } else {
           playSound();
 
-          // バイブレーション（毎回）
-          if (vibrationEnabled && "vibrate" in navigator) {
-            navigator.vibrate([500, 200, 500, 200, 500]);
+          // バイブレーション（毎回・iOS Safari対応）
+          if (vibrationEnabled) {
+            triggerAlarmVibration();
           }
         }
       }, 5000);
 
-      // 強力なバイブレーション（iPhone対応）
-      if (vibrationEnabled && "vibrate" in navigator) {
-        navigator.vibrate([500, 200, 500, 200, 500]);
+      // 強力なバイブレーション（iOS Safari対応）
+      if (vibrationEnabled) {
+        triggerAlarmVibration();
       }
 
       // フラッシュエフェクト（長めに）
@@ -1015,6 +1020,7 @@ export function CommTimeComponent() {
       flashEnabled,
       createAlarmAudio,
       stopAlarm,
+      triggerAlarmVibration,
     ]
   );
 
