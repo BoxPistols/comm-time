@@ -34,7 +34,8 @@
     "swagger-ui-react": "^5.31.0",
     "swiper": "^12.0.3",
     "tailwind-merge": "^2.5.5",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "web-haptics": "^0.0.6"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
