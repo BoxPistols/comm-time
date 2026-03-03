@@ -72,6 +72,7 @@ import { useKanbanStatuses } from "@/hooks/useKanbanStatuses";
 import {
   useHapticFeedback,
   VIBRATION_PATTERNS,
+  VIBRATION_PATTERN_KEYS,
   VibrationPatternKey,
 } from "@/hooks/useHapticFeedback";
 import {
@@ -280,6 +281,8 @@ export function CommTimeComponent() {
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
   const [vibrationPattern, setVibrationPattern] =
     useState<VibrationPatternKey>("standard");
+  const vibrationPatternRef = useRef<VibrationPatternKey>("standard");
+  vibrationPatternRef.current = vibrationPattern;
   const [notificationPermission, setNotificationPermission] =
     useState<NotificationPermission>("default");
 
@@ -663,10 +666,7 @@ export function CommTimeComponent() {
         "vibrationEnabled",
         JSON.stringify(vibrationEnabled)
       );
-      localStorage.setItem(
-        "vibrationPattern",
-        JSON.stringify(vibrationPattern)
-      );
+      localStorage.setItem("vibrationPattern", vibrationPattern);
       localStorage.setItem("countdownMode", JSON.stringify(countdownMode));
       localStorage.setItem("targetEndTime", targetEndTime);
       localStorage.setItem("endTimeInputMode", JSON.stringify(endTimeInputMode));
@@ -983,14 +983,14 @@ export function CommTimeComponent() {
 
           // バイブレーション（毎回・iOS Safari対応）
           if (vibrationEnabled) {
-            triggerAlarmVibration(vibrationPattern);
+            triggerAlarmVibration(vibrationPatternRef.current);
           }
         }
       }, 5000);
 
       // 強力なバイブレーション（iOS Safari対応）
       if (vibrationEnabled) {
-        triggerAlarmVibration(vibrationPattern);
+        triggerAlarmVibration(vibrationPatternRef.current);
       }
 
       // フラッシュエフェクト（長めに）
@@ -1027,7 +1027,6 @@ export function CommTimeComponent() {
     [
       forceFocus,
       vibrationEnabled,
-      vibrationPattern,
       notificationsEnabled,
       notificationPermission,
       flashEnabled,
@@ -4570,12 +4569,9 @@ export function CommTimeComponent() {
                           </span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
-                          {(
-                            Object.entries(VIBRATION_PATTERNS) as [
-                              VibrationPatternKey,
-                              (typeof VIBRATION_PATTERNS)[VibrationPatternKey],
-                            ][]
-                          ).map(([key, pattern]) => (
+                          {VIBRATION_PATTERN_KEYS.map((key) => {
+                            const pattern = VIBRATION_PATTERNS[key];
+                            return (
                             <button
                               key={key}
                               type="button"
@@ -4602,7 +4598,8 @@ export function CommTimeComponent() {
                                 {pattern.description}
                               </div>
                             </button>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
