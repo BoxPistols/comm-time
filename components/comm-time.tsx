@@ -4390,7 +4390,7 @@ export function CommTimeComponent() {
         {/* 設定モーダル */}
         <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
           <DialogContent className="max-w-7xl h-[95vh] p-0 flex flex-col overflow-hidden">
-            <DialogHeader className="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 shadow-sm">
+            <DialogHeader className="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-6 py-3 sm:py-4 shadow-sm">
               <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                 ⚙️ 設定
               </DialogTitle>
@@ -4399,7 +4399,7 @@ export function CommTimeComponent() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="flex-1 overflow-y-auto px-6 py-6">
+            <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 sm:py-6">
               <div className="space-y-6 max-w-6xl mx-auto">
                 {/* チクタク音設定 */}
                 <div className="bg-gradient-to-r from-green-50 to-teal-50 dark:from-green-950 dark:to-teal-950 rounded-xl p-4 border border-green-200 dark:border-green-800">
