@@ -12,6 +12,10 @@ import {
   isOpenAIConfigured,
   getDefaultModel,
 } from '@/lib/openai'
+import {
+  checkRateLimit,
+  rateLimitHeaders,
+} from '@/lib/rate-limit'
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 
 // CORS preflight
@@ -189,7 +193,7 @@ async function getUserMemosContext(client: SupabaseClient, userId: string): Prom
  * - message: string (required) - ユーザーのメッセージ
  * - history?: Array<{role: 'user' | 'assistant', content: string}> - 会話履歴
  * - stream?: boolean - ストリーミングレスポンスを使用するか (default: false)
- * - model?: string - 使用するモデル (default: 環境変数 or gpt-4o-mini)
+ * - model?: string - 使用するモデル (default: 環境変数 or gpt-5.4-nano)
  */
 export async function POST(request: NextRequest) {
   // 認証チェック
@@ -220,6 +224,22 @@ export async function POST(request: NextRequest) {
   const history = (body.history as Array<{ role: 'user' | 'assistant'; content: string }>) || []
   const useStream = body.stream === true
   const model = (body.model as string) || getDefaultModel()
+
+  // レート制限（認証済みユーザーに対して50回/日）
+  const rateLimit = checkRateLimit(auth.userId, 'chat')
+
+  if (!rateLimit.allowed) {
+    return new Response(
+      JSON.stringify({ error: rateLimit.error, remaining: 0, resetTime: rateLimit.resetTime }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          ...rateLimitHeaders(rateLimit),
+        },
+      }
+    )
+  }
 
   // コンテキストを並列で取得（認証済みクライアントを使用）
   const [timeContext, todosContext, memosContext] = await Promise.all([
