@@ -44,6 +44,9 @@ const MODEL_OPTIONS: ModelOption[] = [
   { id: "custom", name: "ローカルLLM（無料）", description: "LM Studio等", isCustom: true },
 ];
 
+// レート制限の設定
+const RATE_LIMIT_MAX = 50;
+
 // 認証ヘッダーを取得
 async function getAuthHeaders(): Promise<HeadersInit> {
   const { data: { session } } = await supabase.auth.getSession();
@@ -79,6 +82,7 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
   const [customEndpoint, setCustomEndpoint] = useState("http://localhost:1234/v1");
   const [customModelName, setCustomModelName] = useState("");
   const [showCustomSettings, setShowCustomSettings] = useState(false);
+  const [remainingRequests, setRemainingRequests] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -180,8 +184,17 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
           }),
         });
 
+        // 残り回数をヘッダーから取得
+        const remaining = response.headers.get("X-RateLimit-Remaining");
+        if (remaining !== null) {
+          setRemainingRequests(parseInt(remaining, 10));
+        }
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
+          if (response.status === 429) {
+            throw new Error(errorData.error || "リクエスト上限に達しました");
+          }
           throw new Error(errorData.error || `HTTP error: ${response.status}`);
         }
 
@@ -656,13 +669,16 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
               <Send size={18} />
             </button>
           </div>
-          <p
-            className={`text-xs mt-2 ${
-              darkMode ? "text-gray-500" : "text-gray-400"
-            }`}
-          >
-            Enter で送信 / Shift+Enter で改行
-          </p>
+          <div className={`flex items-center justify-between text-xs mt-2 ${
+            darkMode ? "text-gray-500" : "text-gray-400"
+          }`}>
+            <span>Enter で送信 / Shift+Enter で改行</span>
+            {remainingRequests !== null && (
+              <span className={remainingRequests <= 10 ? "text-amber-500" : ""}>
+                残り {remainingRequests}/{RATE_LIMIT_MAX} 回
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

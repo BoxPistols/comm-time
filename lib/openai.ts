@@ -244,6 +244,7 @@ export function isOpenAIConfigured(): boolean {
 /**
  * 利用可能なモデルのリスト（UIで選択用）
  * GPT-5.4 nano（デフォルト）と GPT-5.4 mini の2択
+ * ログイン済みユーザーは両方使用可能（50回/日のレート制限）
  */
 export const AVAILABLE_MODELS = [
   { id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', description: '高速・軽量（デフォルト）' },

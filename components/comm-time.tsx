@@ -1083,17 +1083,26 @@ export function CommTimeComponent() {
   }, [showKanbanModal]);
 
   // Cmd+K / Ctrl+K で検索モーダルを開く
+  // Cmd+Shift+K / Ctrl+Shift+K でAIチャットを開く
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        setShowSearchModal(true);
+        if (e.shiftKey) {
+          // Cmd+Shift+K: AIチャットを開く/閉じる
+          if (isAuthenticated) {
+            setShowAIChat((prev) => !prev);
+          }
+        } else {
+          // Cmd+K: 検索モーダルを開く
+          setShowSearchModal(true);
+        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [isAuthenticated]);
 
   // 検索結果選択時のハンドラ
   const handleSearchResultSelect = useCallback(

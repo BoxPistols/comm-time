@@ -12,6 +12,10 @@ import {
   isOpenAIConfigured,
   getDefaultModel,
 } from '@/lib/openai'
+import {
+  checkRateLimit,
+  rateLimitHeaders,
+} from '@/lib/rate-limit'
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 
 // CORS preflight
@@ -220,6 +224,22 @@ export async function POST(request: NextRequest) {
   const history = (body.history as Array<{ role: 'user' | 'assistant'; content: string }>) || []
   const useStream = body.stream === true
   const model = (body.model as string) || getDefaultModel()
+
+  // レート制限（認証済みユーザーに対して50回/日）
+  const rateLimit = checkRateLimit(auth.userId, 'chat')
+
+  if (!rateLimit.allowed) {
+    return new Response(
+      JSON.stringify({ error: rateLimit.error, remaining: 0, resetTime: rateLimit.resetTime }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          ...rateLimitHeaders(rateLimit),
+        },
+      }
+    )
+  }
 
   // コンテキストを並列で取得（認証済みクライアントを使用）
   const [timeContext, todosContext, memosContext] = await Promise.all([
