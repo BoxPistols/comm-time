@@ -150,7 +150,7 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
           body: JSON.stringify({
             model: customModelName || "local-model",
             messages: [
-              { role: "system", content: "あなたはタスク管理のアシスタントです。" },
+              { role: "system", content: "あなたはタスク管理のアシスタントです。\n\n## 文体ルール\n語尾を揃えず「〜です」「〜ですね」「〜ましょう」「〜がいいかも」など変化をつけること。箇条書きは最小限に、自然な文章で伝える。「素晴らしいですね！」「いかがでしたか？」など媚びた前置きや定型の結びは使わない。「まず」「次に」「さらに」を連続させない。短い文と長い文を混ぜてリズムを作る。考えながら話すような自然な口調で、具体的な提案をする。絵文字は使わない。" },
               ...messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
               { role: "user", content: userMessage },
             ],
