@@ -26,6 +26,18 @@ const SIZE_CONFIG: Record<ChatSize, { width: number; height: number }> = {
 
 // ドラッグリサイズの制限
 const MIN_WIDTH = 300;
+
+// ローカルLLM用のシステムプロンプト（簡潔版）
+const LOCAL_SYSTEM_PROMPT = `あなたはタスク管理のアシスタントです。
+
+## 文体ルール
+- 語尾を揃えず「〜です」「〜ですね」「〜ましょう」「〜がいいかも」など変化をつける
+- 箇条書きは最小限に、自然な文章で伝える
+- 「素晴らしいですね！」「いかがでしたか？」など媚びた前置きや定型の結びは使わない
+- 「まず」「次に」「さらに」を連続させない
+- 短い文と長い文を混ぜてリズムを作る
+- 考えながら話すような自然な口調で、具体的な提案をする
+- 絵文字は使わない`;
 const MAX_WIDTH = 800;
 const MIN_HEIGHT = 350;
 const MAX_HEIGHT = 900;
@@ -150,7 +162,7 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
           body: JSON.stringify({
             model: customModelName || "local-model",
             messages: [
-              { role: "system", content: "あなたはタスク管理のアシスタントです。\n\n## 文体ルール\n語尾を揃えず「〜です」「〜ですね」「〜ましょう」「〜がいいかも」など変化をつけること。箇条書きは最小限に、自然な文章で伝える。「素晴らしいですね！」「いかがでしたか？」など媚びた前置きや定型の結びは使わない。「まず」「次に」「さらに」を連続させない。短い文と長い文を混ぜてリズムを作る。考えながら話すような自然な口調で、具体的な提案をする。絵文字は使わない。" },
+              { role: "system", content: LOCAL_SYSTEM_PROMPT },
               ...messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
               { role: "user", content: userMessage },
             ],
