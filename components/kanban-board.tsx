@@ -141,7 +141,7 @@ export function KanbanBoard({
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      <div className="flex gap-3 overflow-x-auto pb-2 h-full">
         {sortedColumns.map((column) => {
           const columnTodos = getColumnTodos(column.name);
           const colors = getColumnColors(column.color);
@@ -149,7 +149,7 @@ export function KanbanBoard({
           return (
             <div
               key={column.id}
-              className={`flex-shrink-0 w-52 sm:w-64 rounded-xl border ${colors.border} ${colors.bg}`}
+              className={`flex-shrink-0 flex-1 min-w-[200px] rounded-xl border flex flex-col ${colors.border} ${colors.bg}`}
             >
               {/* カラムヘッダー */}
               <div
@@ -177,7 +177,7 @@ export function KanbanBoard({
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className={`min-h-[200px] max-h-[400px] overflow-y-auto p-2 space-y-2 transition-colors ${
+                    className={`min-h-[200px] flex-1 overflow-y-auto p-2 space-y-2 transition-colors ${
                       snapshot.isDraggingOver
                         ? darkMode
                           ? "bg-gray-700/50"

@@ -1,3 +1,67 @@
+// タイマー関連の型定義
+export type AlarmPoint = {
+  id: string;
+  minutes: number;
+  isDone: boolean;
+  linkedTodo?: string;
+  remainingTime: number;
+};
+
+export type AlarmSettings = {
+  volume: number;
+  frequency: number;
+};
+
+export type TabType = "meeting" | "pomodoro";
+
+export type PomodoroState = "work" | "break";
+
+export type PomodoroSettings = {
+  workDuration: number;
+  breakDuration: number;
+  cycles: number;
+  infiniteMode: boolean;
+  workAlarm: AlarmSettings;
+  breakAlarm: AlarmSettings;
+};
+
+// TODO関連の型定義
+export type TodoItem = {
+  id: string;
+  text: string;
+  isCompleted: boolean;
+  dueDate?: string; // YYYY-MM-DD
+  dueTime?: string; // HH:MM
+  tagIds?: string[]; // タグIDの配列
+  priority?: PriorityLevel; // 優先度
+  importance?: ImportanceLevel; // 重要度
+  kanbanStatus?: KanbanStatus; // カンバンステータス
+};
+
+// ゴミ箱に入ったTODOの型
+export type TrashedTodoItem = TodoItem & {
+  deletedAt: string; // ISO形式の日時
+};
+
+// TODOのバージョン履歴の型
+export type TodoVersion = {
+  id: string;
+  todoId: string;
+  text: string;
+  timestamp: string; // ISO形式の日時
+  changeType: "create" | "update" | "delete";
+};
+
+// ゴミ箱に入ったメモの型
+export type TrashedMemoItem = {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  deletedAt: string;
+};
+
 // タグの型定義
 export type Tag = {
   id: string;
