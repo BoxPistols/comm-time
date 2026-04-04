@@ -40,7 +40,6 @@ import {
 import {
   DragDropContext,
   Draggable,
-  type DropResult,
 } from "react-beautiful-dnd";
 import { StrictModeDroppable } from "@/components/strict-mode-droppable";
 import {
@@ -52,7 +51,7 @@ import {
 } from "@/components/ui/dialog";
 import { AuthDialog } from "@/components/auth-dialog";
 import { useAuth } from "@/hooks/useAuth";
-import { useSupabaseTodos } from "@/hooks/useSupabaseTodos";
+// useSupabaseTodos は useTodoManager 内部で使用
 // useSupabaseTags は useTagManager 内部で使用
 import { useSupabasePomodoroTask } from "@/hooks/useSupabasePomodoroTask";
 // import { useSupabaseMemos } from "@/hooks/useSupabaseMemos";
@@ -78,22 +77,13 @@ import { useMeetingTimer } from "@/hooks/useMeetingTimer";
 import { usePomodoroTimer } from "@/hooks/usePomodoroTimer";
 import { useDefaultSettings } from "@/hooks/useDefaultSettings";
 import { useTagManager } from "@/hooks/useTagManager";
+import { useTodoManager } from "@/hooks/useTodoManager";
 import {
   type TabType,
-  type TodoItem,
-  type TrashedTodoItem,
-  type TodoVersion,
-  type TrashedMemoItem,
-  type PriorityLevel,
-  type ImportanceLevel,
-  type KanbanStatus,
-  type FilterState,
-  initialFilterState,
   PRIORITY_CONFIG,
   IMPORTANCE_CONFIG,
   TAG_COLORS,
 } from "@/types";
-// 定数は各hookで直接import
 export function CommTimeComponent() {
   // クライアントサイドマウント状態（Hydration error回避）
   const [mounted, setMounted] = useState(false);
@@ -144,23 +134,7 @@ export function CommTimeComponent() {
     return "meeting";
   });
 
-  // 共通のメモ/TODO（meeting/pomodoro共有）
-  const [sharedMemo, setSharedMemo] = useState("");
-  const [sharedTodos, setSharedTodos] = useState<TodoItem[]>([]);
-
-  // 後方互換性のため、共通データを参照するエイリアス
-  const meetingTodos = sharedTodos;
-  const setMeetingTodos = setSharedTodos;
-  const pomodoroTodos = sharedTodos;
-  const setPomodoroTodos = setSharedTodos;
-
-  // TODO関連の状態
-  const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
-
-  // Supabaseフック（データベースモード有効時に使用）
-  // メモ・TODOは共通化されているため、meeting/pomodoroの区別なし
-  const sharedSupabaseTodos = useSupabaseTodos(useDatabase ? user : null);
-  // const sharedSupabaseMemos = useSupabaseMemos(useDatabase ? user : null);
+  // Supabaseフック
   const supabasePomodoroTask = useSupabasePomodoroTask(useDatabase ? user : null);
 
   // 複数メモ管理フック
@@ -233,53 +207,37 @@ export function CommTimeComponent() {
     updatePomodoroTask, clearPomodoroTask,
   } = pomodoro;
 
-  // 設定モーダルの状態
-  const [settingsOpen, setSettingsOpen] = useState(false);
-
-  // TODOソート状態
-  const [sortByDeadline, setSortByDeadline] = useState(false);
-
-  // 締切アラート設定
-  const [deadlineAlertEnabled, setDeadlineAlertEnabled] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("deadlineAlertEnabled") === "true";
-    }
-    return false;
-  });
-  const [deadlineAlertMinutes, setDeadlineAlertMinutes] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("deadlineAlertMinutes");
-      return saved ? parseInt(saved, 10) : 60;
-    }
-    return 60;
-  });
-  const alertedTodoIdsRef = useRef<Set<string>>(new Set());
+  // TODO管理
+  const todoManager = useTodoManager({ useDatabase, user, setAlarmPoints });
+  const {
+    sharedTodos, setSharedTodos,
+    filteredTodos,
+    editingTodoId, setEditingTodoId,
+    setEditDialogTodoId, editDialogTodo,
+    expandedDeadlineTodoId, setExpandedDeadlineTodoId,
+    expandedTodoContentId, setExpandedTodoContentId,
+    filterState, setFilterState, hasActiveFilters,
+    sortByDeadline, setSortByDeadline,
+    trashedTodos, setTrashedMemos,
+    showTrash, setShowTrash,
+    deadlineAlertEnabled, setDeadlineAlertEnabled,
+    deadlineAlertMinutes, setDeadlineAlertMinutes,
+    alertedTodoIdsRef,
+    addTodo, toggleTodo, removeTodo, updateTodo,
+    startEditingTodo, cancelEditingTodo,
+    clearAllTodos, clearCompletedTodos,
+    restoreTodo, permanentlyDeleteTodo, emptyTrash,
+    updateTodoKanbanStatus, handleSaveTodoDetails,
+    updateTodoDeadline, extendDeadline, getDeadlineStatus,
+    sortTodosByDeadline, onDragEnd,
+  } = todoManager;
 
   // タグ管理
   const tagManager = useTagManager({ useDatabase, user, setSharedTodos });
   const { tags, tagsMap, addTag, updateTag, deleteTag } = tagManager;
 
-  // フィルター状態
-  const [filterState, setFilterState] = useState<FilterState>(initialFilterState);
-
-  // フィルターがアクティブかどうかを判定
-  const hasActiveFilters = React.useMemo(() => {
-    return filterState.tags.length > 0 ||
-           filterState.priority !== "all" ||
-           filterState.importance !== "all" ||
-           filterState.kanbanStatus !== "all";
-  }, [filterState]);
-
-  // 表示モード（リスト / カンバン）
-  const [viewMode] = useState<"list" | "kanban">(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("todoViewMode");
-      if (saved === "kanban" || saved === "list") {
-        return saved;
-      }
-    }
-    return "list";
-  });
+  // 設定モーダルの状態
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // タグ管理パネルの表示状態
   const [showTagManager, setShowTagManager] = useState(false);
@@ -295,88 +253,6 @@ export function CommTimeComponent() {
 
   // フィルターパネルの表示状態
   const [showFilterPanel, setShowFilterPanel] = useState(false);
-
-  // TODO編集ダイアログの状態
-  const [editDialogTodoId, setEditDialogTodoId] = useState<string | null>(null);
-  const editDialogTodo = React.useMemo(() => editDialogTodoId
-    ? sharedTodos.find((todo) => todo.id === editDialogTodoId) || null
-    : null, [editDialogTodoId, sharedTodos]);
-
-  // 期限入力を展開中のTodoのID
-  const [expandedDeadlineTodoId, setExpandedDeadlineTodoId] = useState<
-    string | null
-  >(null);
-
-  // TODO内容を展開中のTodoのID（3行以上の場合に使用）
-  const [expandedTodoContentId, setExpandedTodoContentId] = useState<
-    string | null
-  >(null);
-
-  // ゴミ箱の状態（30日間保存）
-  const [trashedTodos, setTrashedTodos] = useState<TrashedTodoItem[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("trashedTodos");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          // 30日経過したアイテムを除外
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          return parsed.filter(
-            (item: TrashedTodoItem) => new Date(item.deletedAt) > thirtyDaysAgo
-          );
-        } catch {
-          return [];
-        }
-      }
-    }
-    return [];
-  });
-
-  // ゴミ箱UIの表示状態
-  const [showTrash, setShowTrash] = useState(false);
-
-  // メモのゴミ箱（30日間保存）
-  const [trashedMemos, setTrashedMemos] = useState<TrashedMemoItem[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("trashedMemos");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          // 30日経過したアイテムを除外
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          return parsed.filter(
-            (item: TrashedMemoItem) => new Date(item.deletedAt) > thirtyDaysAgo
-          );
-        } catch {
-          return [];
-        }
-      }
-    }
-    return [];
-  });
-
-  // バージョン履歴（削除・10文字以上の変更のみ保存）
-  const [todoVersions, setTodoVersions] = useState<TodoVersion[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("todoVersions");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          // 30日経過したバージョンを除外
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          return parsed.filter(
-            (item: TodoVersion) => new Date(item.timestamp) > thirtyDaysAgo
-          );
-        } catch {
-          return [];
-        }
-      }
-    }
-    return [];
-  });
 
   // ダークモードの状態
   const [darkMode, setDarkMode] = useState(false);
@@ -418,100 +294,20 @@ export function CommTimeComponent() {
 
   // 初期データのロード
   useEffect(() => {
-    // メモ/TODOのマイグレーション: 既存の分離データを共通データに統合
-    const savedSharedMemo = getStorageValue("sharedMemo", "");
-    const savedSharedTodos = getStorageValue("sharedTodos", []);
-
-    if (savedSharedMemo || savedSharedTodos.length > 0) {
-      // すでに共通データが存在する場合はそれを使用
-      setSharedMemo(savedSharedMemo);
-      setSharedTodos(savedSharedTodos);
-    } else {
-      // 既存のmeeting/pomodoroデータをマイグレーション
-      const oldMeetingMemo = getStorageValue("meetingMemo", "");
-      const oldPomodoroMemo = getStorageValue("pomodoroMemo", "");
-      const oldMeetingTodos = getStorageValue("meetingTodos", []);
-      const oldPomodoroTodos = getStorageValue("pomodoroTodos", []);
-
-      // 両方のメモを結合して保持（データを失わないため）
-      const migratedMemo = [oldMeetingMemo, oldPomodoroMemo]
-        .filter(Boolean)
-        .join("\n\n---\n\n");
-
-      // TODOは両方を統合（重複を除く）
-      const allTodos = [...oldMeetingTodos, ...oldPomodoroTodos];
-      const uniqueTodos = allTodos.filter(
-        (todo, index, self) => index === self.findIndex((t) => t.id === todo.id)
-      );
-
-      setSharedMemo(migratedMemo);
-      setSharedTodos(uniqueTodos);
-
-      // マイグレーション完了後、共通データとして保存
-      if (typeof window !== "undefined") {
-        localStorage.setItem("sharedMemo", migratedMemo);
-        localStorage.setItem("sharedTodos", JSON.stringify(uniqueTodos));
-      }
-    }
     setDarkMode(getStorageValue("darkMode", false));
     setWorkMode(getStorageValue("workMode", false));
   }, []);
 
-  // データの自動保存（初期データ読み込み後のみ）
+  // アプリ設定の自動保存
   useEffect(() => {
-    // mountedフラグで初回レンダリング時の保存を防ぐ
     if (!mounted) return;
-
     if (typeof window !== "undefined") {
-      // 共通のメモ/TODOとして保存
-      localStorage.setItem("sharedMemo", sharedMemo);
-      localStorage.setItem("sharedTodos", JSON.stringify(sharedTodos));
       localStorage.setItem("darkMode", JSON.stringify(darkMode));
       localStorage.setItem("workMode", JSON.stringify(workMode));
       localStorage.setItem("useDatabase", JSON.stringify(useDatabase));
       localStorage.setItem("activeTab", activeTab);
-
-      // ゴミ箱とバージョン履歴の保存
-      localStorage.setItem("trashedTodos", JSON.stringify(trashedTodos));
-      localStorage.setItem("todoVersions", JSON.stringify(todoVersions));
-      localStorage.setItem("trashedMemos", JSON.stringify(trashedMemos));
-
-      localStorage.setItem("todoViewMode", viewMode);
     }
-  }, [
-    mounted,
-    sharedMemo,
-    sharedTodos,
-    darkMode,
-    workMode,
-    useDatabase,
-    activeTab,
-    trashedTodos,
-    todoVersions,
-    trashedMemos,
-    viewMode,
-    endTimeInputMode,
-    progressPreset,
-  ]);
-
-  // Supabaseデータの同期（データベースモード有効時）
-  // 共通データとして1つのuseEffectで同期
-  useEffect(() => {
-    if (useDatabase && user) {
-      // TODOsをSupabaseから同期
-      if (
-        sharedSupabaseTodos.todos.length > 0 ||
-        !sharedSupabaseTodos.loading
-      ) {
-        setSharedTodos(sharedSupabaseTodos.todos);
-      }
-    }
-  }, [
-    useDatabase,
-    user,
-    sharedSupabaseTodos.todos,
-    sharedSupabaseTodos.loading,
-  ]);
+  }, [mounted, darkMode, workMode, useDatabase, activeTab]);
 
   // ポモドーロタスクのSupabase同期
   useEffect(() => {
@@ -519,36 +315,7 @@ export function CommTimeComponent() {
       setCurrentPomodoroTask(supabasePomodoroTask.task.taskText);
       setCurrentPomodoroTaskId(supabasePomodoroTask.task.todoId);
     }
-  }, [
-    useDatabase,
-    user,
-    supabasePomodoroTask.task,
-    supabasePomodoroTask.loading,
-  ]);
-
-  /*
-  useEffect(() => {
-    if (useDatabase && user) {
-      // メモをSupabaseから同期
-      if (!sharedSupabaseMemos.loading) {
-        setSharedMemo(sharedSupabaseMemos.memo);
-        // textareaにフォーカスがなく、composing中でない場合のみ更新
-        if (
-          memoTextareaRef.current &&
-          document.activeElement !== memoTextareaRef.current &&
-          !isComposingRef.current
-        ) {
-          memoTextareaRef.current.value = sharedSupabaseMemos.memo;
-        }
-      }
-    }
-  }, [
-    useDatabase,
-    user,
-    sharedSupabaseMemos.memo,
-    sharedSupabaseMemos.loading,
-  ]);
-  */
+  }, [useDatabase, user, supabasePomodoroTask.task, supabasePomodoroTask.loading]);
 
   // 認証状態が変化した時にuseDatabaseを自動的に有効化
   useEffect(() => {
@@ -690,500 +457,16 @@ export function CommTimeComponent() {
     resetToDefaultsFn(setMeetingAlarmSettings, setPomodoroSettings, pomodoroSettings);
   }, [resetToDefaultsFn, setMeetingAlarmSettings, setPomodoroSettings, pomodoroSettings]);
 
-  // カンバンステータス更新関数（看板ビューで使用）
-  const updateTodoKanbanStatus = useCallback(
-    (todoId: string, kanbanStatus: KanbanStatus) => {
-      if (useDatabase && user) {
-        sharedSupabaseTodos.updateTodo(todoId, { kanbanStatus });
-      } else {
-        setSharedTodos((prev) =>
-          prev.map((todo) =>
-            todo.id === todoId ? { ...todo, kanbanStatus } : todo
-          )
-        );
-      }
-    },
-    [useDatabase, user, sharedSupabaseTodos]
-  );
-
-  // TODO詳細保存（タグ・優先度・重要度・ステータス）
-  const handleSaveTodoDetails = useCallback(
-    (
-      todoId: string,
-      updates: {
-        tagIds?: string[];
-        priority?: PriorityLevel;
-        importance?: ImportanceLevel;
-        kanbanStatus?: KanbanStatus;
-      }
-    ) => {
-      if (useDatabase && user) {
-        sharedSupabaseTodos.updateTodo(todoId, updates);
-      } else {
-        setSharedTodos((prev) =>
-          prev.map((todo) =>
-            todo.id === todoId ? { ...todo, ...updates } : todo
-          )
-        );
-      }
-    },
-    [useDatabase, user, sharedSupabaseTodos]
-  );
-
-  // フィルタリングされたTODOを取得
-  const filteredTodos = React.useMemo(() => {
-    return sharedTodos.filter((todo) => {
-      // タグフィルター
-      if (filterState.tags.length > 0) {
-        const todoTags = todo.tagIds || [];
-        if (!filterState.tags.some((tagId) => todoTags.includes(tagId))) {
-          return false;
-        }
-      }
-      // 優先度フィルター
-      if (filterState.priority !== "all") {
-        if ((todo.priority || "none") !== filterState.priority) {
-          return false;
-        }
-      }
-      // 重要度フィルター
-      if (filterState.importance !== "all") {
-        if ((todo.importance || "none") !== filterState.importance) {
-          return false;
-        }
-      }
-      // カンバンステータスフィルター
-      if (filterState.kanbanStatus !== "all") {
-        if ((todo.kanbanStatus || "backlog") !== filterState.kanbanStatus) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [sharedTodos, filterState]);
-
-  // TODO管理機能
-  const addTodo = useCallback(
-    (text: string, isPomodoro: boolean) => {
-      if (!text.trim()) return; // 空のTODOは追加しない
-
-      if (useDatabase && user) {
-        // データベースモード: Supabaseを使用（共通TODO）
-        sharedSupabaseTodos.addTodo(text.trim());
-      } else {
-        // ローカルモード: LocalStorageを使用
-        const newTodo = {
-          id: Date.now().toString(),
-          text: text.trim(),
-          isCompleted: false,
-        };
-
-        // LocalStorageモードでは個別に保存（後方互換性のため）
-        if (isPomodoro) {
-          setPomodoroTodos((prev) => [...prev, newTodo]);
-        } else {
-          setMeetingTodos((prev) => [...prev, newTodo]);
-        }
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setMeetingTodos and setPomodoroTodos are stable aliases of setSharedTodos
-    [useDatabase, user, sharedSupabaseTodos]
-  );
-
-  const toggleTodo = useCallback(
-    (id: string, isPomodoro: boolean) => {
-      if (useDatabase && user) {
-        // データベースモード: Supabaseを使用（共通TODO）
-        sharedSupabaseTodos.toggleTodo(id);
-      } else {
-        // ローカルモード: LocalStorageを使用（個別に保存）
-        const updateTodos = (prev: TodoItem[]) =>
-          prev.map((todo) =>
-            todo.id === id ? { ...todo, isCompleted: !todo.isCompleted } : todo
-          );
-
-        if (isPomodoro) {
-          setPomodoroTodos(updateTodos);
-        } else {
-          setMeetingTodos(updateTodos);
-        }
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setMeetingTodos and setPomodoroTodos are stable aliases of setSharedTodos
-    [useDatabase, user, sharedSupabaseTodos]
-  );
-
-  // バージョン履歴を追加するヘルパー関数
-  const addTodoVersion = useCallback(
-    (
-      todoId: string,
-      text: string,
-      changeType: "create" | "update" | "delete"
-    ) => {
-      const newVersion: TodoVersion = {
-        id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        todoId,
-        text,
-        timestamp: new Date().toISOString(),
-        changeType,
-      };
-      setTodoVersions((prev) => [...prev, newVersion]);
-    },
-    []
-  );
-
-  const removeTodo = useCallback(
-    (id: string, isPomodoro: boolean) => {
-      // 削除前にTODOを取得してゴミ箱に移動
-      const todos = isPomodoro ? pomodoroTodos : meetingTodos;
-      const todoToRemove = todos.find((todo) => todo.id === id);
-
-      if (todoToRemove) {
-        // ゴミ箱に追加
-        const trashedTodo: TrashedTodoItem = {
-          ...todoToRemove,
-          deletedAt: new Date().toISOString(),
-        };
-        setTrashedTodos((prev) => [...prev, trashedTodo]);
-
-        // バージョン履歴に追加
-        addTodoVersion(id, todoToRemove.text, "delete");
-      }
-
-      if (useDatabase && user) {
-        // データベースモード: Supabaseを使用（共通TODO）
-        sharedSupabaseTodos.removeTodo(id);
-      } else {
-        // ローカルモード: LocalStorageを使用（個別に保存）
-        if (isPomodoro) {
-          setPomodoroTodos((prev) => prev.filter((todo) => todo.id !== id));
-        } else {
-          setMeetingTodos((prev) => prev.filter((todo) => todo.id !== id));
-        }
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setMeetingTodos and setPomodoroTodos are stable aliases of setSharedTodos
-    [
-      useDatabase,
-      user,
-      sharedSupabaseTodos,
-      pomodoroTodos,
-      meetingTodos,
-      addTodoVersion,
-    ]
-  );
-
-  // ゴミ箱からTODOを復元
-  const restoreTodo = useCallback(
-    (trashedTodo: TrashedTodoItem) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { deletedAt, ...todoItem } = trashedTodo;
-
-      if (useDatabase && user) {
-        // データベースモード: Supabaseを使用
-        sharedSupabaseTodos.addTodo(todoItem.text);
-      } else {
-        // ローカルモード: 共有TODOリストに追加
-        setMeetingTodos((prev) => [...prev, todoItem]);
-      }
-
-      // ゴミ箱から削除
-      setTrashedTodos((prev) => prev.filter((t) => t.id !== trashedTodo.id));
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setMeetingTodos is a stable alias of setSharedTodos
-    [useDatabase, user, sharedSupabaseTodos]
-  );
-
-  // ゴミ箱からTODOを完全削除
-  const permanentlyDeleteTodo = useCallback((id: string) => {
-    setTrashedTodos((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
   // メモをゴミ箱に移動
   const moveMemotoTrash = useCallback((memo: MemoData) => {
-    const trashedMemo = {
-      ...memo,
-      deletedAt: new Date().toISOString(),
-    };
+    const trashedMemo = { ...memo, deletedAt: new Date().toISOString() };
     setTrashedMemos((prev) => [...prev, trashedMemo]);
-  }, []);
+  }, [setTrashedMemos]);
 
   // メモを削除（ゴミ箱に移動）
   const handleDeleteMemo = useCallback(
-    (id: string) => {
-      multipleMemos.deleteMemo(id, moveMemotoTrash);
-    },
+    (id: string) => { multipleMemos.deleteMemo(id, moveMemotoTrash); },
     [multipleMemos, moveMemotoTrash]
-  );
-
-  // ゴミ箱を空にする
-  const emptyTrash = useCallback(() => {
-    setTrashedTodos([]);
-  }, []);
-
-  const updateTodo = useCallback(
-    (id: string, newText: string, isPomodoro: boolean) => {
-      if (!newText.trim()) return; // 空のテキストの場合は更新しない
-
-      // 10文字以上の変更の場合、バージョン履歴に追加
-      const todos = isPomodoro ? pomodoroTodos : meetingTodos;
-      const currentTodo = todos.find((todo) => todo.id === id);
-      if (currentTodo) {
-        const oldText = currentTodo.text;
-        const newTextTrimmed = newText.trim();
-        // 文字列の差分が10文字以上の場合のみバージョン保存
-        if (
-          Math.abs(oldText.length - newTextTrimmed.length) >= 10 ||
-          (oldText !== newTextTrimmed && newTextTrimmed.length >= 10)
-        ) {
-          addTodoVersion(id, oldText, "update");
-        }
-      }
-
-      if (useDatabase && user) {
-        // データベースモード: Supabaseを使用（共通TODO）
-        sharedSupabaseTodos.updateTodo(id, { text: newText.trim() });
-      } else {
-        // ローカルモード: LocalStorageを使用（個別に保存）
-        const updateFunc = (prev: TodoItem[]) =>
-          prev.map((todo) =>
-            todo.id === id ? { ...todo, text: newText.trim() } : todo
-          );
-
-        if (isPomodoro) {
-          setPomodoroTodos(updateFunc);
-        } else {
-          setMeetingTodos(updateFunc);
-        }
-      }
-      setEditingTodoId(null);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setMeetingTodos and setPomodoroTodos are stable aliases of setSharedTodos
-    [
-      useDatabase,
-      user,
-      sharedSupabaseTodos,
-      pomodoroTodos,
-      meetingTodos,
-      addTodoVersion,
-    ]
-  );
-
-  const startEditingTodo = useCallback((id: string) => {
-    setEditingTodoId(id);
-  }, []);
-
-  const cancelEditingTodo = useCallback(() => {
-    setEditingTodoId(null);
-  }, []);
-
-  // 一括削除機能
-  const clearAllTodos = useCallback(async () => {
-    if (useDatabase && user) {
-      // データベースモード: すべてのTODOを削除
-      const allTodos = sharedSupabaseTodos.todos;
-      // 複数の削除リクエストを並列で実行してパフォーマンスを向上させます
-      const removalPromises = allTodos.map((todo) =>
-        sharedSupabaseTodos.removeTodo(todo.id)
-      );
-      await Promise.all(removalPromises);
-    } else {
-      // ローカルモード
-      setSharedTodos([]);
-    }
-  }, [useDatabase, user, sharedSupabaseTodos]);
-
-  const clearCompletedTodos = useCallback(async () => {
-    if (useDatabase && user) {
-      // データベースモード: 完了したTODOを削除
-      const completedTodos = sharedSupabaseTodos.todos.filter(
-        (t) => t.isCompleted
-      );
-      // 複数の削除リクエストを並列で実行してパフォーマンスを向上させます
-      const removalPromises = completedTodos.map((todo) =>
-        sharedSupabaseTodos.removeTodo(todo.id)
-      );
-      await Promise.all(removalPromises);
-    } else {
-      // ローカルモード
-      setSharedTodos((prev) => prev.filter((todo) => !todo.isCompleted));
-    }
-  }, [useDatabase, user, sharedSupabaseTodos]);
-
-  // TODOとアラームポイントのリンク機能
-  const linkTodoToAlarmPoint = useCallback(
-    (todoId: string, alarmPointId: string) => {
-      setAlarmPoints((prev) =>
-        prev.map((point) =>
-          point.id === alarmPointId ? { ...point, linkedTodo: todoId } : point
-        )
-      );
-    },
-    []
-  );
-
-  // 期限の更新機能
-  const updateTodoDeadline = useCallback(
-    (
-      id: string,
-      dueDate: string | undefined,
-      dueTime: string | undefined,
-      isPomodoro: boolean
-    ) => {
-      if (useDatabase && user) {
-        // データベースモード: Supabaseを使用（共通TODO）
-        sharedSupabaseTodos.updateTodo(id, { dueDate, dueTime });
-      } else {
-        // ローカルモード: LocalStorageを使用（個別に保存）
-        const updateFunc = (prev: TodoItem[]) =>
-          prev.map((todo) =>
-            todo.id === id ? { ...todo, dueDate, dueTime } : todo
-          );
-
-        if (isPomodoro) {
-          setPomodoroTodos(updateFunc);
-        } else {
-          setMeetingTodos(updateFunc);
-        }
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setMeetingTodos and setPomodoroTodos are stable aliases of setSharedTodos
-    [useDatabase, user, sharedSupabaseTodos]
-  );
-
-  // 期限延長機能
-  const extendDeadline = useCallback(
-    (id: string, days: number, isPomodoro: boolean) => {
-      // 現在のTODOを取得して新しい期限を計算
-      const todos = isPomodoro ? pomodoroTodos : meetingTodos;
-      const todo = todos.find((t) => t.id === id);
-      if (!todo) return;
-
-      const currentDate = todo.dueDate ? new Date(todo.dueDate) : new Date();
-      currentDate.setDate(currentDate.getDate() + days);
-      const newDueDate = currentDate.toISOString().split("T")[0];
-
-      if (useDatabase && user) {
-        // データベースモード: Supabaseを使用
-        sharedSupabaseTodos.updateTodo(id, {
-          dueDate: newDueDate,
-          dueTime: todo.dueTime,
-        });
-      } else {
-        // ローカルモード: LocalStorageを使用
-        const updateFunc = (prev: TodoItem[]) =>
-          prev.map((t) => (t.id === id ? { ...t, dueDate: newDueDate } : t));
-
-        if (isPomodoro) {
-          setPomodoroTodos(updateFunc);
-        } else {
-          setMeetingTodos(updateFunc);
-        }
-      }
-    },
-    [
-      useDatabase,
-      user,
-      sharedSupabaseTodos,
-      pomodoroTodos,
-      meetingTodos,
-      setMeetingTodos,
-      setPomodoroTodos,
-    ]
-  );
-
-  // 期限までの残り時間を取得
-  const getDeadlineStatus = useCallback((todo: TodoItem) => {
-    if (!todo.dueDate) return null;
-
-    const now = new Date();
-    const deadline = new Date(todo.dueDate);
-
-    if (todo.dueTime) {
-      const [hours, minutes] = todo.dueTime.split(":").map(Number);
-      deadline.setHours(hours, minutes, 0, 0);
-    } else {
-      deadline.setHours(23, 59, 59, 999);
-    }
-
-    const diffMs = deadline.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-    const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
-
-    return {
-      isOverdue: diffMs < 0,
-      isSoon: diffMs > 0 && diffHours <= 24,
-      diffDays,
-      diffHours,
-      diffMs,
-    };
-  }, []);
-
-  // Todoをソート（期限順）
-  const sortTodosByDeadline = useCallback((todos: TodoItem[]) => {
-    return [...todos].sort((a, b) => {
-      if (!a.dueDate && !b.dueDate) return 0;
-      if (!a.dueDate) return 1;
-      if (!b.dueDate) return -1;
-
-      const dateA = new Date(a.dueDate);
-      const dateB = new Date(b.dueDate);
-
-      if (a.dueTime) {
-        const [hoursA, minutesA] = a.dueTime.split(":").map(Number);
-        dateA.setHours(hoursA, minutesA);
-      }
-      if (b.dueTime) {
-        const [hoursB, minutesB] = b.dueTime.split(":").map(Number);
-        dateB.setHours(hoursB, minutesB);
-      }
-
-      return dateA.getTime() - dateB.getTime();
-    });
-  }, []);
-
-  // ドラッグ&ドロップの処理
-  const onDragEnd = useCallback(
-    (result: DropResult) => {
-      if (!result.destination) return;
-
-      const sourceId = result.source.droppableId;
-      const destId = result.destination.droppableId;
-
-      if (sourceId === destId) {
-        // 同じリスト内での並び替え
-        const items =
-          sourceId === "meetingTodos" ? meetingTodos : pomodoroTodos;
-        const reorderedItems = Array.from(items);
-        const [removed] = reorderedItems.splice(result.source.index, 1);
-        reorderedItems.splice(result.destination.index, 0, removed);
-
-        if (sourceId === "meetingTodos") {
-          setMeetingTodos(reorderedItems);
-        } else {
-          setPomodoroTodos(reorderedItems);
-        }
-
-        // Supabaseの順序も更新（データベースモード時のみ）
-        if (useDatabase && user) {
-          sharedSupabaseTodos.reorderTodos(reorderedItems);
-        }
-      } else if (destId.startsWith("alarmPoint")) {
-        // TODOをアラームポイントにリンク
-        const todoId = result.draggableId;
-        const alarmPointId = destId.split("-")[1];
-        linkTodoToAlarmPoint(todoId, alarmPointId);
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setMeetingTodos and setPomodoroTodos are stable aliases of setSharedTodos
-    [
-      meetingTodos,
-      pomodoroTodos,
-      linkTodoToAlarmPoint,
-      useDatabase,
-      user,
-      sharedSupabaseTodos,
-    ]
   );
 
   // SSR時はローディング表示（Hydration error回避）
@@ -1946,7 +1229,7 @@ export function CommTimeComponent() {
                         {point.linkedTodo && (
                           <span className="text-xs sm:text-sm text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900 px-2 sm:px-3 py-1 rounded-full">
                             {
-                              meetingTodos.find(
+                              sharedTodos.find(
                                 (todo) => todo.id === point.linkedTodo
                               )?.text
                             }
@@ -2874,11 +2157,7 @@ export function CommTimeComponent() {
                                           editingInputRef.current?.value.trim() ||
                                           "";
                                         if (value) {
-                                          updateTodo(
-                                            todo.id,
-                                            value,
-                                            activeTab === "pomodoro"
-                                          );
+                                          updateTodo(todo.id, value);
                                         }
                                       } else if (e.key === "Escape") {
                                         cancelEditingTodo();
@@ -2894,11 +2173,7 @@ export function CommTimeComponent() {
                                           editingInputRef.current?.value.trim() ||
                                           "";
                                         if (value) {
-                                          updateTodo(
-                                            todo.id,
-                                            value,
-                                            activeTab === "pomodoro"
-                                          );
+                                          updateTodo(todo.id, value);
                                         }
                                       }}
                                       className="p-1.5 text-green-600 hover:bg-green-100 rounded-lg transition-colors duration-200"
@@ -3028,7 +2303,6 @@ export function CommTimeComponent() {
                                                 todo.id,
                                                 e.target.value || undefined,
                                                 todo.dueTime,
-                                                activeTab === "pomodoro"
                                               )
                                             }
                                             className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:[color-scheme:dark]"
@@ -3042,7 +2316,6 @@ export function CommTimeComponent() {
                                                 todo.id,
                                                 todo.dueDate,
                                                 e.target.value || undefined,
-                                                activeTab === "pomodoro"
                                               )
                                             }
                                             className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:[color-scheme:dark]"
@@ -3055,8 +2328,7 @@ export function CommTimeComponent() {
                                                 updateTodoDeadline(
                                                   todo.id,
                                                   undefined,
-                                                  undefined,
-                                                  activeTab === "pomodoro"
+                                                  undefined
                                                 )
                                               }
                                               className="text-xs px-2 py-1 bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 rounded transition-colors"
@@ -3075,11 +2347,7 @@ export function CommTimeComponent() {
                                             <button
                                               type="button"
                                               onClick={() =>
-                                                extendDeadline(
-                                                  todo.id,
-                                                  1,
-                                                  activeTab === "pomodoro"
-                                                )
+                                                extendDeadline(todo.id, 1)
                                               }
                                               className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 rounded transition-colors"
                                               title="1日延長"
@@ -3089,11 +2357,7 @@ export function CommTimeComponent() {
                                             <button
                                               type="button"
                                               onClick={() =>
-                                                extendDeadline(
-                                                  todo.id,
-                                                  3,
-                                                  activeTab === "pomodoro"
-                                                )
+                                                extendDeadline(todo.id, 3)
                                               }
                                               className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 rounded transition-colors"
                                               title="3日延長"
@@ -3103,11 +2367,7 @@ export function CommTimeComponent() {
                                             <button
                                               type="button"
                                               onClick={() =>
-                                                extendDeadline(
-                                                  todo.id,
-                                                  7,
-                                                  activeTab === "pomodoro"
-                                                )
+                                                extendDeadline(todo.id, 7)
                                               }
                                               className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 rounded transition-colors"
                                               title="1週間延長"
@@ -3183,10 +2443,7 @@ export function CommTimeComponent() {
                                     <button
                                       type="button"
                                       onClick={() =>
-                                        toggleTodo(
-                                          todo.id,
-                                          activeTab === "pomodoro"
-                                        )
+                                        toggleTodo(todo.id)
                                       }
                                       className={`p-1 rounded transition-colors ${
                                         todo.isCompleted
@@ -3257,10 +2514,7 @@ export function CommTimeComponent() {
                                     <button
                                       type="button"
                                       onClick={() =>
-                                        removeTodo(
-                                          todo.id,
-                                          activeTab === "pomodoro"
-                                        )
+                                        removeTodo(todo.id)
                                       }
                                       className="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50 rounded transition-colors"
                                       title="削除"
@@ -3307,7 +2561,7 @@ export function CommTimeComponent() {
                       e.preventDefault();
                       const value = todoInputRef.current?.value.trim() || "";
                       if (value) {
-                        addTodo(value, activeTab === "pomodoro");
+                        addTodo(value);
                         if (todoInputRef.current) {
                           todoInputRef.current.value = "";
                           todoInputRef.current.focus();
@@ -3324,7 +2578,7 @@ export function CommTimeComponent() {
                   onClick={() => {
                     const value = todoInputRef.current?.value.trim() || "";
                     if (value) {
-                      addTodo(value, activeTab === "pomodoro");
+                      addTodo(value);
                       if (todoInputRef.current) {
                         todoInputRef.current.value = "";
                         todoInputRef.current.focus();
@@ -4197,7 +3451,7 @@ export function CommTimeComponent() {
                   columns={kanbanStatusesHook.statuses}
                   darkMode={darkMode}
                   onStatusChange={updateTodoKanbanStatus}
-                  onToggleTodo={(id) => toggleTodo(id, activeTab === "pomodoro")}
+                  onToggleTodo={(id) => toggleTodo(id)}
                   onEditTodo={(id) => {
                     setEditingTodoId(id);
                     setShowKanbanModal(false);

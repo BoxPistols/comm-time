@@ -3,20 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import type { AlarmSettings, PomodoroSettings } from "@/types";
 import { INITIAL_POMODORO_SETTINGS } from "@/lib/constants";
-
-function getStorageValue<T>(key: string, defaultValue: T): T {
-  if (typeof window !== "undefined") {
-    const saved = localStorage.getItem(key);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return saved as unknown as T;
-      }
-    }
-  }
-  return defaultValue;
-}
+import { getStorageValue } from "@/lib/storage";
 
 export type PomodoroTimerState = {
   // State
@@ -50,7 +37,7 @@ type PomodoroTimerOptions = {
   tickSoundEnabled: boolean;
   tickAudioContextRef: React.RefObject<AudioContext | null>;
   useDatabase: boolean;
-  user: unknown;
+  user: { id: string } | null;
   supabasePomodoroTask?: {
     updateTask: (text: string, todoId: string | null) => Promise<void>;
     clearTask: () => Promise<void>;

@@ -6,21 +6,7 @@ import {
   type VibrationPatternKey,
 } from "@/hooks/useHapticFeedback";
 import type { AlarmSettings } from "@/types";
-
-// localStorage helper
-function getStorageValue<T>(key: string, defaultValue: T): T {
-  if (typeof window !== "undefined") {
-    const saved = localStorage.getItem(key);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return saved as unknown as T;
-      }
-    }
-  }
-  return defaultValue;
-}
+import { getStorageValue } from "@/lib/storage";
 
 export type AlarmSystem = {
   // State

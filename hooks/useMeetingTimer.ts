@@ -7,20 +7,7 @@ import {
   INITIAL_MEETING_ALARM_SETTINGS,
   DEFAULT_PROGRESS_PRESET,
 } from "@/lib/constants";
-
-function getStorageValue<T>(key: string, defaultValue: T): T {
-  if (typeof window !== "undefined") {
-    const saved = localStorage.getItem(key);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return saved as unknown as T;
-      }
-    }
-  }
-  return defaultValue;
-}
+import { getStorageValue } from "@/lib/storage";
 
 export type MeetingTimerState = {
   // State
