@@ -50,7 +50,7 @@ type PomodoroTimerOptions = {
   tickSoundEnabled: boolean;
   tickAudioContextRef: React.RefObject<AudioContext | null>;
   useDatabase: boolean;
-  user: { id: string } | null;
+  user: unknown;
   supabasePomodoroTask?: {
     updateTask: (text: string, todoId: string | null) => Promise<void>;
     clearTask: () => Promise<void>;
