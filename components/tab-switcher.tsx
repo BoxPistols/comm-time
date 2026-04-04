@@ -10,7 +10,7 @@ type TabSwitcherProps = {
 
 export function TabSwitcher({ activeTab, onTabChange }: TabSwitcherProps) {
   return (
-    <div className="flex gap-3 sm:gap-4 mb-4 sm:mb-6">
+    <div className="flex gap-3 sm:gap-4">
       <button
         type="button"
         onClick={() => onTabChange("meeting")}

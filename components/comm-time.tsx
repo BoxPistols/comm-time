@@ -223,6 +223,27 @@ export function CommTimeComponent() {
     resetToDefaults: resetToDefaultsFn,
   } = defaults;
 
+  // パネル比率モード: "timer" = タイマー大(2/3), "equal" = 均等(1/2), "notes" = ノート大(2/3)
+  type LayoutMode = "timer" | "equal" | "notes";
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("layoutMode");
+      if (saved === "timer" || saved === "equal" || saved === "notes") return saved;
+    }
+    return "timer";
+  });
+  const cycleLayoutMode = useCallback(() => {
+    setLayoutMode(prev => {
+      const next = prev === "timer" ? "equal" : prev === "equal" ? "notes" : "timer";
+      localStorage.setItem("layoutMode", next);
+      return next;
+    });
+  }, []);
+
+  const leftWidth = layoutMode === "timer" ? "lg:w-2/3" : layoutMode === "equal" ? "lg:w-1/2" : "lg:w-1/3";
+  const rightWidth = layoutMode === "timer" ? "lg:w-1/3" : layoutMode === "equal" ? "lg:w-1/2" : "lg:w-2/3";
+  const layoutLabel = layoutMode === "timer" ? "タイマー優先" : layoutMode === "equal" ? "均等" : "ノート優先";
+
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
   const editingInputRef = useRef<HTMLInputElement>(null);
@@ -559,7 +580,20 @@ export function CommTimeComponent() {
           workMode={workMode}
           setWorkMode={setWorkMode}
         />
-        <TabSwitcher activeTab={activeTab} onTabChange={setActiveTab} />
+        <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="flex-1">
+            <TabSwitcher activeTab={activeTab} onTabChange={setActiveTab} />
+          </div>
+          <button
+            type="button"
+            onClick={cycleLayoutMode}
+            className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 shadow-md hover:shadow-lg transition-all text-xs font-medium whitespace-nowrap"
+            title={`レイアウト: ${layoutLabel}`}
+          >
+            <Columns className="w-4 h-4" />
+            {layoutLabel}
+          </button>
+        </div>
 
         <div
           className={`flex gap-4 sm:gap-6 lg:flex-row ${ 
@@ -568,7 +602,7 @@ export function CommTimeComponent() {
               : "flex-col"
           }`}
         >
-          <div className="w-full lg:w-2/3">
+          <div className={`w-full ${leftWidth} transition-all duration-300`}>
             {activeTab === "meeting" && (
               <MeetingTimerPanel
                 isMeetingRunning={isMeetingRunning}
@@ -639,12 +673,14 @@ export function CommTimeComponent() {
             )}
           </div>
           <div
-            className={`w-full lg:w-1/3 flex flex-col gap-4 ${
+            className={`w-full ${rightWidth} flex flex-col gap-4 transition-all duration-300 ${
               workMode ? "flex-col-reverse lg:flex-col" : ""
             }`}
           >
             {/* メモセクション（Markdownプレビュー対応） */}
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl border border-white/20 dark:border-gray-700/20 max-h-[400px] lg:max-h-[450px] overflow-hidden">
+            <div className={`bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-xl border border-white/20 dark:border-gray-700/20 overflow-hidden ${
+              layoutMode === "notes" ? "max-h-[600px] lg:max-h-[700px]" : "max-h-[400px] lg:max-h-[450px]"
+            }`}>
               <MemoSwiper
                 memos={multipleMemos.memos}
                 onCreateMemo={multipleMemos.createMemo}
