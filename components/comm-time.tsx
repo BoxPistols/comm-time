@@ -53,7 +53,7 @@ import {
 import { AuthDialog } from "@/components/auth-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useSupabaseTodos } from "@/hooks/useSupabaseTodos";
-import { useSupabaseTags } from "@/hooks/useSupabaseTags";
+// useSupabaseTags は useTagManager 内部で使用
 import { useSupabasePomodoroTask } from "@/hooks/useSupabasePomodoroTask";
 // import { useSupabaseMemos } from "@/hooks/useSupabaseMemos";
 import { useMultipleMemos } from "@/hooks/useMultipleMemos";
@@ -76,14 +76,14 @@ import {
 import { useAlarmSystem } from "@/hooks/useAlarmSystem";
 import { useMeetingTimer } from "@/hooks/useMeetingTimer";
 import { usePomodoroTimer } from "@/hooks/usePomodoroTimer";
+import { useDefaultSettings } from "@/hooks/useDefaultSettings";
+import { useTagManager } from "@/hooks/useTagManager";
 import {
-  type AlarmSettings,
   type TabType,
   type TodoItem,
   type TrashedTodoItem,
   type TodoVersion,
   type TrashedMemoItem,
-  type Tag,
   type PriorityLevel,
   type ImportanceLevel,
   type KanbanStatus,
@@ -93,11 +93,7 @@ import {
   IMPORTANCE_CONFIG,
   TAG_COLORS,
 } from "@/types";
-import {
-  INITIAL_MEETING_ALARM_SETTINGS,
-  INITIAL_POMODORO_SETTINGS,
-  DEFAULT_MEETING_ALARM_POINT_MINUTES,
-} from "@/lib/constants";
+// 定数は各hookで直接import
 export function CommTimeComponent() {
   // クライアントサイドマウント状態（Hydration error回避）
   const [mounted, setMounted] = useState(false);
@@ -185,9 +181,6 @@ export function CommTimeComponent() {
     localStorage.setItem("memoActiveIndex", String(index));
   }, []);
 
-  // タグ管理フック（データベースモード用）
-  const supabaseTags = useSupabaseTags(useDatabase ? user : null);
-
   // カンバンステータス管理フック
   const kanbanStatusesHook = useKanbanStatuses(useDatabase ? user : null);
 
@@ -262,28 +255,9 @@ export function CommTimeComponent() {
   });
   const alertedTodoIdsRef = useRef<Set<string>>(new Set());
 
-  // タグ管理の状態（ローカルストレージ用）
-  const [localTags, setLocalTags] = useState<Tag[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("tags");
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch {
-          return [];
-        }
-      }
-    }
-    return [];
-  });
-
-  // タグはデータベースモードに応じて切り替え
-  const tags = useDatabase && user ? supabaseTags.tags : localTags;
-
-  // tagsをMapに変換してO(1)検索を実現
-  const tagsMap = React.useMemo(() => {
-    return new Map(tags.map(tag => [tag.id, tag]));
-  }, [tags]);
+  // タグ管理
+  const tagManager = useTagManager({ useDatabase, user, setSharedTodos });
+  const { tags, tagsMap, addTag, updateTag, deleteTag } = tagManager;
 
   // フィルター状態
   const [filterState, setFilterState] = useState<FilterState>(initialFilterState);
@@ -414,23 +388,18 @@ export function CommTimeComponent() {
   const [highlightedTodoId, setHighlightedTodoId] = useState<string | null>(null);
   const [highlightedMemoId, setHighlightedMemoId] = useState<string | null>(null);
 
-  // 初期値設定用のstate
-  const [defaultMeetingAlarmSettings, setDefaultMeetingAlarmSettings] =
-    useState<AlarmSettings>(INITIAL_MEETING_ALARM_SETTINGS);
-  const [defaultMeetingAlarmPoints, setDefaultMeetingAlarmPoints] = useState<
-    number[]
-  >(DEFAULT_MEETING_ALARM_POINT_MINUTES);
-  const [defaultPomodoroWorkDuration, setDefaultPomodoroWorkDuration] =
-    useState(INITIAL_POMODORO_SETTINGS.workDuration);
-  const [defaultPomodoroBreakDuration, setDefaultPomodoroBreakDuration] =
-    useState(INITIAL_POMODORO_SETTINGS.breakDuration);
-  const [defaultPomodoroCycles, setDefaultPomodoroCycles] = useState(
-    INITIAL_POMODORO_SETTINGS.cycles
-  );
-  const [defaultPomodoroWorkAlarm, setDefaultPomodoroWorkAlarm] =
-    useState<AlarmSettings>(INITIAL_POMODORO_SETTINGS.workAlarm);
-  const [defaultPomodoroBreakAlarm, setDefaultPomodoroBreakAlarm] =
-    useState<AlarmSettings>(INITIAL_POMODORO_SETTINGS.breakAlarm);
+  // 初期値設定
+  const defaults = useDefaultSettings();
+  const {
+    defaultMeetingAlarmSettings, setDefaultMeetingAlarmSettings,
+    defaultMeetingAlarmPoints, setDefaultMeetingAlarmPoints,
+    defaultPomodoroWorkDuration, setDefaultPomodoroWorkDuration,
+    defaultPomodoroBreakDuration, setDefaultPomodoroBreakDuration,
+    defaultPomodoroCycles, setDefaultPomodoroCycles,
+    defaultPomodoroWorkAlarm, setDefaultPomodoroWorkAlarm,
+    defaultPomodoroBreakAlarm, setDefaultPomodoroBreakAlarm,
+    resetToDefaults: resetToDefaultsFn,
+  } = defaults;
 
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
@@ -486,45 +455,6 @@ export function CommTimeComponent() {
     }
     setDarkMode(getStorageValue("darkMode", false));
     setWorkMode(getStorageValue("workMode", false));
-
-    // 初期値設定の読み込み
-    setDefaultMeetingAlarmSettings(
-      getStorageValue(
-        "defaultMeetingAlarmSettings",
-        INITIAL_MEETING_ALARM_SETTINGS
-      )
-    );
-    setDefaultMeetingAlarmPoints(
-      getStorageValue("defaultMeetingAlarmPoints", DEFAULT_MEETING_ALARM_POINT_MINUTES)
-    );
-    setDefaultPomodoroWorkDuration(
-      getStorageValue(
-        "defaultPomodoroWorkDuration",
-        INITIAL_POMODORO_SETTINGS.workDuration
-      )
-    );
-    setDefaultPomodoroBreakDuration(
-      getStorageValue(
-        "defaultPomodoroBreakDuration",
-        INITIAL_POMODORO_SETTINGS.breakDuration
-      )
-    );
-    setDefaultPomodoroCycles(
-      getStorageValue("defaultPomodoroCycles", INITIAL_POMODORO_SETTINGS.cycles)
-    );
-    setDefaultPomodoroWorkAlarm(
-      getStorageValue(
-        "defaultPomodoroWorkAlarm",
-        INITIAL_POMODORO_SETTINGS.workAlarm
-      )
-    );
-    setDefaultPomodoroBreakAlarm(
-      getStorageValue(
-        "defaultPomodoroBreakAlarm",
-        INITIAL_POMODORO_SETTINGS.breakAlarm
-      )
-    );
-
   }, []);
 
   // データの自動保存（初期データ読み込み後のみ）
@@ -541,43 +471,11 @@ export function CommTimeComponent() {
       localStorage.setItem("useDatabase", JSON.stringify(useDatabase));
       localStorage.setItem("activeTab", activeTab);
 
-      // 初期値設定の保存
-      localStorage.setItem(
-        "defaultMeetingAlarmSettings",
-        JSON.stringify(defaultMeetingAlarmSettings)
-      );
-      localStorage.setItem(
-        "defaultMeetingAlarmPoints",
-        JSON.stringify(defaultMeetingAlarmPoints)
-      );
-      localStorage.setItem(
-        "defaultPomodoroWorkDuration",
-        JSON.stringify(defaultPomodoroWorkDuration)
-      );
-      localStorage.setItem(
-        "defaultPomodoroBreakDuration",
-        JSON.stringify(defaultPomodoroBreakDuration)
-      );
-      localStorage.setItem(
-        "defaultPomodoroCycles",
-        JSON.stringify(defaultPomodoroCycles)
-      );
-      localStorage.setItem(
-        "defaultPomodoroWorkAlarm",
-        JSON.stringify(defaultPomodoroWorkAlarm)
-      );
-      localStorage.setItem(
-        "defaultPomodoroBreakAlarm",
-        JSON.stringify(defaultPomodoroBreakAlarm)
-      );
-
       // ゴミ箱とバージョン履歴の保存
       localStorage.setItem("trashedTodos", JSON.stringify(trashedTodos));
       localStorage.setItem("todoVersions", JSON.stringify(todoVersions));
       localStorage.setItem("trashedMemos", JSON.stringify(trashedMemos));
 
-      // タグ、フィルター、ビューモードの保存（ローカルタグのみ保存）
-      localStorage.setItem("tags", JSON.stringify(localTags));
       localStorage.setItem("todoViewMode", viewMode);
     }
   }, [
@@ -588,17 +486,9 @@ export function CommTimeComponent() {
     workMode,
     useDatabase,
     activeTab,
-    defaultMeetingAlarmSettings,
-    defaultMeetingAlarmPoints,
-    defaultPomodoroWorkDuration,
-    defaultPomodoroBreakDuration,
-    defaultPomodoroCycles,
-    defaultPomodoroWorkAlarm,
-    defaultPomodoroBreakAlarm,
     trashedTodos,
     todoVersions,
     trashedMemos,
-    localTags,
     viewMode,
     endTimeInputMode,
     progressPreset,
@@ -797,77 +687,8 @@ export function CommTimeComponent() {
 
   // 設定を初期値にリセット
   const resetToDefaults = useCallback(() => {
-    setMeetingAlarmSettings(defaultMeetingAlarmSettings);
-    setPomodoroSettings({
-      ...pomodoroSettings,
-      workDuration: defaultPomodoroWorkDuration,
-      breakDuration: defaultPomodoroBreakDuration,
-      cycles: defaultPomodoroCycles,
-      workAlarm: defaultPomodoroWorkAlarm,
-      breakAlarm: defaultPomodoroBreakAlarm,
-    });
-  }, [
-    defaultMeetingAlarmSettings,
-    defaultPomodoroWorkDuration,
-    defaultPomodoroBreakDuration,
-    defaultPomodoroCycles,
-    defaultPomodoroWorkAlarm,
-    defaultPomodoroBreakAlarm,
-    pomodoroSettings,
-  ]);
-
-  // タグCRUD関数（データベースモード対応）
-  const addTag = useCallback(
-    async (name: string, color: string) => {
-      if (useDatabase && user) {
-        // データベースモード: Supabaseに保存
-        const newTag = await supabaseTags.addTag(name, color);
-        return newTag || { id: "", name, color };
-      } else {
-        // ローカルモード: LocalStorageに保存
-        const newTag: Tag = {
-          id: `tag-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          name,
-          color,
-        };
-        setLocalTags((prev) => [...prev, newTag]);
-        return newTag;
-      }
-    },
-    [useDatabase, user, supabaseTags]
-  );
-
-  const updateTag = useCallback(
-    (id: string, name: string, color: string) => {
-      if (useDatabase && user) {
-        supabaseTags.updateTag(id, name, color);
-      } else {
-        setLocalTags((prev) =>
-          prev.map((tag) => (tag.id === id ? { ...tag, name, color } : tag))
-        );
-      }
-    },
-    [useDatabase, user, supabaseTags]
-  );
-
-  const deleteTag = useCallback(
-    (id: string) => {
-      if (useDatabase && user) {
-        // データベースモード: RPCがTODOからのタグ参照も一括削除
-        supabaseTags.deleteTag(id);
-      } else {
-        setLocalTags((prev) => prev.filter((tag) => tag.id !== id));
-        // 関連するTODOからもタグを削除
-        setSharedTodos((prev) =>
-          prev.map((todo) => ({
-            ...todo,
-            tagIds: todo.tagIds?.filter((tagId) => tagId !== id),
-          }))
-        );
-      }
-    },
-    [useDatabase, user, supabaseTags]
-  );
+    resetToDefaultsFn(setMeetingAlarmSettings, setPomodoroSettings, pomodoroSettings);
+  }, [resetToDefaultsFn, setMeetingAlarmSettings, setPomodoroSettings, pomodoroSettings]);
 
   // カンバンステータス更新関数（看板ビューで使用）
   const updateTodoKanbanStatus = useCallback(
@@ -2228,7 +2049,7 @@ export function CommTimeComponent() {
                       <button
                         type="button"
                         onClick={() =>
-                          setMeetingAlarmSettings(INITIAL_MEETING_ALARM_SETTINGS)
+                          setMeetingAlarmSettings(defaultMeetingAlarmSettings)
                         }
                         className="px-4 py-2.5 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg text-sm sm:text-base"
                       >
