@@ -70,12 +70,19 @@ import { SearchModal, type SearchResult } from "@/components/search-modal";
 import { RichTextWithLinks } from "@/components/rich-text-with-links";
 import { useKanbanStatuses } from "@/hooks/useKanbanStatuses";
 import {
-  useHapticFeedback,
   VIBRATION_PATTERNS,
   VIBRATION_PATTERN_KEYS,
-  VibrationPatternKey,
 } from "@/hooks/useHapticFeedback";
+import { useAlarmSystem } from "@/hooks/useAlarmSystem";
+import { useMeetingTimer } from "@/hooks/useMeetingTimer";
+import { usePomodoroTimer } from "@/hooks/usePomodoroTimer";
 import {
+  type AlarmSettings,
+  type TabType,
+  type TodoItem,
+  type TrashedTodoItem,
+  type TodoVersion,
+  type TrashedMemoItem,
   type Tag,
   type PriorityLevel,
   type ImportanceLevel,
@@ -86,76 +93,11 @@ import {
   IMPORTANCE_CONFIG,
   TAG_COLORS,
 } from "@/types";
-
-// 型定義
-type AlarmPoint = {
-  id: string;
-  minutes: number;
-  isDone: boolean;
-  linkedTodo?: string;
-  remainingTime: number;
-};
-
-type AlarmSettings = {
-  volume: number;
-  frequency: number;
-};
-
-type TabType = "meeting" | "pomodoro";
-
-type TodoItem = {
-  id: string;
-  text: string;
-  isCompleted: boolean;
-  dueDate?: string; // YYYY-MM-DD
-  dueTime?: string; // HH:MM
-  tagIds?: string[]; // タグIDの配列
-  priority?: PriorityLevel; // 優先度
-  importance?: ImportanceLevel; // 重要度
-  kanbanStatus?: KanbanStatus; // カンバンステータス
-};
-
-// ゴミ箱に入ったTODOの型
-type TrashedTodoItem = TodoItem & {
-  deletedAt: string; // ISO形式の日時
-};
-
-// TODOのバージョン履歴の型
-type TodoVersion = {
-  id: string;
-  todoId: string;
-  text: string;
-  timestamp: string; // ISO形式の日時
-  changeType: "create" | "update" | "delete";
-};
-
-// 初期値の設定
-const initialMeetingAlarmPoints: AlarmPoint[] = [
-  { id: "1", minutes: 30, isDone: false, remainingTime: 30 * 60 },
-  { id: "2", minutes: 50, isDone: false, remainingTime: 50 * 60 },
-  { id: "3", minutes: 60, isDone: false, remainingTime: 60 * 60 },
-];
-
-const initialMeetingAlarmSettings: AlarmSettings = {
-  volume: 44,
-  frequency: 340,
-};
-
-const initialPomodoroSettings = {
-  workDuration: 25,
-  breakDuration: 5,
-  cycles: 4,
-  infiniteMode: false,
-  workAlarm: {
-    volume: 65,
-    frequency: 240,
-  },
-  breakAlarm: {
-    volume: 36,
-    frequency: 740,
-  },
-};
-
+import {
+  INITIAL_MEETING_ALARM_SETTINGS,
+  INITIAL_POMODORO_SETTINGS,
+  DEFAULT_MEETING_ALARM_POINT_MINUTES,
+} from "@/lib/constants";
 export function CommTimeComponent() {
   // クライアントサイドマウント状態（Hydration error回避）
   const [mounted, setMounted] = useState(false);
@@ -206,16 +148,6 @@ export function CommTimeComponent() {
     return "meeting";
   });
 
-  // ミーティングタイマー関連の状態
-  const [isMeetingRunning, setIsMeetingRunning] = useState(false);
-  const [meetingStartTime, setMeetingStartTime] = useState<Date | null>(null);
-  const [meetingElapsedTime, setMeetingElapsedTime] = useState(0);
-  const [alarmPoints, setAlarmPoints] = useState<AlarmPoint[]>(
-    initialMeetingAlarmPoints
-  );
-  const [meetingAlarmSettings, setMeetingAlarmSettings] =
-    useState<AlarmSettings>(initialMeetingAlarmSettings);
-
   // 共通のメモ/TODO（meeting/pomodoro共有）
   const [sharedMemo, setSharedMemo] = useState("");
   const [sharedTodos, setSharedTodos] = useState<TodoItem[]>([]);
@@ -223,19 +155,6 @@ export function CommTimeComponent() {
   // 後方互換性のため、共通データを参照するエイリアス
   const meetingTodos = sharedTodos;
   const setMeetingTodos = setSharedTodos;
-
-  // ポモドーロタイマー関連の状態
-  const [isPomodoroRunning, setIsPomodoroRunning] = useState(false);
-  const [pomodoroStartTime, setPomodoroStartTime] = useState<Date | null>(null);
-  const [pomodoroElapsedTime, setPomodoroElapsedTime] = useState(0);
-  const [pomodoroState, setPomodoroState] = useState<"work" | "break">("work");
-  const [pomodoroSettings, setPomodoroSettings] = useState(
-    initialPomodoroSettings
-  );
-
-  const [pomodoroCycles, setPomodoroCycles] = useState(0);
-
-  // ポモドーロもShared TODOを参照
   const pomodoroTodos = sharedTodos;
   const setPomodoroTodos = setSharedTodos;
 
@@ -272,38 +191,54 @@ export function CommTimeComponent() {
   // カンバンステータス管理フック
   const kanbanStatusesHook = useKanbanStatuses(useDatabase ? user : null);
 
-  // ハプティックフィードバック（iOS Safari対応）
-  const { triggerAlarmVibration, cancelVibration } = useHapticFeedback();
+  // アラーム/通知/振動/フラッシュ/チクタク音システム
+  const alarm = useAlarmSystem();
+  const {
+    isAlarmRinging, isFlashing, flashEnabled, setFlashEnabled,
+    forceFocus, setForceFocus,
+    notificationsEnabled,
+    vibrationEnabled, setVibrationEnabled,
+    vibrationPattern, setVibrationPattern,
+    tickSoundEnabled, setTickSoundEnabled,
+    tickSoundVolume, setTickSoundVolume,
+    playAlarm, stopAlarm, playTickSound, previewSound,
+    toggleNotifications, triggerAlarmVibration,
+    tickAudioContextRef,
+  } = alarm;
 
-  // その他の状態
-  const [forceFocus, setForceFocus] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const [vibrationEnabled, setVibrationEnabled] = useState(true);
-  const [vibrationPattern, setVibrationPattern] =
-    useState<VibrationPatternKey>("standard");
-  const vibrationPatternRef = useRef<VibrationPatternKey>("standard");
-  vibrationPatternRef.current = vibrationPattern;
-  const [notificationPermission, setNotificationPermission] =
-    useState<NotificationPermission>("default");
+  // ミーティングタイマー
+  const meeting = useMeetingTimer({ playAlarm, playTickSound, tickSoundEnabled, tickAudioContextRef });
+  const {
+    isMeetingRunning, meetingStartTime, meetingElapsedTime,
+    alarmPoints, setAlarmPoints, meetingAlarmSettings, setMeetingAlarmSettings,
+    alarmPointMinutesInput, setAlarmPointMinutesInput,
+    countdownMode, setCountdownMode, targetEndTime, setTargetEndTime,
+    countdownSeconds, endTimeInputMode, setEndTimeInputMode,
+    progressPreset, setProgressPreset,
+    remainingMeetingMinutes, meetingTotalDurationMinutes,
+    toggleMeetingTimer, resetMeetingTimer,
+    addAlarmPoint, updateAlarmPoint, removeAlarmPoint,
+    generateAlarmPointsFromEndTime, formatTime, getEndTime, getCountdown,
+  } = meeting;
 
-  // カウントダウンモードの状態
-  const [countdownMode, setCountdownMode] = useState(false);
-  const [targetEndTime, setTargetEndTime] = useState("");
-  const [countdownSeconds, setCountdownSeconds] = useState(0);
-
-  // エンド時間入力モードの状態
-  const [endTimeInputMode, setEndTimeInputMode] = useState(false);
-  const [progressPreset, setProgressPreset] = useState<number[]>([25, 50, 75, 100]);
-  const [remainingMeetingMinutes, setRemainingMeetingMinutes] = useState(0);
-  const [meetingTotalDurationMinutes, setMeetingTotalDurationMinutes] = useState(0);
-
-  // アラームポイント入力（編集中の文字列を保持）
-  const [alarmPointMinutesInput, setAlarmPointMinutesInput] = useState<Record<string, string>>({});
-
-  // チクタク音の状態
-  const [tickSoundEnabled, setTickSoundEnabled] = useState(false);
-  const [tickSoundVolume, setTickSoundVolume] = useState(5); // 0-100
-  const tickAudioContextRef = useRef<AudioContext | null>(null);
+  // ポモドーロタイマー
+  const pomodoro = usePomodoroTimer({
+    playAlarm, playTickSound, tickSoundEnabled, tickAudioContextRef,
+    useDatabase, user,
+    supabasePomodoroTask: supabasePomodoroTask,
+  });
+  const {
+    isPomodoroRunning, pomodoroStartTime, pomodoroElapsedTime,
+    pomodoroState, pomodoroSettings, setPomodoroSettings,
+    pomodoroCycles,
+    currentPomodoroTask, setCurrentPomodoroTask,
+    currentPomodoroTaskId, setCurrentPomodoroTaskId,
+    isEditingPomodoroTask, setIsEditingPomodoroTask,
+    showTodoPicker, setShowTodoPicker,
+    pomodoroTaskInputRef,
+    togglePomodoroTimer, resetPomodoroTimer, startWithTodo,
+    updatePomodoroTask, clearPomodoroTask,
+  } = pomodoro;
 
   // 設定モーダルの状態
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -428,15 +363,6 @@ export function CommTimeComponent() {
   const [showTrash, setShowTrash] = useState(false);
 
   // メモのゴミ箱（30日間保存）
-  type TrashedMemoItem = {
-    id: string;
-    title: string;
-    content: string;
-    created_at: string;
-    updated_at: string;
-    deletedAt: string;
-  };
-
   const [trashedMemos, setTrashedMemos] = useState<TrashedMemoItem[]>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("trashedMemos");
@@ -478,48 +404,33 @@ export function CommTimeComponent() {
     return [];
   });
 
-  // フラッシュの状態
-  const [isFlashing, setIsFlashing] = useState(false);
-  const [flashEnabled, setFlashEnabled] = useState(true);
-
   // ダークモードの状態
   const [darkMode, setDarkMode] = useState(false);
 
   // ワークモードの状態（モバイルでToDo/メモを上部に表示）
   const [workMode, setWorkMode] = useState(false);
 
-  // アラーム状態（繰り返し用）
-  const [isAlarmRinging, setIsAlarmRinging] = useState(false);
-  const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const titleBlinkIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  // ポモドーロで取り組む現在のタスク
-  const [currentPomodoroTask, setCurrentPomodoroTask] = useState("");
-  const [currentPomodoroTaskId, setCurrentPomodoroTaskId] = useState<string | null>(null);
-  const [isEditingPomodoroTask, setIsEditingPomodoroTask] = useState(false);
-  const [showTodoPicker, setShowTodoPicker] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [highlightedTodoId, setHighlightedTodoId] = useState<string | null>(null);
   const [highlightedMemoId, setHighlightedMemoId] = useState<string | null>(null);
-  const pomodoroTaskInputRef = useRef<HTMLInputElement>(null);
 
   // 初期値設定用のstate
   const [defaultMeetingAlarmSettings, setDefaultMeetingAlarmSettings] =
-    useState<AlarmSettings>(initialMeetingAlarmSettings);
+    useState<AlarmSettings>(INITIAL_MEETING_ALARM_SETTINGS);
   const [defaultMeetingAlarmPoints, setDefaultMeetingAlarmPoints] = useState<
     number[]
-  >([30, 50, 60]);
+  >(DEFAULT_MEETING_ALARM_POINT_MINUTES);
   const [defaultPomodoroWorkDuration, setDefaultPomodoroWorkDuration] =
-    useState(initialPomodoroSettings.workDuration);
+    useState(INITIAL_POMODORO_SETTINGS.workDuration);
   const [defaultPomodoroBreakDuration, setDefaultPomodoroBreakDuration] =
-    useState(initialPomodoroSettings.breakDuration);
+    useState(INITIAL_POMODORO_SETTINGS.breakDuration);
   const [defaultPomodoroCycles, setDefaultPomodoroCycles] = useState(
-    initialPomodoroSettings.cycles
+    INITIAL_POMODORO_SETTINGS.cycles
   );
   const [defaultPomodoroWorkAlarm, setDefaultPomodoroWorkAlarm] =
-    useState<AlarmSettings>(initialPomodoroSettings.workAlarm);
+    useState<AlarmSettings>(INITIAL_POMODORO_SETTINGS.workAlarm);
   const [defaultPomodoroBreakAlarm, setDefaultPomodoroBreakAlarm] =
-    useState<AlarmSettings>(initialPomodoroSettings.breakAlarm);
+    useState<AlarmSettings>(INITIAL_POMODORO_SETTINGS.breakAlarm);
 
   // refs
   const todoInputRef = useRef<HTMLInputElement>(null);
@@ -538,15 +449,6 @@ export function CommTimeComponent() {
 
   // 初期データのロード
   useEffect(() => {
-    // ローカルストレージからすべての保存データを読み込む
-    setAlarmPoints(getStorageValue("alarmPoints", initialMeetingAlarmPoints));
-    setMeetingAlarmSettings(
-      getStorageValue("meetingAlarmSettings", initialMeetingAlarmSettings)
-    );
-    setPomodoroSettings(
-      getStorageValue("pomodoroSettings", initialPomodoroSettings)
-    );
-
     // メモ/TODOのマイグレーション: 既存の分離データを共通データに統合
     const savedSharedMemo = getStorageValue("sharedMemo", "");
     const savedSharedTodos = getStorageValue("sharedTodos", []);
@@ -582,62 +484,47 @@ export function CommTimeComponent() {
         localStorage.setItem("sharedTodos", JSON.stringify(uniqueTodos));
       }
     }
-    setNotificationsEnabled(getStorageValue("notificationsEnabled", false));
-    setVibrationEnabled(getStorageValue("vibrationEnabled", true));
-    setVibrationPattern(getStorageValue("vibrationPattern", "standard"));
-    setCountdownMode(getStorageValue("countdownMode", false));
-    setTargetEndTime(getStorageValue("targetEndTime", ""));
-    setEndTimeInputMode(getStorageValue("endTimeInputMode", false));
-    setProgressPreset(getStorageValue("progressPreset", [25, 50, 75, 100]));
-    setTickSoundEnabled(getStorageValue("tickSoundEnabled", false));
-    setTickSoundVolume(getStorageValue("tickSoundVolume", 5));
-    setFlashEnabled(getStorageValue("flashEnabled", true));
     setDarkMode(getStorageValue("darkMode", false));
     setWorkMode(getStorageValue("workMode", false));
-    setCurrentPomodoroTask(getStorageValue("currentPomodoroTask", ""));
 
     // 初期値設定の読み込み
     setDefaultMeetingAlarmSettings(
       getStorageValue(
         "defaultMeetingAlarmSettings",
-        initialMeetingAlarmSettings
+        INITIAL_MEETING_ALARM_SETTINGS
       )
     );
     setDefaultMeetingAlarmPoints(
-      getStorageValue("defaultMeetingAlarmPoints", [30, 50, 60])
+      getStorageValue("defaultMeetingAlarmPoints", DEFAULT_MEETING_ALARM_POINT_MINUTES)
     );
     setDefaultPomodoroWorkDuration(
       getStorageValue(
         "defaultPomodoroWorkDuration",
-        initialPomodoroSettings.workDuration
+        INITIAL_POMODORO_SETTINGS.workDuration
       )
     );
     setDefaultPomodoroBreakDuration(
       getStorageValue(
         "defaultPomodoroBreakDuration",
-        initialPomodoroSettings.breakDuration
+        INITIAL_POMODORO_SETTINGS.breakDuration
       )
     );
     setDefaultPomodoroCycles(
-      getStorageValue("defaultPomodoroCycles", initialPomodoroSettings.cycles)
+      getStorageValue("defaultPomodoroCycles", INITIAL_POMODORO_SETTINGS.cycles)
     );
     setDefaultPomodoroWorkAlarm(
       getStorageValue(
         "defaultPomodoroWorkAlarm",
-        initialPomodoroSettings.workAlarm
+        INITIAL_POMODORO_SETTINGS.workAlarm
       )
     );
     setDefaultPomodoroBreakAlarm(
       getStorageValue(
         "defaultPomodoroBreakAlarm",
-        initialPomodoroSettings.breakAlarm
+        INITIAL_POMODORO_SETTINGS.breakAlarm
       )
     );
 
-    // 通知権限の確認
-    if (typeof window !== "undefined" && "Notification" in window) {
-      setNotificationPermission(Notification.permission);
-    }
   }, []);
 
   // データの自動保存（初期データ読み込み後のみ）
@@ -646,42 +533,13 @@ export function CommTimeComponent() {
     if (!mounted) return;
 
     if (typeof window !== "undefined") {
-      localStorage.setItem("alarmPoints", JSON.stringify(alarmPoints));
-      localStorage.setItem(
-        "meetingAlarmSettings",
-        JSON.stringify(meetingAlarmSettings)
-      );
-      localStorage.setItem(
-        "pomodoroSettings",
-        JSON.stringify(pomodoroSettings)
-      );
       // 共通のメモ/TODOとして保存
       localStorage.setItem("sharedMemo", sharedMemo);
       localStorage.setItem("sharedTodos", JSON.stringify(sharedTodos));
-      localStorage.setItem(
-        "notificationsEnabled",
-        JSON.stringify(notificationsEnabled)
-      );
-      localStorage.setItem(
-        "vibrationEnabled",
-        JSON.stringify(vibrationEnabled)
-      );
-      localStorage.setItem("vibrationPattern", vibrationPattern);
-      localStorage.setItem("countdownMode", JSON.stringify(countdownMode));
-      localStorage.setItem("targetEndTime", targetEndTime);
-      localStorage.setItem("endTimeInputMode", JSON.stringify(endTimeInputMode));
-      localStorage.setItem("progressPreset", JSON.stringify(progressPreset));
-      localStorage.setItem(
-        "tickSoundEnabled",
-        JSON.stringify(tickSoundEnabled)
-      );
-      localStorage.setItem("tickSoundVolume", JSON.stringify(tickSoundVolume));
-      localStorage.setItem("flashEnabled", JSON.stringify(flashEnabled));
       localStorage.setItem("darkMode", JSON.stringify(darkMode));
       localStorage.setItem("workMode", JSON.stringify(workMode));
       localStorage.setItem("useDatabase", JSON.stringify(useDatabase));
       localStorage.setItem("activeTab", activeTab);
-      localStorage.setItem("currentPomodoroTask", currentPomodoroTask);
 
       // 初期値設定の保存
       localStorage.setItem(
@@ -723,20 +581,9 @@ export function CommTimeComponent() {
       localStorage.setItem("todoViewMode", viewMode);
     }
   }, [
-    mounted, // mountedを依存配列に追加
-    alarmPoints,
-    meetingAlarmSettings,
-    pomodoroSettings,
+    mounted,
     sharedMemo,
     sharedTodos,
-    notificationsEnabled,
-    vibrationEnabled,
-    vibrationPattern,
-    countdownMode,
-    targetEndTime,
-    tickSoundEnabled,
-    tickSoundVolume,
-    flashEnabled,
     darkMode,
     workMode,
     useDatabase,
@@ -753,7 +600,6 @@ export function CommTimeComponent() {
     trashedMemos,
     localTags,
     viewMode,
-    currentPomodoroTask,
     endTimeInputMode,
     progressPreset,
   ]);
@@ -833,240 +679,14 @@ export function CommTimeComponent() {
     }
   }, [darkMode]);
 
-  // 時間のフォーマット関数
-  const formatTime = useCallback((seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = seconds % 60;
-    return `${hours.toString().padStart(2, "0")}:${minutes
-      .toString()
-      .padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
-  }, []);
-
-  // Safari対応のアラーム音生成（HTMLAudioElement使用）
-  const createAlarmAudio = useCallback((settings: AlarmSettings) => {
-    try {
-      // Web Audio APIで音を生成してBlobを作成
-      const win = window as typeof window & {
-        webkitAudioContext?: typeof AudioContext;
-      };
-      const AudioContextClass = win.AudioContext || win.webkitAudioContext;
-      if (!AudioContextClass) return null;
-
-      const audioContext = new AudioContextClass();
-      const sampleRate = audioContext.sampleRate;
-      const duration = 0.5; // 0.5秒
-      const numSamples = sampleRate * duration;
-      const buffer = audioContext.createBuffer(1, numSamples, sampleRate);
-      const channelData = buffer.getChannelData(0);
-
-      // サイン波を生成
-      for (let i = 0; i < numSamples; i++) {
-        const t = i / sampleRate;
-        channelData[i] =
-          Math.sin(2 * Math.PI * settings.frequency * t) *
-          (settings.volume / 100);
-      }
-
-      // WAVファイルとしてエンコード
-      const wavBlob = bufferToWave(buffer, numSamples);
-      const audioUrl = URL.createObjectURL(wavBlob);
-      const audio = new Audio(audioUrl);
-      audio.volume = settings.volume / 100;
-
-      return audio;
-    } catch (error) {
-      console.error("アラーム音の生成に失敗:", error);
-      return null;
-    }
-  }, []);
-
-  // バッファをWAVに変換
-  const bufferToWave = (buffer: AudioBuffer, len: number) => {
-    const numChannels = buffer.numberOfChannels;
-    const sampleRate = buffer.sampleRate;
-    const format = 1; // PCM
-    const bitDepth = 16;
-
-    const bytesPerSample = bitDepth / 8;
-    const blockAlign = numChannels * bytesPerSample;
-
-    const data = new Float32Array(len);
-    buffer.copyFromChannel(data, 0, 0);
-
-    const dataLength = len * numChannels * bytesPerSample;
-    const arrayBuffer = new ArrayBuffer(44 + dataLength);
-    const view = new DataView(arrayBuffer);
-
-    // WAVヘッダーを書き込み
-    const writeString = (offset: number, string: string) => {
-      for (let i = 0; i < string.length; i++) {
-        view.setUint8(offset + i, string.charCodeAt(i));
-      }
-    };
-
-    writeString(0, "RIFF");
-    view.setUint32(4, 36 + dataLength, true);
-    writeString(8, "WAVE");
-    writeString(12, "fmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, format, true);
-    view.setUint16(22, numChannels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * blockAlign, true);
-    view.setUint16(32, blockAlign, true);
-    view.setUint16(34, bitDepth, true);
-    writeString(36, "data");
-    view.setUint32(40, dataLength, true);
-
-    // PCMデータを書き込み
-    let offset = 44;
-    for (let i = 0; i < len; i++) {
-      const sample = Math.max(-1, Math.min(1, data[i]));
-      view.setInt16(
-        offset,
-        sample < 0 ? sample * 0x8000 : sample * 0x7fff,
-        true
-      );
-      offset += 2;
-    }
-
-    return new Blob([arrayBuffer], { type: "audio/wav" });
-  };
-
-  // アラーム停止機能
-  const stopAlarm = useCallback(() => {
-    setIsAlarmRinging(false);
-    setIsFlashing(false);
-    cancelVibration();
-    if (alarmIntervalRef.current) {
-      clearInterval(alarmIntervalRef.current);
-      alarmIntervalRef.current = null;
-    }
-    if (titleBlinkIntervalRef.current) {
-      clearInterval(titleBlinkIntervalRef.current);
-      titleBlinkIntervalRef.current = null;
-    }
-    document.title = "Comm Time";
-  }, [cancelVibration]);
-
-  // アラーム再生機能（Safari対応・繰り返し対応）
-  const playAlarm = useCallback(
-    (settings: AlarmSettings, message: string = "アラーム!") => {
-      if (typeof window === "undefined") return;
-
-      // 既存のアラームを停止
-      stopAlarm();
-      setIsAlarmRinging(true);
-
-      // Safari対応の音声再生
-      const playSound = () => {
-        try {
-          const audio = createAlarmAudio(settings);
-          if (audio) {
-            audio.play().catch((e) => console.error("音声再生エラー:", e));
-          }
-        } catch (error) {
-          console.error("音声再生に失敗:", error);
-        }
-      };
-
-      // 繰り返しアラーム（5秒ごとに30秒間）
-      playSound(); // 最初の再生
-      let alarmCount = 0;
-      alarmIntervalRef.current = setInterval(() => {
-        alarmCount++;
-        if (alarmCount >= 6) {
-          stopAlarm();
-        } else {
-          playSound();
-
-          // バイブレーション（毎回・iOS Safari対応）
-          if (vibrationEnabled) {
-            triggerAlarmVibration(vibrationPatternRef.current);
-          }
-        }
-      }, 5000);
-
-      // 強力なバイブレーション（iOS Safari対応）
-      if (vibrationEnabled) {
-        triggerAlarmVibration(vibrationPatternRef.current);
-      }
-
-      // フラッシュエフェクト（長めに）
-      if (flashEnabled) {
-        setIsFlashing(true);
-        setTimeout(() => setIsFlashing(false), 30000); // 30秒間点滅
-      }
-
-      // 通知（バックグラウンドでユーザーに知らせる）
-      if (notificationsEnabled && notificationPermission === "granted") {
-        new Notification("Comm Time", {
-          body: message,
-          icon: "/favicon.svg",
-          badge: "/favicon.svg",
-          tag: "comm-time-alarm",
-          requireInteraction: true,
-        });
-      }
-
-      // タイトル点滅（目立つように）
-      let titleBlink = false;
-      titleBlinkIntervalRef.current = setInterval(() => {
-        titleBlink = !titleBlink;
-        document.title = titleBlink
-          ? "🔔🔔🔔 " + message + " 🔔🔔🔔"
-          : "⚠️⚠️⚠️ TIME UP! ⚠️⚠️⚠️";
-      }, 500);
-
-      // フォーカス
-      if (forceFocus) {
-        window.focus();
-      }
-    },
-    [
-      forceFocus,
-      vibrationEnabled,
-      notificationsEnabled,
-      notificationPermission,
-      flashEnabled,
-      createAlarmAudio,
-      stopAlarm,
-      triggerAlarmVibration,
-    ]
-  );
+  // (アラーム関連: useAlarmSystem hookに移動済み)
+  // (formatTime: useMeetingTimer hookに移動済み)
 
   // 現在時刻の更新
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-
-  // クリーンアップ: コンポーネントアンマウント時にアラーム停止
-  useEffect(() => {
-    return () => {
-      if (alarmIntervalRef.current) {
-        clearInterval(alarmIntervalRef.current);
-      }
-      if (titleBlinkIntervalRef.current) {
-        clearInterval(titleBlinkIntervalRef.current);
-      }
-    };
-  }, []);
-
-  // 画面クリックでアラーム停止（フラッシュがない場合）
-  useEffect(() => {
-    const handleClick = () => {
-      if (isAlarmRinging && !isFlashing) {
-        stopAlarm();
-      }
-    };
-
-    if (isAlarmRinging && !isFlashing) {
-      window.addEventListener("click", handleClick);
-      return () => window.removeEventListener("click", handleClick);
-    }
-  }, [isAlarmRinging, isFlashing, stopAlarm]);
 
   // カンバンモーダルのESCキーで閉じる
   useEffect(() => {
@@ -1173,462 +793,7 @@ export function CommTimeComponent() {
     });
   }, [deadlineAlertEnabled, deadlineAlertMinutes, sharedTodos, currentTime, playAlarm, meetingAlarmSettings]);
 
-  // チクタク音を再生する関数（モバイル対応）
-  const playTickSound = useCallback(async () => {
-    if (typeof window === "undefined" || !tickSoundEnabled) return;
-
-    try {
-      if (!tickAudioContextRef.current) {
-        const win = window as typeof window & {
-          webkitAudioContext?: typeof AudioContext;
-        };
-        const AudioContextClass = win.AudioContext || win.webkitAudioContext;
-        if (AudioContextClass) {
-          tickAudioContextRef.current = new AudioContextClass();
-        }
-      }
-
-      const audioContext = tickAudioContextRef.current;
-      if (!audioContext) return;
-
-      // モバイルブラウザ対応: AudioContextがsuspendedの場合はresume
-      if (audioContext.state === "suspended") {
-        await audioContext.resume();
-      }
-
-      // AudioContextがrunning状態の時のみ音を再生
-      if (audioContext.state === "running") {
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-
-        oscillator.type = "sine";
-        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-        gainNode.gain.setValueAtTime(
-          tickSoundVolume / 100,
-          audioContext.currentTime
-        );
-
-        oscillator.start();
-        gainNode.gain.exponentialRampToValueAtTime(
-          0.00001,
-          audioContext.currentTime + 0.05
-        );
-        oscillator.stop(audioContext.currentTime + 0.05);
-      }
-    } catch (error) {
-      console.error("チクタク音の再生に失敗しました:", error);
-    }
-  }, [tickSoundEnabled, tickSoundVolume]);
-
-  // ミーティングタイマーの更新
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (isMeetingRunning && meetingStartTime) {
-      timer = setInterval(() => {
-        const now = new Date();
-
-        if (countdownMode && targetEndTime) {
-          // カウントダウンモード: 終了時刻までの残り時間を計算
-          const [hours, minutes] = targetEndTime.split(":").map(Number);
-          const targetDate = new Date();
-          targetDate.setHours(hours, minutes, 0, 0);
-
-          // 終了時刻が過去の場合は明日として扱う
-          if (targetDate < meetingStartTime) {
-            targetDate.setDate(targetDate.getDate() + 1);
-          }
-
-          const remainingMs = targetDate.getTime() - now.getTime();
-          const remainingSec = Math.max(0, Math.floor(remainingMs / 1000));
-
-          setCountdownSeconds((prevSeconds) => {
-            // カウントダウンが0になったらアラーム（前回の値が0より大きく、今回0になった場合）
-            if (prevSeconds > 0 && remainingSec === 0) {
-              playAlarm(meetingAlarmSettings, "時間になりました！");
-              setIsMeetingRunning(false);
-            }
-            return remainingSec;
-          });
-
-          document.title = `CT (${formatTime(remainingSec)})`;
-        } else {
-          // 通常モード: 経過時間を計算
-          const newElapsedTime = Math.floor(
-            (now.getTime() - meetingStartTime.getTime()) / 1000
-          );
-          setMeetingElapsedTime(newElapsedTime);
-          document.title = `CT (${formatTime(newElapsedTime)})`;
-        }
-
-        // チクタク音を再生
-        playTickSound();
-      }, 1000);
-    }
-    return () => {
-      clearInterval(timer);
-      if (!isMeetingRunning) {
-        document.title = "CT";
-      }
-    };
-  }, [
-    isMeetingRunning,
-    meetingStartTime,
-    formatTime,
-    countdownMode,
-    targetEndTime,
-    playAlarm,
-    meetingAlarmSettings,
-    playTickSound,
-  ]);
-
-  // アラームポイントの更新
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (isMeetingRunning) {
-      timer = setInterval(() => {
-        setAlarmPoints((prevPoints) =>
-          prevPoints.map((point) => {
-            if (!point.isDone) {
-              const newRemainingTime = Math.max(0, point.remainingTime - 1);
-              if (newRemainingTime === 0) {
-                playAlarm(
-                  meetingAlarmSettings,
-                  `${point.minutes}分経過しました`
-                );
-                return {
-                  ...point,
-                  isDone: true,
-                  remainingTime: newRemainingTime,
-                };
-              }
-              return { ...point, remainingTime: newRemainingTime };
-            }
-            return point;
-          })
-        );
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [isMeetingRunning, meetingAlarmSettings, playAlarm]);
-
-  // 終了時刻からの残り時間を計算（エンド時間入力モード用）
-  useEffect(() => {
-    if (!targetEndTime || !endTimeInputMode) {
-      setRemainingMeetingMinutes(0);
-      return;
-    }
-
-    const calculateRemainingMinutes = () => {
-      const now = new Date();
-      const [hours, minutes] = targetEndTime.split(":").map(Number);
-      const endTime = new Date();
-      endTime.setHours(hours, minutes, 0, 0);
-
-      if (endTime <= now) {
-        endTime.setDate(endTime.getDate() + 1);
-      }
-
-      const totalMs = endTime.getTime() - now.getTime();
-      const totalMinutes = Math.floor(totalMs / 60000);
-      setRemainingMeetingMinutes(Math.max(0, totalMinutes));
-    };
-
-    calculateRemainingMinutes();
-    // 1分ごとに更新
-    const interval = setInterval(calculateRemainingMinutes, 60000);
-    return () => clearInterval(interval);
-  }, [targetEndTime, endTimeInputMode]);
-
-  // ポモドーロタイマーの更新
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (isPomodoroRunning && pomodoroStartTime) {
-      timer = setInterval(() => {
-        const now = new Date();
-        setPomodoroElapsedTime(
-          Math.floor((now.getTime() - pomodoroStartTime.getTime()) / 1000)
-        );
-        // チクタク音を再生
-        playTickSound();
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [isPomodoroRunning, pomodoroStartTime, playTickSound]);
-
-  // ポモドーロの状態管理
-  useEffect(() => {
-    if (isPomodoroRunning) {
-      const currentDuration =
-        pomodoroState === "work"
-          ? pomodoroSettings.workDuration
-          : pomodoroSettings.breakDuration;
-
-      if (pomodoroElapsedTime >= currentDuration * 60) {
-        const newState = pomodoroState === "work" ? "break" : "work";
-        setPomodoroState(newState);
-        setPomodoroElapsedTime(0);
-        setPomodoroStartTime(new Date());
-        playAlarm(
-          newState === "work"
-            ? pomodoroSettings.workAlarm
-            : pomodoroSettings.breakAlarm,
-          newState === "work"
-            ? "休憩終了！作業を開始してください"
-            : "お疲れ様です！休憩時間です"
-        );
-
-        if (newState === "work") {
-          setPomodoroCycles((prev) => prev + 1);
-        }
-
-        if (
-          !pomodoroSettings.infiniteMode &&
-          pomodoroCycles >= pomodoroSettings.cycles
-        ) {
-          setIsPomodoroRunning(false);
-        }
-      }
-    }
-  }, [
-    pomodoroElapsedTime,
-    isPomodoroRunning,
-    pomodoroState,
-    pomodoroSettings,
-    pomodoroCycles,
-    playAlarm,
-  ]);
-
-  // タイマーの制御機能
-  const toggleMeetingTimer = useCallback(async () => {
-    if (isMeetingRunning) {
-      setIsMeetingRunning(false);
-    } else {
-      // タイマー開始時にAudioContextをresumeする（モバイル対応）
-      if (tickSoundEnabled && tickAudioContextRef.current) {
-        try {
-          if (tickAudioContextRef.current.state === "suspended") {
-            await tickAudioContextRef.current.resume();
-          }
-        } catch (error) {
-          console.error("AudioContextのresume失敗:", error);
-        }
-      }
-
-      if (meetingStartTime === null) {
-        setMeetingStartTime(new Date());
-      } else {
-        const now = new Date();
-        const pausedDuration =
-          now.getTime() -
-          (meetingStartTime.getTime() + meetingElapsedTime * 1000);
-        setMeetingStartTime(new Date(now.getTime() - pausedDuration));
-      }
-      setIsMeetingRunning(true);
-    }
-  }, [
-    isMeetingRunning,
-    meetingStartTime,
-    meetingElapsedTime,
-    tickSoundEnabled,
-  ]);
-
-  const resetMeetingTimer = useCallback(() => {
-    setIsMeetingRunning(false);
-    setMeetingStartTime(null);
-    setMeetingElapsedTime(0);
-    setAlarmPoints(initialMeetingAlarmPoints);
-  }, []);
-
-  const togglePomodoroTimer = useCallback(async () => {
-    if (isPomodoroRunning) {
-      setIsPomodoroRunning(false);
-    } else {
-      // タイマー開始時にAudioContextをresumeする（モバイル対応）
-      if (tickSoundEnabled && tickAudioContextRef.current) {
-        try {
-          if (tickAudioContextRef.current.state === "suspended") {
-            await tickAudioContextRef.current.resume();
-          }
-        } catch (error) {
-          console.error("AudioContextのresume失敗:", error);
-        }
-      }
-
-      if (pomodoroStartTime === null) {
-        setPomodoroStartTime(new Date());
-        setPomodoroElapsedTime(0);
-      } else {
-        const now = new Date();
-        const adjustedStartTime = new Date(
-          now.getTime() - pomodoroElapsedTime * 1000
-        );
-        setPomodoroStartTime(adjustedStartTime);
-      }
-      setIsPomodoroRunning(true);
-    }
-  }, [
-    isPomodoroRunning,
-    pomodoroStartTime,
-    pomodoroElapsedTime,
-    tickSoundEnabled,
-  ]);
-
-  const resetPomodoroTimer = useCallback(() => {
-    setIsPomodoroRunning(false);
-    setPomodoroStartTime(null);
-    setPomodoroElapsedTime(0);
-    setPomodoroState("work");
-    setPomodoroCycles(0);
-    setPomodoroSettings(initialPomodoroSettings);
-  }, []);
-
-  // アラームポイントの管理機能
-  const addAlarmPoint = useCallback(() => {
-    const newId = Date.now().toString();
-    const newMinutes = Math.max(1, Math.floor(meetingElapsedTime / 60) + 1);
-    const newPoint = {
-      id: newId,
-      minutes: newMinutes,
-      isDone: false,
-      remainingTime: newMinutes * 60,
-    };
-    setAlarmPoints((prevPoints) =>
-      [...prevPoints, newPoint].sort((a, b) => a.minutes - b.minutes)
-    );
-  }, [meetingElapsedTime]);
-
-  const updateAlarmPoint = useCallback((id: string, minutes: number) => {
-    setAlarmPoints((prevPoints) =>
-      prevPoints
-        .map((point) =>
-          point.id === id
-            ? {
-                ...point,
-                minutes: Math.max(1, minutes),
-                remainingTime: Math.max(1, minutes) * 60,
-              }
-            : point
-        )
-        .sort((a, b) => a.minutes - b.minutes)
-    );
-  }, []);
-
-  const removeAlarmPoint = useCallback((id: string) => {
-    setAlarmPoints((prevPoints) =>
-      prevPoints.filter((point) => point.id !== id)
-    );
-  }, []);
-
-  // エンド時間入力モード: 終了時刻から進行率ベースでアラームポイントを自動生成
-  const generateAlarmPointsFromEndTime = useCallback((endTimeStr: string, presets: number[]) => {
-    if (!endTimeStr) return;
-
-    const now = new Date();
-    const [hours, minutes] = endTimeStr.split(":").map(Number);
-    const endTime = new Date();
-    endTime.setHours(hours, minutes, 0, 0);
-
-    // 終了時刻が過去の場合は翌日として扱う
-    if (endTime <= now) {
-      endTime.setDate(endTime.getDate() + 1);
-    }
-
-    const totalMs = endTime.getTime() - now.getTime();
-    const totalMinutes = Math.floor(totalMs / 60000);
-    setMeetingTotalDurationMinutes(totalMinutes);
-    setRemainingMeetingMinutes(Math.max(0, totalMinutes));
-
-    if (totalMinutes <= 0) return;
-
-    // 進行率プリセットに基づいてアラームポイントを生成
-    const newAlarmPoints: AlarmPoint[] = presets
-      .filter((percent) => percent > 0 && percent <= 100)
-      .map((percent, index) => {
-        const alarmMinutes = Math.round((totalMinutes * percent) / 100);
-        return {
-          id: `auto-${Date.now()}-${index}`,
-          minutes: alarmMinutes,
-          isDone: false,
-          remainingTime: alarmMinutes * 60,
-        };
-      })
-      .filter((point) => point.minutes > 0)
-      .filter((point, index, arr) =>
-        // 重複する分数を除去
-        arr.findIndex(p => p.minutes === point.minutes) === index
-      )
-      .sort((a, b) => a.minutes - b.minutes);
-
-    setAlarmPoints(newAlarmPoints);
-  }, []);
-
-  // 終了時刻の計算機能
-  const getEndTime = useCallback(
-    (startTime: Date | null, durationInSeconds: number) => {
-      if (!startTime) return "--:--:--";
-      const endTime = new Date(startTime.getTime() + durationInSeconds * 1000);
-      return endTime.toLocaleTimeString();
-    },
-    []
-  );
-
-  // カウントダウン時間の計算
-  const getCountdown = useCallback(
-    (totalSeconds: number, elapsedSeconds: number) => {
-      const remainingSeconds = totalSeconds - elapsedSeconds;
-      return formatTime(Math.max(0, remainingSeconds));
-    },
-    [formatTime]
-  );
-
-  // 通知権限のリクエスト
-  const requestNotificationPermission = useCallback(async () => {
-    if (typeof window === "undefined") return;
-
-    // iOS Safariなど、一部のブラウザでは通知がサポートされていない
-    if (!("Notification" in window) || !window.Notification) {
-      // 通知が使えない場合は、何もせずに戻る（エラーメッセージを出さない）
-      console.log("このブラウザでは通知機能が利用できません");
-      return;
-    }
-
-    try {
-      const permission = await Notification.requestPermission();
-      setNotificationPermission(permission);
-      if (permission === "granted") {
-        setNotificationsEnabled(true);
-        // テスト通知を送信
-        try {
-          new Notification("Comm Time", {
-            body: "通知が有効になりました！",
-            icon: "/favicon.svg",
-          });
-        } catch (e) {
-          console.log("通知の送信に失敗しました:", e);
-        }
-      } else if (permission === "denied") {
-        console.log("通知が拒否されました");
-      }
-    } catch (error) {
-      console.error("通知権限のリクエストに失敗しました:", error);
-    }
-  }, []);
-
-  // 通知トグル
-  const toggleNotifications = useCallback(() => {
-    if (notificationPermission !== "granted") {
-      requestNotificationPermission();
-    } else {
-      setNotificationsEnabled(!notificationsEnabled);
-    }
-  }, [
-    notificationPermission,
-    notificationsEnabled,
-    requestNotificationPermission,
-  ]);
+  // (タイマーロジック: useMeetingTimer / usePomodoroTimer hookに移動済み)
 
   // 設定を初期値にリセット
   const resetToDefaults = useCallback(() => {
@@ -1650,19 +815,6 @@ export function CommTimeComponent() {
     defaultPomodoroBreakAlarm,
     pomodoroSettings,
   ]);
-
-  // 音のプレビュー機能
-  const previewSound = useCallback(
-    (settings: AlarmSettings) => {
-      const audio = createAlarmAudio(settings);
-      if (audio) {
-        audio.play().catch((error) => {
-          console.error("音のプレビュー再生に失敗:", error);
-        });
-      }
-    },
-    [createAlarmAudio]
-  );
 
   // タグCRUD関数（データベースモード対応）
   const addTag = useCallback(
@@ -1756,27 +908,6 @@ export function CommTimeComponent() {
     },
     [useDatabase, user, sharedSupabaseTodos]
   );
-
-  // ポモドーロタスク更新関数（Supabase連携対応）
-  const updatePomodoroTask = useCallback(
-    (taskText: string, todoId: string | null = null) => {
-      setCurrentPomodoroTask(taskText);
-      setCurrentPomodoroTaskId(todoId);
-      if (useDatabase && user) {
-        supabasePomodoroTask.updateTask(taskText, todoId);
-      }
-    },
-    [useDatabase, user, supabasePomodoroTask]
-  );
-
-  // ポモドーロタスククリア関数
-  const clearPomodoroTask = useCallback(() => {
-    setCurrentPomodoroTask("");
-    setCurrentPomodoroTaskId(null);
-    if (useDatabase && user) {
-      supabasePomodoroTask.clearTask();
-    }
-  }, [useDatabase, user, supabasePomodoroTask]);
 
   // フィルタリングされたTODOを取得
   const filteredTodos = React.useMemo(() => {
@@ -2719,7 +1850,6 @@ export function CommTimeComponent() {
                           value={targetEndTime}
                           onChange={(e) => {
                             setTargetEndTime(e.target.value);
-                            setMeetingTotalDurationMinutes(0);
                           }}
                           className="px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:[color-scheme:dark]"
                         />
@@ -3098,7 +2228,7 @@ export function CommTimeComponent() {
                       <button
                         type="button"
                         onClick={() =>
-                          setMeetingAlarmSettings(initialMeetingAlarmSettings)
+                          setMeetingAlarmSettings(INITIAL_MEETING_ALARM_SETTINGS)
                         }
                         className="px-4 py-2.5 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg text-sm sm:text-base"
                       >
@@ -4290,14 +3420,8 @@ export function CommTimeComponent() {
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        updatePomodoroTask(todo.text, todo.id);
+                                        startWithTodo(todo.text, todo.id);
                                         setActiveTab("pomodoro");
-                                        if (!isPomodoroRunning || pomodoroState !== 'work') {
-                                          setPomodoroState('work');
-                                          setPomodoroElapsedTime(0);
-                                          setPomodoroStartTime(new Date());
-                                          setIsPomodoroRunning(true);
-                                        }
                                         // スムーズスクロールでタイマー表示位置へ
                                         const timerElement = document.getElementById('pomodoro-timer-section');
                                         if (timerElement) {
