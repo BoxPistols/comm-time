@@ -13,6 +13,7 @@ import type {
   FilterState,
 } from "@/types";
 import { initialFilterState } from "@/types";
+import { getStorageValue } from "@/lib/storage";
 import { useSupabaseTodos } from "@/hooks/useSupabaseTodos";
 import type { DropResult } from "react-beautiful-dnd";
 
@@ -103,9 +104,14 @@ export function useTodoManager(options: TodoManagerOptions): TodoManagerState {
   // Supabase hook
   const sharedSupabaseTodos = useSupabaseTodos(useDatabase ? user : null);
 
-  // Core state
-  const [sharedMemo, setSharedMemo] = useState("");
-  const [sharedTodos, setSharedTodos] = useState<TodoItem[]>([]);
+  // Core state - localStorageから復元
+  const [mounted, setMounted] = useState(false);
+  const [sharedMemo, setSharedMemo] = useState(() =>
+    getStorageValue("sharedMemo", "")
+  );
+  const [sharedTodos, setSharedTodos] = useState<TodoItem[]>(() =>
+    getStorageValue("sharedTodos", [])
+  );
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null);
   const [editDialogTodoId, setEditDialogTodoId] = useState<string | null>(null);
   const [expandedDeadlineTodoId, setExpandedDeadlineTodoId] = useState<string | null>(null);
@@ -217,16 +223,19 @@ export function useTodoManager(options: TodoManagerOptions): TodoManagerState {
     });
   }, [sharedTodos, filterState]);
 
-  // localStorage保存
+  // マウント完了フラグ
+  useEffect(() => { setMounted(true); }, []);
+
+  // localStorage保存（マウント後のみ）
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!mounted || typeof window === "undefined") return;
     localStorage.setItem("sharedMemo", sharedMemo);
     localStorage.setItem("sharedTodos", JSON.stringify(sharedTodos));
     localStorage.setItem("trashedTodos", JSON.stringify(trashedTodos));
     localStorage.setItem("todoVersions", JSON.stringify(todoVersions));
     localStorage.setItem("trashedMemos", JSON.stringify(trashedMemos));
     localStorage.setItem("todoViewMode", viewMode);
-  }, [sharedMemo, sharedTodos, trashedTodos, todoVersions, trashedMemos, viewMode]);
+  }, [mounted, sharedMemo, sharedTodos, trashedTodos, todoVersions, trashedMemos, viewMode]);
 
   // Supabase sync
   useEffect(() => {
