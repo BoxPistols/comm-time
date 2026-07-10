@@ -302,7 +302,7 @@ export function toCacheRow(calendarId: string, event: GoogleEvent): CachedEventR
     description: event.description ?? null,
     location: event.location ?? null,
     hangout_link: event.hangoutLink ?? null,
-    // 終日予定の date (YYYY-MM-DD) はローカル日付として 00:00 扱いで保存する
+    // 終日予定の date (YYYY-MM-DD) は UTC 0時として保存し、表示側で eventDisplayDate により補正する
     start_at: startRaw ? new Date(startRaw).toISOString() : null,
     end_at: endRaw ? new Date(endRaw).toISOString() : null,
     is_all_day: isAllDay,

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { CALENDAR_TEXT } from "@/lib/constants";
-import { formatDateHeading, isSameDay, startOfDay } from "@/lib/calendar-date";
+import { eventDisplayDate, formatDateHeading, isSameDay, startOfDay } from "@/lib/calendar-date";
 import { EventCard } from "./event-card";
 import type { CalendarEvent } from "@/types/calendar";
 
@@ -16,7 +16,7 @@ export function CalendarAgendaView({ events, onEventClick }: CalendarAgendaViewP
   const groups = useMemo(() => {
     const map = new Map<number, { date: Date; events: CalendarEvent[] }>();
     for (const event of events) {
-      const day = startOfDay(new Date(event.startAt));
+      const day = startOfDay(eventDisplayDate(event.startAt, event.isAllDay));
       const key = day.getTime();
       const group = map.get(key) ?? { date: day, events: [] };
       group.events.push(event);

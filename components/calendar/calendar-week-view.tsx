@@ -1,8 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
 import { CALENDAR_TEXT } from "@/lib/constants";
-import { addDays, formatDateHeading, isSameDay, startOfWeekMonday } from "@/lib/calendar-date";
+import {
+  addDays,
+  eventDisplayDate,
+  formatDateHeading,
+  isSameDay,
+  startOfWeekMonday,
+} from "@/lib/calendar-date";
 import { EventCard } from "./event-card";
 import type { CalendarEvent } from "@/types/calendar";
 
@@ -16,17 +21,13 @@ export function CalendarWeekView({ events, onEventClick }: CalendarWeekViewProps
   const today = new Date();
   const weekStart = startOfWeekMonday(today);
 
-  const days = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => {
-      const date = addDays(weekStart, i);
-      const dayEvents = events
-        .filter((e) => isSameDay(new Date(e.startAt), date))
-        .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-      return { date, events: dayEvents };
-    });
-    // weekStart は today から導出され日単位でしか変わらないため events のみ監視する
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events]);
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const date = addDays(weekStart, i);
+    const dayEvents = events
+      .filter((e) => isSameDay(eventDisplayDate(e.startAt, e.isAllDay), date))
+      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+    return { date, events: dayEvents };
+  });
 
   const isEmpty = days.every((d) => d.events.length === 0);
   if (isEmpty) {

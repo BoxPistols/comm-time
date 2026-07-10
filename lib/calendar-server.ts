@@ -27,13 +27,20 @@ export type CalendarConnectionRow = {
   last_synced_at: string | null;
 };
 
+// サーバーレス環境での接続オーバーヘッド削減のためモジュールレベルでキャッシュする
+let serviceRoleClient: SupabaseClient | null = null;
+
 export function getServiceRoleClient(): SupabaseClient | null {
+  if (serviceRoleClient) {
+    return serviceRoleClient;
+  }
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceRoleKey) {
     return null;
   }
-  return createClient(supabaseUrl, serviceRoleKey);
+  serviceRoleClient = createClient(supabaseUrl, serviceRoleKey);
+  return serviceRoleClient;
 }
 
 export async function loadConnection(
@@ -99,18 +106,25 @@ export async function syncCalendars(
   let didFullSync = false;
 
   // 選択解除されたカレンダーのキャッシュは削除する
-  if (connection.selected_calendar_ids.length > 0) {
+  // （not-in の文字列組み立ては ID 中の特殊文字で壊れるため、対象 ID を求めてから .in() で削除する）
+  const { data: cachedCalendars } = await db
+    .from("calendar_event_cache")
+    .select("calendar_id")
+    .eq("user_id", connection.user_id);
+  const selectedSet = new Set(connection.selected_calendar_ids);
+  const staleCalendarIds = Array.from(
+    new Set(
+      ((cachedCalendars ?? []) as { calendar_id: string }[])
+        .map((row) => row.calendar_id)
+        .filter((id) => !selectedSet.has(id))
+    )
+  );
+  if (staleCalendarIds.length > 0) {
     await db
       .from("calendar_event_cache")
       .delete()
       .eq("user_id", connection.user_id)
-      .not(
-        "calendar_id",
-        "in",
-        `(${connection.selected_calendar_ids.map((id) => `"${id}"`).join(",")})`
-      );
-  } else {
-    await db.from("calendar_event_cache").delete().eq("user_id", connection.user_id);
+      .in("calendar_id", staleCalendarIds);
   }
 
   for (const calendarId of connection.selected_calendar_ids) {

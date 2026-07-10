@@ -51,3 +51,13 @@ export function formatDateHeading(date: Date): string {
 export function toIso(date: Date): string {
   return date.toISOString();
 }
+
+// 終日予定の date-only 値（UTC 0時で保存）はタイムゾーンでずれるため、
+// UTC の年月日をそのままローカル日付として解釈する
+export function eventDisplayDate(iso: string, isAllDay: boolean): Date {
+  const d = new Date(iso);
+  if (isAllDay) {
+    return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  }
+  return d;
+}

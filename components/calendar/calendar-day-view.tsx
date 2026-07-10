@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
 import { CALENDAR_TEXT } from "@/lib/constants";
-import { isSameDay } from "@/lib/calendar-date";
+import { eventDisplayDate, isSameDay } from "@/lib/calendar-date";
 import { EventCard } from "./event-card";
 import type { CalendarEvent } from "@/types/calendar";
 
@@ -14,18 +13,21 @@ type CalendarDayViewProps = {
 // 今日の予定を時系列で表示（終日予定を先頭に）
 export function CalendarDayView({ events, onEventClick }: CalendarDayViewProps) {
   const today = new Date();
-  const todayEvents = useMemo(
-    () =>
-      events
-        .filter((e) => isSameDay(new Date(e.startAt), today) || (e.isAllDay && new Date(e.startAt) <= today && new Date(e.endAt) > today))
-        .sort((a, b) => {
-          if (a.isAllDay !== b.isAllDay) return a.isAllDay ? -1 : 1;
-          return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
-        }),
-    // today は描画ごとに生成されるため依存に含めない（日付単位の比較のみに使用）
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [events]
-  );
+
+  const todayEvents = events
+    .filter((e) => {
+      const start = eventDisplayDate(e.startAt, e.isAllDay);
+      if (e.isAllDay) {
+        // Google の終日予定の end は排他的（翌日 00:00）
+        const end = eventDisplayDate(e.endAt, true);
+        return isSameDay(start, today) || (start <= today && end > today);
+      }
+      return isSameDay(start, today);
+    })
+    .sort((a, b) => {
+      if (a.isAllDay !== b.isAllDay) return a.isAllDay ? -1 : 1;
+      return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
+    });
 
   if (todayEvents.length === 0) {
     return (

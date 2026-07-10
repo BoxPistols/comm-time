@@ -46,8 +46,10 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     ? (input.scope as (typeof SCOPE_VALUES)[number])
     : "instance";
   const memo = typeof input.memo === "string" ? input.memo : null;
+  // tag_ids カラムは uuid[] のため、不正な値は upsert 前に除外する
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const tagIds = Array.isArray(input.tagIds)
-    ? input.tagIds.filter((id): id is string => typeof id === "string")
+    ? input.tagIds.filter((id): id is string => typeof id === "string" && uuidRegex.test(id))
     : [];
 
   const { data, error } = await auth.supabase
