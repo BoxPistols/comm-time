@@ -12,7 +12,8 @@ export type AlarmSettings = {
   frequency: number;
 };
 
-export type TabType = "meeting" | "pomodoro";
+// カレンダー連携によりデフォルトタブは calendar（docs/CALENDAR_INTEGRATION_PLAN.md FR-2.0）
+export type TabType = "calendar" | "meeting" | "pomodoro";
 
 export type PomodoroState = "work" | "break";
 
