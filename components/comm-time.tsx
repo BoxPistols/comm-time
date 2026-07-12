@@ -17,6 +17,7 @@ import { AIChat } from "@/components/ai-chat";
 import { SearchModal, type SearchResult } from "@/components/search-modal";
 import { FlashOverlay } from "@/components/flash-overlay";
 import { TabSwitcher } from "@/components/tab-switcher";
+import { CalendarTab } from "@/components/calendar/calendar-tab";
 import { AppHeader } from "@/components/app-header";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { MeetingTimerPanel } from "@/components/meeting-timer/MeetingTimerPanel";
@@ -73,11 +74,12 @@ export function CommTimeComponent() {
     // ローカルストレージからアクティブタブを復元
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("activeTab");
-      if (saved && (saved === "meeting" || saved === "pomodoro")) {
+      if (saved && (saved === "calendar" || saved === "meeting" || saved === "pomodoro")) {
         return saved as TabType;
       }
     }
-    return "meeting";
+    // デフォルトはカレンダー（docs/CALENDAR_INTEGRATION_PLAN.md FR-2.0）
+    return "calendar";
   });
 
   // Supabaseフック
@@ -603,6 +605,8 @@ export function CommTimeComponent() {
           }`}
         >
           <div className={`w-full ${leftWidth} transition-all duration-300`}>
+            {activeTab === "calendar" && <CalendarTab user={user} />}
+
             {activeTab === "meeting" && (
               <MeetingTimerPanel
                 isMeetingRunning={isMeetingRunning}
