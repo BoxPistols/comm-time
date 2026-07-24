@@ -606,7 +606,7 @@ export function CommTimeComponent() {
           }`}
         >
           <div className={`w-full ${leftWidth} transition-all duration-300`}>
-            {activeTab === "calendar" && <CalendarTab user={user} />}
+            {activeTab === "calendar" && <CalendarTab user={user} todos={sharedTodos} onAddTodo={addTodo} />}
 
             {activeTab === "meeting" && (
               <MeetingTimerPanel

@@ -14,9 +14,12 @@ import { CalendarWeekView } from "./calendar-week-view";
 import { CalendarAgendaView } from "./calendar-agenda-view";
 import { EventDetailDrawer } from "./event-detail-drawer";
 import type { CalendarEvent, CalendarViewType } from "@/types/calendar";
+import type { LocalTodoItem } from "@/hooks/useSupabaseTodos";
 
 type CalendarTabProps = {
   user: User | null;
+  todos?: LocalTodoItem[];
+  onAddTodo?: (text: string, options?: { dueDate?: string; dueTime?: string }) => Promise<string | null>;
 };
 
 const VIEW_OPTIONS: { value: CalendarViewType; label: string }[] = [
@@ -28,7 +31,7 @@ const VIEW_OPTIONS: { value: CalendarViewType; label: string }[] = [
 // 予定リストは今日から14日先まで表示する
 const AGENDA_DAYS = 14;
 
-export function CalendarTab({ user }: CalendarTabProps) {
+export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
   const [view, setView] = useState<CalendarViewType>("today");
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
@@ -135,6 +138,8 @@ export function CalendarTab({ user }: CalendarTabProps) {
 
       <EventDetailDrawer
         event={selectedEvent}
+        todos={todos}
+        onAddTodo={onAddTodo}
         onClose={() => setSelectedEvent(null)}
         onAnnotationChanged={() => void eventsState.refresh()}
       />

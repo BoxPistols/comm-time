@@ -39,7 +39,7 @@ export function CalendarWeekView({ events, onEventClick }: CalendarWeekViewProps
   }
 
   return (
-    <div className="grid grid-cols-1 gap-3 lg:grid-cols-7 lg:gap-2">
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-7 lg:gap-2 lg:items-start">
       {days.map((day) => {
         const isToday = isSameDay(day.date, today);
         return (

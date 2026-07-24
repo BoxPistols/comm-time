@@ -85,9 +85,9 @@ export function useSupabaseTodos(user: User | null) {
     }
   }
 
-  // TODO追加
-  const addTodo = async (text: string) => {
-    if (!user) return
+  // TODO追加（作成されたTODOのIDを返す）
+  const addTodo = async (text: string, options?: { dueDate?: string; dueTime?: string }): Promise<string | null> => {
+    if (!user) return null
 
     try {
       // DBから現在のTODO件数を取得（他クライアントからの同時追加にも対応）
@@ -107,6 +107,8 @@ export function useSupabaseTodos(user: User | null) {
           text,
           is_completed: false,
           order_index: orderIndex,
+          due_date: options?.dueDate || null,
+          due_time: options?.dueTime || null,
         })
         .select()
         .single()
@@ -115,10 +117,13 @@ export function useSupabaseTodos(user: User | null) {
 
       if (data) {
         setTodos(prev => [...prev, convertToLocal(data)])
+        return data.id
       }
+      return null
     } catch (err: any) {
       setError(err.message)
       console.error("Error adding todo:", err)
+      return null
     }
   }
 

@@ -55,7 +55,7 @@ export type TodoManagerState = {
   setDeadlineAlertMinutes: (v: number) => void;
   alertedTodoIdsRef: React.MutableRefObject<Set<string>>;
   // CRUD
-  addTodo: (text: string) => void;
+  addTodo: (text: string, options?: { dueDate?: string; dueTime?: string }) => Promise<string | null>;
   toggleTodo: (id: string) => void;
   removeTodo: (id: string) => void;
   updateTodo: (id: string, newText: string) => void;
@@ -261,13 +261,21 @@ export function useTodoManager(options: TodoManagerOptions): TodoManagerState {
   );
 
   const addTodo = useCallback(
-    (text: string) => {
-      if (!text.trim()) return;
+    async (text: string, options?: { dueDate?: string; dueTime?: string }): Promise<string | null> => {
+      if (!text.trim()) return null;
       if (useDatabase && user) {
-        sharedSupabaseTodos.addTodo(text.trim());
+        return await sharedSupabaseTodos.addTodo(text.trim(), options);
       } else {
-        const newTodo = { id: Date.now().toString(), text: text.trim(), isCompleted: false };
+        const newId = Date.now().toString();
+        const newTodo = {
+          id: newId,
+          text: text.trim(),
+          isCompleted: false,
+          dueDate: options?.dueDate,
+          dueTime: options?.dueTime,
+        };
         setSharedTodos((prev) => [...prev, newTodo]);
+        return newId;
       }
     },
     [useDatabase, user, sharedSupabaseTodos]
