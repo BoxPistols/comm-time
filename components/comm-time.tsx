@@ -23,6 +23,7 @@ import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { MeetingTimerPanel } from "@/components/meeting-timer/MeetingTimerPanel";
 import { PomodoroTimerPanel } from "@/components/pomodoro-timer/PomodoroTimerPanel";
 import { TodoListPanel } from "@/components/todo-list/TodoListPanel";
+import { DeadlineTimeline } from "@/components/deadline-timeline";
 import { useKanbanStatuses } from "@/hooks/useKanbanStatuses";
 import { useAlarmSystem } from "@/hooks/useAlarmSystem";
 import { useMeetingTimer } from "@/hooks/useMeetingTimer";
@@ -645,6 +646,7 @@ export function CommTimeComponent() {
             )}
 
             {activeTab === "pomodoro" && (
+              <>
               <PomodoroTimerPanel
                 isPomodoroRunning={isPomodoroRunning}
                 pomodoroStartTime={pomodoroStartTime}
@@ -674,6 +676,12 @@ export function CommTimeComponent() {
                 filteredTodos={filteredTodos}
                 filterState={filterState}
               />
+              <DeadlineTimeline
+                todos={sharedTodos}
+                currentPomodoroTaskId={currentPomodoroTaskId}
+                onStartPomodoro={(todo) => startWithTodo(todo.text, todo.id)}
+              />
+              </>
             )}
           </div>
           <div
