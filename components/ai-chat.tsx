@@ -26,6 +26,18 @@ const SIZE_CONFIG: Record<ChatSize, { width: number; height: number }> = {
 
 // ドラッグリサイズの制限
 const MIN_WIDTH = 300;
+
+// ローカルLLM用のシステムプロンプト（簡潔版）
+const LOCAL_SYSTEM_PROMPT = `あなたはタスク管理のアシスタントです。
+
+## 文体ルール
+- 語尾を揃えず「〜です」「〜ですね」「〜ましょう」「〜がいいかも」など変化をつける
+- 箇条書きは最小限に、自然な文章で伝える
+- 「素晴らしいですね！」「いかがでしたか？」など媚びた前置きや定型の結びは使わない
+- 「まず」「次に」「さらに」を連続させない
+- 短い文と長い文を混ぜてリズムを作る
+- 考えながら話すような自然な口調で、具体的な提案をする
+- 絵文字は使わない`;
 const MAX_WIDTH = 800;
 const MIN_HEIGHT = 350;
 const MAX_HEIGHT = 900;
@@ -39,10 +51,13 @@ type ModelOption = {
 };
 
 const MODEL_OPTIONS: ModelOption[] = [
-  { id: "gpt-4.1-nano", name: "gpt-4.1-nano", description: "高速・軽量" },
-  { id: "gpt-4o-mini", name: "gpt-4o-mini", description: "推奨・高速" },
+  { id: "gpt-5.4-nano", name: "GPT-5.4 Nano", description: "高速・軽量（デフォルト）" },
+  { id: "gpt-5.4-mini", name: "GPT-5.4 Mini", description: "高性能" },
   { id: "custom", name: "ローカルLLM（無料）", description: "LM Studio等", isCustom: true },
 ];
+
+// レート制限の設定
+const RATE_LIMIT_MAX = 50;
 
 // 認証ヘッダーを取得
 async function getAuthHeaders(): Promise<HeadersInit> {
@@ -69,16 +84,17 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
   const [selectedModel, setSelectedModel] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("aiChatSelectedModel");
-      // 保存されたモデルが選択肢にあるかチェック（GPT-5系削除対応）
+      // 保存されたモデルが選択肢にあるかチェック（旧モデル廃止対応）
       const isValidModel = saved && MODEL_OPTIONS.some(m => m.id === saved);
-      return isValidModel ? saved : "gpt-4o-mini";
+      return isValidModel ? saved : "gpt-5.4-nano";
     }
-    return "gpt-4o-mini";
+    return "gpt-5.4-nano";
   });
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [customEndpoint, setCustomEndpoint] = useState("http://localhost:1234/v1");
   const [customModelName, setCustomModelName] = useState("");
   const [showCustomSettings, setShowCustomSettings] = useState(false);
+  const [remainingRequests, setRemainingRequests] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -146,7 +162,7 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
           body: JSON.stringify({
             model: customModelName || "local-model",
             messages: [
-              { role: "system", content: "あなたはタスク管理のアシスタントです。" },
+              { role: "system", content: LOCAL_SYSTEM_PROMPT },
               ...messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
               { role: "user", content: userMessage },
             ],
@@ -180,8 +196,17 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
           }),
         });
 
+        // 残り回数をヘッダーから取得
+        const remaining = response.headers.get("X-RateLimit-Remaining");
+        if (remaining !== null) {
+          setRemainingRequests(parseInt(remaining, 10));
+        }
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
+          if (response.status === 429) {
+            throw new Error(errorData.error || "リクエスト上限に達しました");
+          }
           throw new Error(errorData.error || `HTTP error: ${response.status}`);
         }
 
@@ -656,13 +681,16 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
               <Send size={18} />
             </button>
           </div>
-          <p
-            className={`text-xs mt-2 ${
-              darkMode ? "text-gray-500" : "text-gray-400"
-            }`}
-          >
-            Enter で送信 / Shift+Enter で改行
-          </p>
+          <div className={`flex items-center justify-between text-xs mt-2 ${
+            darkMode ? "text-gray-500" : "text-gray-400"
+          }`}>
+            <span>Enter で送信 / Shift+Enter で改行</span>
+            {remainingRequests !== null && (
+              <span className={remainingRequests <= 10 ? "text-amber-500" : ""}>
+                残り {remainingRequests}/{RATE_LIMIT_MAX} 回
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

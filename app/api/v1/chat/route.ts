@@ -12,6 +12,10 @@ import {
   isOpenAIConfigured,
   getDefaultModel,
 } from '@/lib/openai'
+import {
+  checkRateLimit,
+  rateLimitHeaders,
+} from '@/lib/rate-limit'
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 
 // CORS preflight
@@ -94,6 +98,30 @@ const SYSTEM_PROMPT = `あなたは時間管理と計画のプロフェッショ
 ## メモの活用
 - メモにはプロジェクトの背景や詳細情報が含まれている場合がある
 - タスクとメモを関連づけて、より具体的なアドバイスを行う
+
+## 自然な日本語の文体ルール（必ず守ること）
+
+### 禁止パターン — 以下はAIくさい表現なので絶対に使わない
+- 「〜と言えるでしょう」「〜と考えられます」「〜かもしれません」の多用
+- 「まず」「次に」「さらに」「加えて」「また」を連続して使う（接続詞の数珠つなぎ）
+- 「素晴らしいですね！」「いい質問ですね！」など媚びた前置き（すぐ本題に入る）
+- 「いかがでしたか？」「参考になれば幸いです」「お役に立てれば嬉しいです」などの定型的な結び
+- 「〜が重要です」「〜が不可欠です」「〜が鍵となります」を繰り返す
+- 「**太字**:」で始まるインライン見出し付き箇条書き（人間はこの形式をあまり使わない）
+- アスタリスク（*や**）による過度な強調
+- 「結論から言うと」「本記事では」「以下で解説します」などの前置き宣言
+- 「一般的に」「多くの場合」「状況によって異なります」などの安全クッション表現の乱用
+- 「〜において」「〜における」の多用（「〜で」「〜の」で十分な場合が多い）
+- 三点セットの法則（常に3つの例を並べる癖）
+
+### 守るべき文体
+- 語尾を揃えない。「〜です」「〜ですね」「〜ましょう」「〜してみてください」「〜がいいかも」など変化をつける
+- 短い文と長い文を混ぜてリズムを作る。全部同じ長さの文が続かないようにする
+- 箇条書きは最小限にする。3つ以上の箇条書きが連続しないようにし、なるべく自然な文章で伝える
+- 必要なら口語的な表現（「ちょっと」「けっこう」「やっぱり」「〜かな」）を適度に使う
+- 具体的な場面や数字で語る。抽象的な美辞麗句より実用的な提案を
+- 考えながら話しているような自然な流れで書く。完璧に整理された構造より、会話っぽさを優先する
+- 絵文字は使わない
 
 ## 注意事項
 - ユーザーのタスクとメモのデータは会話の文脈として提供されます
@@ -189,7 +217,7 @@ async function getUserMemosContext(client: SupabaseClient, userId: string): Prom
  * - message: string (required) - ユーザーのメッセージ
  * - history?: Array<{role: 'user' | 'assistant', content: string}> - 会話履歴
  * - stream?: boolean - ストリーミングレスポンスを使用するか (default: false)
- * - model?: string - 使用するモデル (default: 環境変数 or gpt-4o-mini)
+ * - model?: string - 使用するモデル (default: 環境変数 or gpt-5.4-nano)
  */
 export async function POST(request: NextRequest) {
   // 認証チェック
@@ -220,6 +248,22 @@ export async function POST(request: NextRequest) {
   const history = (body.history as Array<{ role: 'user' | 'assistant'; content: string }>) || []
   const useStream = body.stream === true
   const model = (body.model as string) || getDefaultModel()
+
+  // レート制限（認証済みユーザーに対して50回/日）
+  const rateLimit = checkRateLimit(auth.userId, 'chat')
+
+  if (!rateLimit.allowed) {
+    return new Response(
+      JSON.stringify({ error: rateLimit.error, remaining: 0, resetTime: rateLimit.resetTime }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          ...rateLimitHeaders(rateLimit),
+        },
+      }
+    )
+  }
 
   // コンテキストを並列で取得（認証済みクライアントを使用）
   const [timeContext, todosContext, memosContext] = await Promise.all([

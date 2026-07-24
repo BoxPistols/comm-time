@@ -29,7 +29,7 @@ export function getOpenAIClient(): OpenAI {
  * デフォルトモデルを取得
  */
 export function getDefaultModel(): string {
-  return process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  return process.env.OPENAI_MODEL || 'gpt-5.4-nano';
 }
 
 // ============================================
@@ -38,10 +38,12 @@ export function getDefaultModel(): string {
 
 /**
  * モデルがmax_completion_tokensを必要とするかを判定
- * GPT-5系、GPT-4.1系は max_completion_tokens を使用
+ * GPT-5系、GPT-5.4系、GPT-4.1系は max_completion_tokens を使用
  * GPT-4系は max_tokens を使用
  */
 export function requiresMaxCompletionTokens(modelId: string): boolean {
+  // GPT-5.4系
+  if (modelId.startsWith('gpt-5.4')) return true;
   // GPT-5系
   if (modelId.startsWith('gpt-5')) return true;
   // GPT-4.1系
@@ -56,9 +58,11 @@ export function requiresMaxCompletionTokens(modelId: string): boolean {
 
 /**
  * モデルがtemperatureパラメータをサポートしないかを判定
- * GPT-5系、o1系、o3系はカスタムtemperatureをサポートしない（デフォルト値1のみ）
+ * GPT-5系、GPT-5.4系、o1系、o3系はカスタムtemperatureをサポートしない（デフォルト値1のみ）
  */
 export function doesNotSupportTemperature(modelId: string): boolean {
+  // GPT-5.4系 - temperatureはデフォルト(1)のみサポート
+  if (modelId.startsWith('gpt-5.4')) return true;
   // GPT-5系 - temperatureはデフォルト(1)のみサポート
   if (modelId.startsWith('gpt-5')) return true;
   // o1系モデル（reasoning models）- temperatureサポートなし
@@ -239,9 +243,10 @@ export function isOpenAIConfigured(): boolean {
 
 /**
  * 利用可能なモデルのリスト（UIで選択用）
- * Note: GPT-5系は現時点でtemperature等のパラメータ制限があるため除外
+ * GPT-5.4 nano（デフォルト）と GPT-5.4 mini の2択
+ * ログイン済みユーザーは両方使用可能（50回/日のレート制限）
  */
 export const AVAILABLE_MODELS = [
-  { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano', description: '高速・軽量' },
-  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: '推奨・高速' },
+  { id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', description: '高速・軽量（デフォルト）' },
+  { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', description: '高性能' },
 ] as const;

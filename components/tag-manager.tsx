@@ -6,8 +6,8 @@ import { type Tag, TAG_COLORS } from "@/types";
 
 interface TagManagerProps {
   tags: Tag[];
-  onAddTag: (name: string, color: string) => Tag | Promise<Tag>;
-  onUpdateTag: (id: string, name: string, color: string) => void;
+  onAddTag: (name: string, color: string) => Tag | null | Promise<Tag | null>;
+  onUpdateTag: (id: string, name: string, color: string) => void | Promise<void>;
   onDeleteTag: (id: string) => void;
   darkMode: boolean;
   onClose: () => void;
@@ -26,12 +26,32 @@ export function TagManager({
   const [editingTagId, setEditingTagId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [editingColor, setEditingColor] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const handleAddTag = async () => {
-    if (newTagName.trim()) {
-      await onAddTag(newTagName.trim(), newTagColor);
-      setNewTagName("");
-      setNewTagColor(TAG_COLORS[0].value);
+    const trimmed = newTagName.trim();
+    if (!trimmed) return;
+
+    const duplicate = tags.some(
+      (t) => t.name.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (duplicate) {
+      setAddError(`「${trimmed}」は既に存在するタグ名です`);
+      return;
+    }
+
+    setAddError(null);
+    try {
+      const result = await onAddTag(trimmed, newTagColor);
+      if (result) {
+        setNewTagName("");
+        setNewTagColor(TAG_COLORS[0].value);
+      } else {
+        setAddError("タグの追加に失敗しました。既に存在する可能性があります。");
+      }
+    } catch {
+      setAddError("タグの追加に失敗しました");
     }
   };
 
@@ -39,14 +59,29 @@ export function TagManager({
     setEditingTagId(tag.id);
     setEditingName(tag.name);
     setEditingColor(tag.color);
+    setEditError(null);
   };
 
-  const handleSaveEdit = () => {
-    if (editingTagId && editingName.trim()) {
-      onUpdateTag(editingTagId, editingName.trim(), editingColor);
+  const handleSaveEdit = async () => {
+    const trimmed = editingName.trim();
+    if (!editingTagId || !trimmed) return;
+
+    const duplicate = tags.some(
+      (t) => t.id !== editingTagId && t.name.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (duplicate) {
+      setEditError(`「${trimmed}」は既に存在するタグ名です`);
+      return;
+    }
+
+    setEditError(null);
+    try {
+      await onUpdateTag(editingTagId, trimmed, editingColor);
       setEditingTagId(null);
       setEditingName("");
       setEditingColor("");
+    } catch {
+      setEditError("タグの更新に失敗しました");
     }
   };
 
@@ -54,6 +89,7 @@ export function TagManager({
     setEditingTagId(null);
     setEditingName("");
     setEditingColor("");
+    setEditError(null);
   };
 
   const getTextColorClass = (bgColor: string) => {
@@ -96,7 +132,7 @@ export function TagManager({
           <input
             type="text"
             value={newTagName}
-            onChange={(e) => setNewTagName(e.target.value)}
+            onChange={(e) => { setNewTagName(e.target.value); setAddError(null); }}
             placeholder="新しいタグ名"
             className={`flex-1 px-3 py-2 rounded-lg border text-sm ${
               darkMode
@@ -124,6 +160,9 @@ export function TagManager({
             追加
           </button>
         </div>
+        {addError && (
+          <p className="text-xs text-red-500">{addError}</p>
+        )}
 
         {/* カラー選択 */}
         <div className="flex flex-wrap gap-2">
@@ -162,17 +201,22 @@ export function TagManager({
             >
               {editingTagId === tag.id ? (
                 <>
+                  <div className="flex-1 flex flex-col gap-1">
                   <input
                     type="text"
                     value={editingName}
-                    onChange={(e) => setEditingName(e.target.value)}
-                    className={`flex-1 px-2 py-1 rounded border text-sm ${
+                    onChange={(e) => { setEditingName(e.target.value); setEditError(null); }}
+                    className={`w-full px-2 py-1 rounded border text-sm ${
                       darkMode
                         ? "bg-gray-600 border-gray-500 text-white"
                         : "bg-white border-gray-300 text-gray-900"
                     }`}
                     autoFocus
                   />
+                  {editError && (
+                    <p className="text-xs text-red-500">{editError}</p>
+                  )}
+                  </div>
                   <div className="flex gap-1">
                     {TAG_COLORS.slice(0, 5).map((color) => (
                       <button

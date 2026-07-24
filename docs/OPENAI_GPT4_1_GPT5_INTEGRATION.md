@@ -12,19 +12,16 @@
 # OpenAI API設定
 OPENAI_API_KEY=your-openai-api-key
 
-# オプション: デフォルトモデル（省略時: gpt-4o-mini）
-OPENAI_MODEL=gpt-4o-mini
+# オプション: デフォルトモデル（省略時: gpt-5.4-nano）
+OPENAI_MODEL=gpt-5.4-nano
 ```
 
 ### 2. 対応モデル
 
 | モデル | パラメータ | 備考 |
 |--------|-----------|------|
-| gpt-4o | `max_tokens` | 最新の高性能モデル |
-| gpt-4o-mini | `max_tokens` | 高速・低コスト |
-| gpt-4-turbo | `max_tokens` | 大規模コンテキスト対応 |
-| gpt-5-mini | `max_completion_tokens` | GPT-5系の軽量版 |
-| gpt-5 | `max_completion_tokens` | GPT-5標準モデル |
+| gpt-5.4-nano | `max_completion_tokens` | 高速・軽量（デフォルト） |
+| gpt-5.4-mini | `max_completion_tokens` | 高性能 |
 | o1 / o1-mini | `max_completion_tokens` | 推論特化モデル |
 | o3 | `max_completion_tokens` | 高度な推論モデル |
 
@@ -49,8 +46,9 @@ components/
 `lib/openai.ts` の `requiresMaxCompletionTokens()` 関数でモデルごとに適切なパラメータを選択:
 
 ```typescript
-// GPT-5系、o1系、o3系は max_completion_tokens を使用
+// GPT-5.4系、GPT-5系、o1系、o3系は max_completion_tokens を使用
 function requiresMaxCompletionTokens(modelId: string): boolean {
+  if (modelId.startsWith('gpt-5.4')) return true;
   if (modelId.startsWith('gpt-5')) return true;
   if (modelId.startsWith('gpt-4.1')) return true;
   if (modelId.startsWith('o1')) return true;
@@ -101,13 +99,13 @@ Body:
   "message": "今日やるべきタスクを教えて",
   "history": [],          // 会話履歴（オプション）
   "stream": false,        // ストリーミング（オプション）
-  "model": "gpt-4o-mini"  // モデル指定（オプション）
+  "model": "gpt-5.4-nano"  // モデル指定（オプション）
 }
 
 Response:
 {
   "message": "AIからの応答",
-  "model": "gpt-4o-mini",
+  "model": "gpt-5.4-nano",
   "usage": {
     "promptTokens": 100,
     "completionTokens": 50,
