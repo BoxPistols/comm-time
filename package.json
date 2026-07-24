@@ -18,6 +18,7 @@
     "playwright:install": "playwright install --with-deps"
   },
   "dependencies": {
+    "@google/genai": "^1.36.0",
     "@radix-ui/react-dialog": "^1.1.15",
     "@supabase/supabase-js": "^2.81.1",
     "@tailwindcss/typography": "^0.5.19",
