@@ -338,22 +338,24 @@ export function useTodoManager(options: TodoManagerOptions): TodoManagerState {
   const startEditingTodo = useCallback((id: string) => setEditingTodoId(id), []);
   const cancelEditingTodo = useCallback(() => setEditingTodoId(null), []);
 
-  const clearAllTodos = useCallback(async () => {
-    if (useDatabase && user) {
-      await Promise.all(sharedSupabaseTodos.todos.map((t) => sharedSupabaseTodos.removeTodo(t.id)));
-    } else {
-      setSharedTodos([]);
-    }
-  }, [useDatabase, user, sharedSupabaseTodos]);
+  const clearTodos = useCallback(
+    async (predicate: (t: TodoItem) => boolean) => {
+      if (useDatabase && user) {
+        const toRemove = sharedSupabaseTodos.todos.filter(predicate);
+        await Promise.all(toRemove.map((t) => sharedSupabaseTodos.removeTodo(t.id)));
+      } else {
+        setSharedTodos((prev) => prev.filter((t) => !predicate(t)));
+      }
+    },
+    [useDatabase, user, sharedSupabaseTodos]
+  );
 
-  const clearCompletedTodos = useCallback(async () => {
-    if (useDatabase && user) {
-      const completed = sharedSupabaseTodos.todos.filter((t) => t.isCompleted);
-      await Promise.all(completed.map((t) => sharedSupabaseTodos.removeTodo(t.id)));
-    } else {
-      setSharedTodos((prev) => prev.filter((todo) => !todo.isCompleted));
-    }
-  }, [useDatabase, user, sharedSupabaseTodos]);
+  const clearAllTodos = useCallback(async () => clearTodos(() => true), [clearTodos]);
+
+  const clearCompletedTodos = useCallback(
+    async () => clearTodos((t) => t.isCompleted),
+    [clearTodos]
+  );
 
   const restoreTodo = useCallback(
     (trashedTodo: TrashedTodoItem) => {
@@ -378,17 +380,24 @@ export function useTodoManager(options: TodoManagerOptions): TodoManagerState {
 
   // --- Kanban & Details ---
 
-  const updateTodoKanbanStatus = useCallback(
-    (todoId: string, kanbanStatus: KanbanStatus) => {
+  const applyTodoUpdate = useCallback(
+    (id: string, updates: Partial<TodoItem>) => {
       if (useDatabase && user) {
-        sharedSupabaseTodos.updateTodo(todoId, { kanbanStatus });
+        sharedSupabaseTodos.updateTodo(id, updates);
       } else {
         setSharedTodos((prev) =>
-          prev.map((todo) => todo.id === todoId ? { ...todo, kanbanStatus } : todo)
+          prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
         );
       }
     },
     [useDatabase, user, sharedSupabaseTodos]
+  );
+
+  const updateTodoKanbanStatus = useCallback(
+    (todoId: string, kanbanStatus: KanbanStatus) => {
+      applyTodoUpdate(todoId, { kanbanStatus });
+    },
+    [applyTodoUpdate]
   );
 
   const handleSaveTodoDetails = useCallback(
@@ -398,30 +407,18 @@ export function useTodoManager(options: TodoManagerOptions): TodoManagerState {
       importance?: ImportanceLevel;
       kanbanStatus?: KanbanStatus;
     }) => {
-      if (useDatabase && user) {
-        sharedSupabaseTodos.updateTodo(todoId, updates);
-      } else {
-        setSharedTodos((prev) =>
-          prev.map((todo) => todo.id === todoId ? { ...todo, ...updates } : todo)
-        );
-      }
+      applyTodoUpdate(todoId, updates);
     },
-    [useDatabase, user, sharedSupabaseTodos]
+    [applyTodoUpdate]
   );
 
   // --- Deadline ---
 
   const updateTodoDeadline = useCallback(
     (id: string, dueDate: string | undefined, dueTime: string | undefined) => {
-      if (useDatabase && user) {
-        sharedSupabaseTodos.updateTodo(id, { dueDate, dueTime });
-      } else {
-        setSharedTodos((prev) =>
-          prev.map((todo) => todo.id === id ? { ...todo, dueDate, dueTime } : todo)
-        );
-      }
+      applyTodoUpdate(id, { dueDate, dueTime });
     },
-    [useDatabase, user, sharedSupabaseTodos]
+    [applyTodoUpdate]
   );
 
   const extendDeadline = useCallback(
@@ -431,15 +428,9 @@ export function useTodoManager(options: TodoManagerOptions): TodoManagerState {
       const currentDate = todo.dueDate ? new Date(todo.dueDate) : new Date();
       currentDate.setDate(currentDate.getDate() + days);
       const newDueDate = currentDate.toISOString().split("T")[0];
-      if (useDatabase && user) {
-        sharedSupabaseTodos.updateTodo(id, { dueDate: newDueDate, dueTime: todo.dueTime });
-      } else {
-        setSharedTodos((prev) =>
-          prev.map((t) => t.id === id ? { ...t, dueDate: newDueDate } : t)
-        );
-      }
+      applyTodoUpdate(id, { dueDate: newDueDate, dueTime: todo.dueTime });
     },
-    [useDatabase, user, sharedSupabaseTodos, sharedTodos]
+    [applyTodoUpdate, sharedTodos]
   );
 
   const getDeadlineStatus = useCallback((todo: TodoItem) => {
