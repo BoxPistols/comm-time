@@ -92,6 +92,14 @@ export async function GET(request: NextRequest) {
         .eq("user_id", auth.userId)
         .in("event_key", allKeys),
     ]);
+    // data だけ見て error を捨てると、取得失敗と「注釈もリンクも無い」が区別できず、
+    // 予定のメモ・優先度・タグが 200 のまま黙って消える
+    if (annotationResult.error) {
+      return apiError(annotationResult.error.message, 500);
+    }
+    if (linkResult.error) {
+      return apiError(linkResult.error.message, 500);
+    }
     annotations = (annotationResult.data ?? []) as AnnotationRow[];
     todoLinks = (linkResult.data ?? []) as TodoLinkRow[];
   }

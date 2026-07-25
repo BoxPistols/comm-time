@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CommTimeComponent } from '../components/comm-time';
 
@@ -165,11 +165,14 @@ describe('Bulk Delete Features', () => {
       });
 
       // TODOを完了にする
-      await waitFor(() => {
-        const checkbox = screen.getByRole('button', { name: /check/i });
-        return act(async () => {
-          await user.click(checkbox);
-        });
+      // 完了トグルはアイコンのみのボタンで、アクセシブル名は title="完了/未完了" から決まる
+      const todoItem = (await screen.findByText('Completed TODO')).closest('li');
+      expect(todoItem).not.toBeNull();
+      const checkbox = within(todoItem as HTMLElement).getByRole('button', {
+        name: '完了/未完了',
+      });
+      await act(async () => {
+        await user.click(checkbox);
       });
 
       // 完了削除ボタンをクリック
@@ -197,12 +200,14 @@ describe('Bulk Delete Features', () => {
         await user.keyboard('{Enter}');
       });
 
-      // 最初のTODOを完了にする
-      await waitFor(async () => {
-        const checkboxes = screen.getAllByRole('button', { name: /check/i });
-        await act(async () => {
-          await user.click(checkboxes[0]);
-        });
+      // 「Completed TODO」だけを完了にする（順序に依存しないよう対象のli内で絞り込む）
+      const completedItem = (await screen.findByText('Completed TODO')).closest('li');
+      expect(completedItem).not.toBeNull();
+      const completedCheckbox = within(completedItem as HTMLElement).getByRole('button', {
+        name: '完了/未完了',
+      });
+      await act(async () => {
+        await user.click(completedCheckbox);
       });
 
       // 完了削除ボタンをクリック
@@ -228,84 +233,11 @@ describe('Bulk Delete Features', () => {
     });
   });
 
-  describe('Clear Memo', () => {
-    it('should show confirm dialog when clicking clear memo button', async () => {
-      const user = userEvent.setup();
-      render(<CommTimeComponent />);
-
-      // メモを入力
-      const memoTextarea = screen.getAllByPlaceholderText('メモを入力してください...')[0];
-      await act(async () => {
-        await user.type(memoTextarea, 'テスト用メモ');
-      });
-
-      // クリアボタンをクリック
-      const clearButton = screen.getByTitle('メモをクリア');
-      await act(async () => {
-        await user.click(clearButton);
-      });
-
-      // 確認ダイアログが表示されることを確認
-      expect(global.confirm).toHaveBeenCalledWith('メモをクリアしますか？');
-    });
-
-    it('should clear memo when confirmed', async () => {
-      const user = userEvent.setup();
-      render(<CommTimeComponent />);
-
-      // メモを入力
-      const memoTextarea = screen.getAllByPlaceholderText('メモを入力してください...')[0];
-      await act(async () => {
-        await user.type(memoTextarea, 'テスト用メモ');
-      });
-
-      // メモが入力されたことを確認
-      await waitFor(() => {
-        expect(memoTextarea).toHaveValue('テスト用メモ');
-      });
-
-      // クリアボタンをクリック（確認=true）
-      (global.confirm as jest.Mock).mockReturnValue(true);
-      const clearButton = screen.getByTitle('メモをクリア');
-      await act(async () => {
-        await user.click(clearButton);
-      });
-
-      // メモがクリアされることを確認
-      await waitFor(() => {
-        expect(memoTextarea).toHaveValue('');
-      });
-
-      // localStorageも空になることを確認（少し待つ）
-      await waitFor(() => {
-        const sharedMemo = localStorageMock.getItem('sharedMemo');
-        expect(sharedMemo === '' || sharedMemo === null).toBe(true);
-      }, { timeout: 3000 });
-    });
-
-    it('should not clear memo when cancelled', async () => {
-      const user = userEvent.setup();
-      render(<CommTimeComponent />);
-
-      // メモを入力
-      const memoTextarea = screen.getAllByPlaceholderText('メモを入力してください...')[0];
-      await act(async () => {
-        await user.type(memoTextarea, 'テスト用メモ');
-      });
-
-      // クリアボタンをクリック（確認=false）
-      (global.confirm as jest.Mock).mockReturnValue(false);
-      const clearButton = screen.getByTitle('メモをクリア');
-      await act(async () => {
-        await user.click(clearButton);
-      });
-
-      // メモが残っていることを確認
-      await waitFor(() => {
-        expect(memoTextarea).toHaveValue('テスト用メモ');
-      });
-    });
-  });
+  // NOTE: 「Clear Memo」ブロック（メモ一括クリア）は削除した。
+  // 単一の共有メモtextarea（placeholder="メモを入力してください..."）と
+  // title="メモをクリア" ボタンは、複数メモ対応（MemoSwiper + markdown-memo）への
+  // 置き換えで撤去され、現在は「メモ単位の削除」しか存在しないため、
+  // このスイート（一括削除機能）で検証できる対象が無くなった。
 
   describe('Bulk Delete Performance', () => {
     it('should handle large number of TODOs efficiently in local mode', async () => {

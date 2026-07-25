@@ -45,6 +45,9 @@ describe('アラーム複数登録機能のテスト', () => {
       writable: true,
     });
     localStorageMock.clear();
+    // 既定タブがカレンダーに変更されたため、アラームポイントUI(MeetingTimerPanel)を
+    // 描画するにはミーティングタブを選択した状態で開始する必要がある
+    localStorageMock.setItem('activeTab', 'meeting');
   });
 
   describe('初期状態のテスト', () => {
@@ -256,6 +259,9 @@ describe('アラーム機能の統合テスト', () => {
       writable: true,
     });
     localStorageMock.clear();
+    // 既定タブがカレンダーに変更されたため、アラームポイントUI(MeetingTimerPanel)を
+    // 描画するにはミーティングタブを選択した状態で開始する必要がある
+    localStorageMock.setItem('activeTab', 'meeting');
   });
 
   test('ページリロード後もアラーム設定が保持される', async () => {
