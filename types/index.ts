@@ -39,6 +39,20 @@ export type TodoItem = {
   kanbanStatus?: KanbanStatus; // カンバンステータス
 };
 
+// Supabase/ローカル両対応の TODO 型（alarmPointId を含む）
+export type LocalTodoItem = {
+  id: string;
+  text: string;
+  isCompleted: boolean;
+  dueDate?: string;
+  dueTime?: string;
+  alarmPointId?: string;
+  tagIds?: string[];
+  priority?: PriorityLevel;
+  importance?: ImportanceLevel;
+  kanbanStatus?: KanbanStatus;
+};
+
 // ゴミ箱に入ったTODOの型
 export type TrashedTodoItem = TodoItem & {
   deletedAt: string; // ISO形式の日時

@@ -17,7 +17,7 @@ import { useEventAnnotations } from "@/hooks/useEventAnnotations";
 import { useTodoEventLinks } from "@/hooks/useTodoEventLinks";
 import type { CalendarEvent, AnnotationScope } from "@/types/calendar";
 import type { PriorityLevel, ImportanceLevel } from "@/types";
-import type { LocalTodoItem } from "@/hooks/useSupabaseTodos";
+import type { LocalTodoItem } from "@/types";
 
 type EventDetailDrawerProps = {
   event: CalendarEvent | null;

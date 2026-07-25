@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { UUID_REGEX } from "@/lib/validation";
 import { authenticateRequest, handleCors, apiResponse, apiError } from "@/lib/api-auth";
 
 export async function OPTIONS() {
@@ -31,8 +32,8 @@ export async function POST(request: NextRequest) {
 
   // todo_id カラムは uuid のため、非 UUID を渡すと Postgres が 22P02 を投げ、
   // クライアント側の入力ミスが 500 として返ってしまう
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(todoId)) {
+
+  if (!UUID_REGEX.test(todoId)) {
     return apiError("todoId must be a valid UUID", 400);
   }
 

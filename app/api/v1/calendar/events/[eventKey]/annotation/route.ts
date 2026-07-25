@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { authenticateRequest, handleCors, apiResponse, apiError } from "@/lib/api-auth";
+import { UUID_REGEX } from "@/lib/validation";
 import type { EventAnnotation } from "@/types/calendar";
 
 export async function OPTIONS() {
@@ -47,9 +48,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     : "instance";
   const memo = typeof input.memo === "string" ? input.memo : null;
   // tag_ids カラムは uuid[] のため、不正な値は upsert 前に除外する
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const tagIds = Array.isArray(input.tagIds)
-    ? input.tagIds.filter((id): id is string => typeof id === "string" && uuidRegex.test(id))
+    ? input.tagIds.filter((id): id is string => typeof id === "string" && UUID_REGEX.test(id))
     : [];
 
   const { data, error } = await auth.supabase

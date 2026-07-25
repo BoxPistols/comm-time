@@ -30,7 +30,7 @@ import { CalendarAgendaView } from "./calendar-agenda-view";
 import { EventDetailDrawer } from "./event-detail-drawer";
 import { BulkTodoDialog } from "./bulk-todo-dialog";
 import type { CalendarEvent, CalendarViewType } from "@/types/calendar";
-import type { LocalTodoItem } from "@/hooks/useSupabaseTodos";
+import type { LocalTodoItem } from "@/types";
 
 type CalendarTabProps = {
   user: User | null;

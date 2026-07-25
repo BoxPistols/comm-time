@@ -80,13 +80,8 @@ export async function fetchCalendarEvents(from: string, to: string): Promise<Cal
   return events;
 }
 
-export type AnnotationInput = {
-  scope: AnnotationScope;
-  memo?: string;
-  priority: PriorityLevel;
-  importance: ImportanceLevel;
-  tagIds: string[];
-};
+// EventAnnotation から eventKey を除いたもの（送信ペイロード）
+export type AnnotationInput = Omit<EventAnnotation, "eventKey">;
 
 export async function saveEventAnnotation(
   eventKey: string,

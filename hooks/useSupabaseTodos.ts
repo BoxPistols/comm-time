@@ -3,25 +3,10 @@
 import { useState, useEffect } from "react"
 import { supabase, type TodoItem as SupabaseTodoItem } from "@/lib/supabase"
 import type { User } from "@supabase/supabase-js"
+import type { LocalTodoItem, PriorityLevel, ImportanceLevel, KanbanStatus } from "@/types"
 
-// 優先度・重要度・カンバンステータスの型
-type PriorityLevel = "high" | "medium" | "low" | "none"
-type ImportanceLevel = "high" | "medium" | "low" | "none"
-type KanbanStatus = string // 動的ステータスに対応するため文字列型
-
-// ローカル用のTodo型（既存のcomm-time.tsxと互換性を保つ）
-export type LocalTodoItem = {
-  id: string
-  text: string
-  isCompleted: boolean
-  dueDate?: string
-  dueTime?: string
-  alarmPointId?: string
-  tagIds?: string[]
-  priority?: PriorityLevel
-  importance?: ImportanceLevel
-  kanbanStatus?: KanbanStatus
-}
+// LocalTodoItem は @/types から re-export（後方互換のため）
+export type { LocalTodoItem }
 
 export function useSupabaseTodos(user: User | null) {
   const [todos, setTodos] = useState<LocalTodoItem[]>([])
