@@ -803,7 +803,8 @@ jobs:
       # Step 1: Try Gemini
       - name: Try Gemini
         id: gemini
-        if: ${{ secrets.GEMINI_API_KEY != '' }}
+        # secrets コンテキストは step の if では使えない(Unrecognized named-value)。
+        # env に入れてシェル側で空判定する
         continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -812,6 +813,10 @@ jobs:
           PR_COMMITS: ${{ fromJson(steps.pr.outputs.result).commits }}
           FILES: ${{ steps.files.outputs.files }}
         run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "success=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           cat > prompt.txt <<'EOT'
           以下のPull Request情報から、簡潔で分かりやすいサマリーを日本語で作成してください。
 
@@ -928,7 +933,8 @@ jobs:
       # Step 3: Try Claude (if both failed)
       - name: Try Claude
         id: claude
-        if: steps.gemini.outputs.success != 'true' && steps.github_models.outputs.success != 'true' && secrets.ANTHROPIC_API_KEY != ''
+        # secrets は step の if で使えないため、キーの有無はシェル側で判定する
+        if: steps.gemini.outputs.success != 'true' && steps.github_models.outputs.success != 'true'
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -937,6 +943,10 @@ jobs:
           PR_COMMITS: ${{ fromJson(steps.pr.outputs.result).commits }}
           FILES: ${{ steps.files.outputs.files }}
         run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "success=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           cat > prompt.txt <<'EOT'
           以下のPull Request情報から、簡潔で分かりやすいサマリーを日本語で作成してください。
 
