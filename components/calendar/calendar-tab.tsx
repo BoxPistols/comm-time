@@ -3,13 +3,14 @@
 // カレンダータブ全体のオーケストレーション
 // ビュー切替（今日/週/月/予定リスト）・連携状態・同期・予定詳細ダイアログを束ねる
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListPlus } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { CALENDAR_TEXT } from "@/lib/constants";
 import {
   addDays,
   addWeeks,
   addMonths,
+  eventDisplayDate,
   startOfDay,
   startOfWeekMonday,
   startOfMonth,
@@ -20,12 +21,14 @@ import {
 } from "@/lib/calendar-date";
 import { useCalendarConnection } from "@/hooks/useCalendarConnection";
 import { useCalendarEvents } from "@/hooks/useCalendarEvents";
+import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
 import { CalendarConnectPanel, SyncStatusBar } from "./calendar-connect-panel";
 import { CalendarDayView } from "./calendar-day-view";
 import { CalendarWeekView } from "./calendar-week-view";
 import { CalendarMonthView } from "./calendar-month-view";
 import { CalendarAgendaView } from "./calendar-agenda-view";
 import { EventDetailDrawer } from "./event-detail-drawer";
+import { BulkTodoDialog } from "./bulk-todo-dialog";
 import type { CalendarEvent, CalendarViewType } from "@/types/calendar";
 import type { LocalTodoItem } from "@/hooks/useSupabaseTodos";
 
@@ -51,6 +54,7 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
   const [view, setView] = useState<CalendarViewType>("today");
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [currentDate, setCurrentDate] = useState(() => startOfDay(new Date()));
+  const [bulkTodoOpen, setBulkTodoOpen] = useState(false);
 
   const connectionState = useCalendarConnection(user);
   const connected = connectionState.connection?.connected ?? false;
@@ -75,6 +79,13 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
   const navigateToday = useCallback(() => {
     setCurrentDate(startOfDay(new Date()));
   }, []);
+
+  // 週/月ビューのみ横スワイプで前後移動できる
+  const swipeHandlers = useSwipeNavigation({
+    onSwipeLeft: navigateNext,
+    onSwipeRight: navigatePrev,
+    enabled: view === "week" || view === "month",
+  });
 
   // 取得期間: 現在の表示月の前後1ヶ月 + アジェンダ分をカバー
   const range = useMemo(() => {
@@ -113,6 +124,29 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
     const todayStart = startOfDay(new Date()).getTime();
     return eventsState.events.filter((e) => new Date(e.endAt).getTime() >= todayStart);
   }, [eventsState.events]);
+
+  // 一括 TODO 化の対象は「今表示している週 / 月」の予定に限定する
+  const periodBounds = useMemo(() => {
+    if (view === "month") {
+      return { start: startOfMonth(currentDate), end: endOfMonth(currentDate) };
+    }
+    const weekStart = startOfWeekMonday(currentDate);
+    const weekEnd = addDays(weekStart, 6);
+    weekEnd.setHours(23, 59, 59, 999);
+    return { start: weekStart, end: weekEnd };
+  }, [view, currentDate]);
+
+  const periodEvents = useMemo(() => {
+    const startMs = periodBounds.start.getTime();
+    const endMs = periodBounds.end.getTime();
+    return eventsState.events.filter((e) => {
+      const t = eventDisplayDate(e.startAt, e.isAllDay).getTime();
+      return t >= startMs && t <= endMs;
+    });
+  }, [eventsState.events, periodBounds]);
+
+  const periodLabel =
+    view === "month" ? formatMonthHeading(currentDate) : formatWeekHeading(startOfWeekMonday(currentDate));
 
   return (
     <div className="space-y-4">
@@ -175,6 +209,16 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
                 >
                   {CALENDAR_TEXT.navToday}
                 </button>
+                {onAddTodo && (
+                  <button
+                    type="button"
+                    onClick={() => setBulkTodoOpen(true)}
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                  >
+                    <ListPlus className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">{CALENDAR_TEXT.bulkTodoButton}</span>
+                  </button>
+                )}
               </div>
               <button
                 type="button"
@@ -198,7 +242,7 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
             </div>
           )}
 
-          <div className={`${VIEW_MAX_HEIGHT} overflow-y-auto`}>
+          <div className={`${VIEW_MAX_HEIGHT} overflow-y-auto`} {...swipeHandlers}>
             {view === "today" && (
               <CalendarDayView events={eventsState.events} onEventClick={handleEventClick} />
             )}
@@ -230,6 +274,17 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
         onClose={() => setSelectedEvent(null)}
         onAnnotationChanged={() => void eventsState.refresh()}
       />
+
+      {onAddTodo && (
+        <BulkTodoDialog
+          open={bulkTodoOpen}
+          events={periodEvents}
+          periodLabel={periodLabel}
+          onAddTodo={onAddTodo}
+          onClose={() => setBulkTodoOpen(false)}
+          onCompleted={() => void eventsState.refresh()}
+        />
+      )}
     </div>
   );
 }
