@@ -52,6 +52,50 @@ export function toIso(date: Date): string {
   return date.toISOString();
 }
 
+export function startOfMonth(date: Date): Date {
+  const d = new Date(date.getFullYear(), date.getMonth(), 1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+export function endOfMonth(date: Date): Date {
+  const d = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+export function addMonths(date: Date, months: number): Date {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + months);
+  return d;
+}
+
+export function addWeeks(date: Date, weeks: number): Date {
+  return addDays(date, weeks * 7);
+}
+
+export function formatMonthHeading(date: Date): string {
+  return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+}
+
+export function formatWeekHeading(weekStart: Date): string {
+  const weekEnd = addDays(weekStart, 6);
+  const startMonth = weekStart.getMonth() + 1;
+  const endMonth = weekEnd.getMonth() + 1;
+  if (startMonth === endMonth) {
+    return `${weekStart.getFullYear()}年${startMonth}月 ${weekStart.getDate()}日〜${weekEnd.getDate()}日`;
+  }
+  return `${startMonth}/${weekStart.getDate()}〜${endMonth}/${weekEnd.getDate()}`;
+}
+
+export function getDaysInMonth(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+export function getFirstDayOfMonth(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+}
+
 // 終日予定の date-only 値（UTC 0時で保存）はタイムゾーンでずれるため、
 // UTC の年月日をそのままローカル日付として解釈する
 export function eventDisplayDate(iso: string, isAllDay: boolean): Date {

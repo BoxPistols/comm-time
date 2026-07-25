@@ -13,13 +13,14 @@ import type { CalendarEvent } from "@/types/calendar";
 
 type CalendarWeekViewProps = {
   events: CalendarEvent[];
+  currentDate?: Date;
   onEventClick: (event: CalendarEvent) => void;
 };
 
 // 月曜始まりの1週間を日別に表示（PC: 7カラム / モバイル: 縦積み）
-export function CalendarWeekView({ events, onEventClick }: CalendarWeekViewProps) {
+export function CalendarWeekView({ events, currentDate, onEventClick }: CalendarWeekViewProps) {
   const today = new Date();
-  const weekStart = startOfWeekMonday(today);
+  const weekStart = startOfWeekMonday(currentDate ?? today);
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(weekStart, i);

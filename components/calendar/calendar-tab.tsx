@@ -1,16 +1,29 @@
 "use client";
 
 // カレンダータブ全体のオーケストレーション
-// ビュー切替（今日/週/予定リスト）・連携状態・同期・予定詳細ダイアログを束ねる
-import { useState, useMemo, useEffect } from "react";
+// ビュー切替（今日/週/月/予定リスト）・連携状態・同期・予定詳細ダイアログを束ねる
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { CALENDAR_TEXT } from "@/lib/constants";
-import { addDays, startOfDay, startOfWeekMonday, toIso } from "@/lib/calendar-date";
+import {
+  addDays,
+  addWeeks,
+  addMonths,
+  startOfDay,
+  startOfWeekMonday,
+  startOfMonth,
+  endOfMonth,
+  formatWeekHeading,
+  formatMonthHeading,
+  toIso,
+} from "@/lib/calendar-date";
 import { useCalendarConnection } from "@/hooks/useCalendarConnection";
 import { useCalendarEvents } from "@/hooks/useCalendarEvents";
 import { CalendarConnectPanel, SyncStatusBar } from "./calendar-connect-panel";
 import { CalendarDayView } from "./calendar-day-view";
 import { CalendarWeekView } from "./calendar-week-view";
+import { CalendarMonthView } from "./calendar-month-view";
 import { CalendarAgendaView } from "./calendar-agenda-view";
 import { EventDetailDrawer } from "./event-detail-drawer";
 import type { CalendarEvent, CalendarViewType } from "@/types/calendar";
@@ -25,26 +38,52 @@ type CalendarTabProps = {
 const VIEW_OPTIONS: { value: CalendarViewType; label: string }[] = [
   { value: "today", label: CALENDAR_TEXT.viewToday },
   { value: "week", label: CALENDAR_TEXT.viewWeek },
+  { value: "month", label: CALENDAR_TEXT.viewMonth },
   { value: "agenda", label: CALENDAR_TEXT.viewAgenda },
 ];
 
 // 予定リストは今日から14日先まで表示する
 const AGENDA_DAYS = 14;
+// ビューの最大高さ（スクロール許容）
+const VIEW_MAX_HEIGHT = "max-h-[60vh]";
 
 export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
   const [view, setView] = useState<CalendarViewType>("today");
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [currentDate, setCurrentDate] = useState(() => startOfDay(new Date()));
 
   const connectionState = useCalendarConnection(user);
   const connected = connectionState.connection?.connected ?? false;
 
-  // 取得期間はビューに依らず「今週の月曜〜アジェンダ末尾」をまとめて取る（切替時の再取得を防ぐ）
-  const range = useMemo(() => {
-    const today = startOfDay(new Date());
-    const from = startOfWeekMonday(today);
-    const to = addDays(today, AGENDA_DAYS);
-    return { from: toIso(from), to: toIso(to) };
+  // ナビゲーション: 前/次/今日
+  const navigatePrev = useCallback(() => {
+    if (view === "week") {
+      setCurrentDate((d) => addWeeks(d, -1));
+    } else if (view === "month") {
+      setCurrentDate((d) => addMonths(d, -1));
+    }
+  }, [view]);
+
+  const navigateNext = useCallback(() => {
+    if (view === "week") {
+      setCurrentDate((d) => addWeeks(d, 1));
+    } else if (view === "month") {
+      setCurrentDate((d) => addMonths(d, 1));
+    }
+  }, [view]);
+
+  const navigateToday = useCallback(() => {
+    setCurrentDate(startOfDay(new Date()));
   }, []);
+
+  // 取得期間: 現在の表示月の前後1ヶ月 + アジェンダ分をカバー
+  const range = useMemo(() => {
+    const monthStart = startOfMonth(addMonths(currentDate, -1));
+    const monthEnd = endOfMonth(addMonths(currentDate, 1));
+    const agendaEnd = addDays(startOfDay(new Date()), AGENDA_DAYS);
+    const to = monthEnd > agendaEnd ? monthEnd : agendaEnd;
+    return { from: toIso(monthStart), to: toIso(to) };
+  }, [currentDate]);
 
   const eventsState = useCalendarEvents({
     enabled: connected,
@@ -113,6 +152,41 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
             />
           </div>
 
+          {(view === "week" || view === "month") && (
+            <div className="mb-3 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={navigatePrev}
+                className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+                aria-label={CALENDAR_TEXT.navPrev}
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                  {view === "week"
+                    ? formatWeekHeading(startOfWeekMonday(currentDate))
+                    : formatMonthHeading(currentDate)}
+                </span>
+                <button
+                  type="button"
+                  onClick={navigateToday}
+                  className="rounded-lg px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  {CALENDAR_TEXT.navToday}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={navigateNext}
+                className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+                aria-label={CALENDAR_TEXT.navNext}
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+
           {eventsState.needsReauth && (
             <div className="mb-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 p-2 text-xs text-amber-700 dark:text-amber-300">
               {CALENDAR_TEXT.reauthRequired}
@@ -124,15 +198,28 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
             </div>
           )}
 
-          {view === "today" && (
-            <CalendarDayView events={eventsState.events} onEventClick={handleEventClick} />
-          )}
-          {view === "week" && (
-            <CalendarWeekView events={eventsState.events} onEventClick={handleEventClick} />
-          )}
-          {view === "agenda" && (
-            <CalendarAgendaView events={agendaEvents} onEventClick={handleEventClick} />
-          )}
+          <div className={`${VIEW_MAX_HEIGHT} overflow-y-auto`}>
+            {view === "today" && (
+              <CalendarDayView events={eventsState.events} onEventClick={handleEventClick} />
+            )}
+            {view === "week" && (
+              <CalendarWeekView
+                events={eventsState.events}
+                currentDate={currentDate}
+                onEventClick={handleEventClick}
+              />
+            )}
+            {view === "month" && (
+              <CalendarMonthView
+                events={eventsState.events}
+                currentDate={currentDate}
+                onEventClick={handleEventClick}
+              />
+            )}
+            {view === "agenda" && (
+              <CalendarAgendaView events={agendaEvents} onEventClick={handleEventClick} />
+            )}
+          </div>
         </div>
       )}
 
