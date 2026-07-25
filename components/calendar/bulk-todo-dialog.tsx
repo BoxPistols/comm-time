@@ -32,10 +32,14 @@ export function BulkTodoDialog({
   onClose,
   onCompleted,
 }: BulkTodoDialogProps) {
-  const { linkTodo } = useTodoEventLinks();
+  const { linkTodo, error: linkError } = useTodoEventLinks();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ created: number; failed: number } | null>(null);
+  const [result, setResult] = useState<{
+    created: number;
+    failed: number;
+    unlinked: string[];
+  } | null>(null);
 
   // まだ TODO が紐付いていない予定のみ対象にする
   const candidates = useMemo(() => {
@@ -81,23 +85,31 @@ export function BulkTodoDialog({
     setSubmitting(true);
     let created = 0;
     let failed = 0;
+    // TODO は作れたがリンクに失敗した件は成功と区別する（黙って握り潰さない）
+    const unlinked: string[] = [];
 
     for (const event of targets) {
       const start = eventDisplayDate(event.startAt, event.isAllDay);
       const dueDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
       const dueTime = event.isAllDay ? undefined : start.toTimeString().slice(0, 5);
       const todoId = await onAddTodo(event.summary, { dueDate, dueTime });
-      if (todoId) {
-        await linkTodo(todoId, event.eventId);
+      if (!todoId) {
+        failed += 1;
+        continue;
+      }
+      if (await linkTodo(todoId, event.eventId)) {
         created += 1;
       } else {
-        failed += 1;
+        unlinked.push(event.summary);
       }
     }
 
     setSubmitting(false);
-    setResult({ created, failed });
-    setSelectedIds(new Set());
+    setResult({ created, failed, unlinked });
+    // 失敗が残っている場合は選択を維持して再試行できるようにする
+    if (failed === 0 && unlinked.length === 0) {
+      setSelectedIds(new Set());
+    }
     onCompleted();
   };
 
@@ -175,16 +187,30 @@ export function BulkTodoDialog({
         )}
 
         {result && (
-          <p className="flex-shrink-0 text-xs text-green-600 dark:text-green-400">
-            {result.created}
-            {CALENDAR_TEXT.bulkTodoResultSuccess}
-            {result.failed > 0 && (
-              <span className="ml-1 text-red-600 dark:text-red-400">
-                / {result.failed}
-                {CALENDAR_TEXT.bulkTodoResultPartial}
-              </span>
+          <div className="flex-shrink-0 space-y-1 text-xs">
+            {result.created > 0 && (
+              <p className="text-green-600 dark:text-green-400">
+                {result.created}
+                {CALENDAR_TEXT.bulkTodoResultSuccess}
+              </p>
             )}
-          </p>
+            {result.failed > 0 && (
+              <p className="text-red-600 dark:text-red-400">
+                {result.failed}
+                {CALENDAR_TEXT.bulkTodoResultPartial}
+              </p>
+            )}
+            {result.unlinked.length > 0 && (
+              <p className="text-amber-600 dark:text-amber-400">
+                {result.unlinked.length}
+                {CALENDAR_TEXT.bulkTodoResultUnlinked}
+                <span className="mt-0.5 block break-words opacity-80">
+                  {result.unlinked.join(" / ")}
+                </span>
+              </p>
+            )}
+            {linkError && <p className="text-red-600 dark:text-red-400">{linkError}</p>}
+          </div>
         )}
 
         {candidates.length > 0 && (

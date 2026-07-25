@@ -78,6 +78,7 @@ export const CALENDAR_TEXT = {
   bulkTodoSelectedCount: "件選択中",
   bulkTodoResultSuccess: "件のTODOを作成しました",
   bulkTodoResultPartial: "件の作成に失敗しました",
+  bulkTodoResultUnlinked: "件はTODOを作成しましたが予定へのリンクに失敗しました",
   allDayLabel: "終日",
   openMeetingLink: "会議に参加",
   eventDetailTitle: "予定の詳細",
