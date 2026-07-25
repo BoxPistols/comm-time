@@ -1,6 +1,11 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import {
+  CalendarApiError,
+  createTodoEventLink,
+  deleteTodoEventLink,
+} from "@/lib/calendar-api";
 
 type UseTodoEventLinksResult = {
   linking: boolean;
@@ -8,6 +13,9 @@ type UseTodoEventLinksResult = {
   linkTodo: (todoId: string, eventKey: string) => Promise<boolean>;
   unlinkTodo: (todoId: string, eventKey: string) => Promise<boolean>;
 };
+
+const LINK_FAILED = "リンクの作成に失敗しました";
+const UNLINK_FAILED = "リンクの解除に失敗しました";
 
 export function useTodoEventLinks(onChanged?: () => void): UseTodoEventLinksResult {
   const [linking, setLinking] = useState(false);
@@ -18,19 +26,11 @@ export function useTodoEventLinks(onChanged?: () => void): UseTodoEventLinksResu
       setLinking(true);
       setError(null);
       try {
-        const res = await fetch("/api/v1/calendar/todo-links", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ todoId, eventKey }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || "リンクの作成に失敗しました");
-        }
+        await createTodoEventLink(todoId, eventKey);
         onChanged?.();
         return true;
       } catch (err) {
-        setError(err instanceof Error ? err.message : "リンクの作成に失敗しました");
+        setError(err instanceof CalendarApiError ? err.message : LINK_FAILED);
         return false;
       } finally {
         setLinking(false);
@@ -44,18 +44,11 @@ export function useTodoEventLinks(onChanged?: () => void): UseTodoEventLinksResu
       setLinking(true);
       setError(null);
       try {
-        const res = await fetch(
-          `/api/v1/calendar/todo-links?todoId=${encodeURIComponent(todoId)}&eventKey=${encodeURIComponent(eventKey)}`,
-          { method: "DELETE" }
-        );
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || "リンクの解除に失敗しました");
-        }
+        await deleteTodoEventLink(todoId, eventKey);
         onChanged?.();
         return true;
       } catch (err) {
-        setError(err instanceof Error ? err.message : "リンクの解除に失敗しました");
+        setError(err instanceof CalendarApiError ? err.message : UNLINK_FAILED);
         return false;
       } finally {
         setLinking(false);

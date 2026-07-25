@@ -110,3 +110,15 @@ export async function deleteEventAnnotation(
     { method: "DELETE" }
   );
 }
+
+export async function createTodoEventLink(todoId: string, eventKey: string): Promise<void> {
+  await request("/api/v1/calendar/todo-links", {
+    method: "POST",
+    body: JSON.stringify({ todoId, eventKey }),
+  });
+}
+
+export async function deleteTodoEventLink(todoId: string, eventKey: string): Promise<void> {
+  const params = new URLSearchParams({ todoId, eventKey });
+  await request(`/api/v1/calendar/todo-links?${params.toString()}`, { method: "DELETE" });
+}
