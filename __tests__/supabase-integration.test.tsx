@@ -260,6 +260,9 @@ describe('Supabase Integration Tests', () => {
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
         order: jest.fn().mockReturnThis(),
+        // 先頭挿入では既存の最小 order_index を引く。既存 0 件なら order_index は 0
+        limit: jest.fn().mockReturnThis(),
+        maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
       });
 
       const TestComponent = () => {

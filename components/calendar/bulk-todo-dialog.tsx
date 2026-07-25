@@ -89,7 +89,9 @@ export function BulkTodoDialog({
     const unlinked: string[] = [];
 
     try {
-      for (const event of targets) {
+      // TODO は 1 件ずつ先頭に積まれるため、時系列の逆順で作ると
+      // 結果として画面上は元の時系列（早い予定が上）に並ぶ
+      for (const event of [...targets].reverse()) {
         const start = eventDisplayDate(event.startAt, event.isAllDay);
         const dueDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
         const dueTime = event.isAllDay ? undefined : start.toTimeString().slice(0, 5);

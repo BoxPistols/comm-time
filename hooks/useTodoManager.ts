@@ -274,7 +274,8 @@ export function useTodoManager(options: TodoManagerOptions): TodoManagerState {
           dueDate: options?.dueDate,
           dueTime: options?.dueTime,
         };
-        setSharedTodos((prev) => [...prev, newTodo]);
+        // 新規 TODO は先頭に置く（長いリストで末尾に埋もれて見失うのを防ぐ）
+        setSharedTodos((prev) => [newTodo, ...prev]);
         return newId;
       }
     },
@@ -361,7 +362,8 @@ export function useTodoManager(options: TodoManagerOptions): TodoManagerState {
       if (useDatabase && user) {
         sharedSupabaseTodos.addTodo(todoItem.text);
       } else {
-        setSharedTodos((prev) => [...prev, todoItem]);
+        // DB 経路（addTodo）が先頭に入れるので、ローカル経路も揃える
+        setSharedTodos((prev) => [todoItem, ...prev]);
       }
       setTrashedTodos((prev) => prev.filter((t) => t.id !== trashedTodo.id));
     },
