@@ -309,8 +309,7 @@ export function useKanbanStatuses(user: User | null) {
           table: "kanban_statuses",
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log("Kanban status change received, refetching:", payload)
+        () => {
           fetchStatuses()
         }
       )

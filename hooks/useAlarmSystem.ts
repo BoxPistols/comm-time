@@ -332,7 +332,7 @@ export function useAlarmSystem(): AlarmSystem {
     if (typeof window === "undefined") return;
 
     if (!("Notification" in window) || !window.Notification) {
-      console.log("このブラウザでは通知機能が利用できません");
+      console.warn("このブラウザでは通知機能が利用できません");
       return;
     }
 
@@ -347,10 +347,10 @@ export function useAlarmSystem(): AlarmSystem {
             icon: "/favicon.svg",
           });
         } catch (e) {
-          console.log("通知の送信に失敗しました:", e);
+          console.error("通知の送信に失敗しました:", e);
         }
       } else if (permission === "denied") {
-        console.log("通知が拒否されました");
+        console.warn("通知が拒否されました");
       }
     } catch (error) {
       console.error("通知権限のリクエストに失敗しました:", error);

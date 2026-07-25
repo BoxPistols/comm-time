@@ -77,8 +77,9 @@ export function useSupabaseTodos(user: User | null) {
       if (error) throw error
 
       setTodos((data || []).map(convertToLocal))
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      // any 禁止規約対応: catch は unknown で受け、Error へ narrowing してメッセージを取り出す（以降の catch も同様）
+      setError(err instanceof Error ? err.message : String(err))
       console.error("Error fetching todos:", err)
     } finally {
       setLoading(false)
@@ -125,8 +126,8 @@ export function useSupabaseTodos(user: User | null) {
         return data.id
       }
       return null
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
       console.error("Error adding todo:", err)
       return null
     }
@@ -152,8 +153,8 @@ export function useSupabaseTodos(user: User | null) {
 
       // ローカル状態は常に更新（関数形式で最新の状態を参照）
       setTodos(prev => prev.map((todo) => (todo.id === id ? { ...todo, ...updates } : todo)))
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
       console.error("Error updating todo:", err)
     }
   }
@@ -172,8 +173,8 @@ export function useSupabaseTodos(user: User | null) {
       if (error) throw error
 
       setTodos(prev => prev.filter((todo) => todo.id !== id))
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
       console.error("Error removing todo:", err)
     }
   }
@@ -195,8 +196,8 @@ export function useSupabaseTodos(user: User | null) {
       if (!todoToToggle) return
 
       await updateTodo(id, { isCompleted: !todoToToggle.is_completed })
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
       console.error("Error toggling todo:", err)
     }
   }
@@ -233,8 +234,8 @@ export function useSupabaseTodos(user: User | null) {
         // エラー時はリフレッシュして正しい順序を復元
         await fetchTodos()
       }
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
       console.error("Error reordering todos:", err)
       // エラー時はリフレッシュして正しい順序を復元
       await fetchTodos()
@@ -261,7 +262,6 @@ export function useSupabaseTodos(user: User | null) {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log("Todo change received:", payload)
 
           // payloadを使って効率的にローカルstateを更新
           switch (payload.eventType) {

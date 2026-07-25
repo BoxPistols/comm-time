@@ -130,8 +130,6 @@ export function useSupabasePomodoroTask(user: User | null) {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log("Pomodoro task change received:", payload)
-
           switch (payload.eventType) {
             case "INSERT":
             case "UPDATE":

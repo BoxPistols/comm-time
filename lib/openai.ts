@@ -6,7 +6,12 @@
  */
 
 import OpenAI from 'openai';
-import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
+// any 禁止規約対応: リクエストボディを SDK の公式型で受ける（互換レイヤの動的フィールドも型に含まれる）
+import type {
+  ChatCompletionCreateParamsNonStreaming,
+  ChatCompletionCreateParamsStreaming,
+  ChatCompletionMessageParam,
+} from 'openai/resources/chat/completions';
 
 // OpenAIクライアントのシングルトンインスタンス
 let openaiClient: OpenAI | null = null;
@@ -119,8 +124,7 @@ export async function chatCompletion(
     : options.messages;
 
   // APIリクエストボディの構築（互換レイヤ）
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const requestBody: any = {
+  const requestBody: ChatCompletionCreateParamsNonStreaming = {
     model,
     messages,
   };
@@ -172,8 +176,7 @@ export async function* chatCompletionStream(
     : options.messages;
 
   // ストリーミング用のパラメータを構築
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const params: any = {
+  const params: ChatCompletionCreateParamsStreaming = {
     model,
     messages,
     stream: true as const,
