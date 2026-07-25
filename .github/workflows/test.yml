@@ -1,0 +1,46 @@
+name: Test
+
+# テストが誰にも実行されないまま腐るのを防ぐための CI。
+# swiper 導入時に複数スイートが parse エラーで死んでいたのに
+# 長期間気付けなかったのが、このワークフローを追加した直接の理由。
+#
+# 注: このワークフローは github.event.* の値を run: に埋め込まない。
+# （PR タイトル等の untrusted 入力を展開するとコマンドインジェクションになる）
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test -- --ci
+
+      - name: Build
+        # ビルドは型エラー以外の統合的な破損（import 解決漏れ等）を拾う
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key-for-build

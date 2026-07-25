@@ -19,8 +19,16 @@ type CalendarMonthViewProps = {
 };
 
 export function CalendarMonthView({ events, currentDate, onEventClick }: CalendarMonthViewProps) {
-  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [pickedDay, setPickedDay] = useState<Date | null>(null);
   const today = useMemo(() => new Date(), []);
+
+  // 月を移動したら前月の選択は無効にする（別月の日付が選ばれたままだと空の詳細が residual 表示される）
+  const selectedDay =
+    pickedDay &&
+    pickedDay.getMonth() === currentDate.getMonth() &&
+    pickedDay.getFullYear() === currentDate.getFullYear()
+      ? pickedDay
+      : null;
 
   const daysInMonth = getDaysInMonth(currentDate);
   const firstDayOffset = (getFirstDayOfMonth(currentDate) + 6) % 7;
@@ -60,9 +68,9 @@ export function CalendarMonthView({ events, currentDate, onEventClick }: Calenda
 
   const handleDayClick = (day: Date) => {
     if (selectedDay && isSameDay(selectedDay, day)) {
-      setSelectedDay(null);
+      setPickedDay(null);
     } else {
-      setSelectedDay(day);
+      setPickedDay(day);
     }
   };
 

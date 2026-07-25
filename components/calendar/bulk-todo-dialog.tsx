@@ -88,29 +88,38 @@ export function BulkTodoDialog({
     // TODO は作れたがリンクに失敗した件は成功と区別する（黙って握り潰さない）
     const unlinked: string[] = [];
 
-    for (const event of targets) {
-      const start = eventDisplayDate(event.startAt, event.isAllDay);
-      const dueDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
-      const dueTime = event.isAllDay ? undefined : start.toTimeString().slice(0, 5);
-      const todoId = await onAddTodo(event.summary, { dueDate, dueTime });
-      if (!todoId) {
-        failed += 1;
-        continue;
+    try {
+      for (const event of targets) {
+        const start = eventDisplayDate(event.startAt, event.isAllDay);
+        const dueDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
+        const dueTime = event.isAllDay ? undefined : start.toTimeString().slice(0, 5);
+        // 1件の例外で全体を止めない。残りを試して結果に含める
+        try {
+          const todoId = await onAddTodo(event.summary, { dueDate, dueTime });
+          if (!todoId) {
+            failed += 1;
+            continue;
+          }
+          if (await linkTodo(todoId, event.eventId)) {
+            created += 1;
+          } else {
+            unlinked.push(event.summary);
+          }
+        } catch {
+          failed += 1;
+        }
       }
-      if (await linkTodo(todoId, event.eventId)) {
-        created += 1;
-      } else {
-        unlinked.push(event.summary);
-      }
-    }
 
-    setSubmitting(false);
-    setResult({ created, failed, unlinked });
-    // 失敗が残っている場合は選択を維持して再試行できるようにする
-    if (failed === 0 && unlinked.length === 0) {
-      setSelectedIds(new Set());
+      setResult({ created, failed, unlinked });
+      // 失敗が残っている場合は選択を維持して再試行できるようにする
+      if (failed === 0 && unlinked.length === 0) {
+        setSelectedIds(new Set());
+      }
+      onCompleted();
+    } finally {
+      // 例外が出てもボタンが「作成中…」で固まらないようにする
+      setSubmitting(false);
     }
-    onCompleted();
   };
 
   if (!open) return null;
