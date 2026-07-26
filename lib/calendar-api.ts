@@ -8,7 +8,6 @@ import type {
   EventAnnotation,
   AnnotationScope,
 } from "@/types/calendar";
-import type { PriorityLevel, ImportanceLevel } from "@/types";
 
 class CalendarApiError extends Error {
   constructor(
