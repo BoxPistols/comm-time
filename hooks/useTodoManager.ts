@@ -1,20 +1,22 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import type { User } from "@supabase/supabase-js";
 import type {
   TodoItem,
   TrashedTodoItem,
-  TodoVersion,
   TrashedMemoItem,
+  TodoVersion,
   PriorityLevel,
   ImportanceLevel,
   KanbanStatus,
   FilterState,
 } from "@/types";
-import { initialFilterState } from "@/types";
 import { getStorageValue } from "@/lib/storage";
 import { useSupabaseTodos } from "@/hooks/useSupabaseTodos";
+import { useTrashManager } from "@/hooks/useTrashManager";
+import { useTodoFilters } from "@/hooks/useTodoFilters";
+import { useDeadlineAlertSettings } from "@/hooks/useDeadlineAlertSettings";
 import type { DropResult } from "react-beautiful-dnd";
 
 export type TodoManagerState = {
@@ -119,109 +121,32 @@ export function useTodoManager(options: TodoManagerOptions): TodoManagerState {
   const [sortByDeadline, setSortByDeadline] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
 
-  // Filter
-  const [filterState, setFilterState] = useState<FilterState>(initialFilterState);
-  const hasActiveFilters = useMemo(() => {
-    return filterState.tags.length > 0 ||
-      filterState.priority !== "all" ||
-      filterState.importance !== "all" ||
-      filterState.kanbanStatus !== "all";
-  }, [filterState]);
-
-  const [viewMode] = useState<"list" | "kanban">(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("todoViewMode");
-      if (saved === "kanban" || saved === "list") return saved;
-    }
-    return "list";
-  });
-
-  // Trash & versions
-  const [trashedTodos, setTrashedTodos] = useState<TrashedTodoItem[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("trashedTodos");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          return parsed.filter(
-            (item: TrashedTodoItem) => new Date(item.deletedAt) > thirtyDaysAgo
-          );
-        } catch { return []; }
-      }
-    }
-    return [];
-  });
-
-  const [trashedMemos, setTrashedMemos] = useState<TrashedMemoItem[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("trashedMemos");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          return parsed.filter(
-            (item: TrashedMemoItem) => new Date(item.deletedAt) > thirtyDaysAgo
-          );
-        } catch { return []; }
-      }
-    }
-    return [];
-  });
-
-  const [todoVersions, setTodoVersions] = useState<TodoVersion[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("todoVersions");
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          return parsed.filter(
-            (item: TodoVersion) => new Date(item.timestamp) > thirtyDaysAgo
-          );
-        } catch { return []; }
-      }
-    }
-    return [];
-  });
-
-  // Deadline alerts
-  const [deadlineAlertEnabled, setDeadlineAlertEnabled] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("deadlineAlertEnabled") === "true";
-    }
-    return false;
-  });
-  const [deadlineAlertMinutes, setDeadlineAlertMinutes] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("deadlineAlertMinutes");
-      return saved ? parseInt(saved, 10) : 60;
-    }
-    return 60;
-  });
-  const alertedTodoIdsRef = useRef<Set<string>>(new Set());
+  // Sub-hooks
+  const {
+    trashedTodos, setTrashedTodos,
+    trashedMemos, setTrashedMemos,
+    todoVersions,
+    addTodoVersion,
+    permanentlyDeleteTodo,
+    emptyTrash,
+  } = useTrashManager();
+  const {
+    filterState, setFilterState,
+    hasActiveFilters,
+    filteredTodos,
+    viewMode,
+  } = useTodoFilters({ sharedTodos });
+  const {
+    deadlineAlertEnabled, setDeadlineAlertEnabled,
+    deadlineAlertMinutes, setDeadlineAlertMinutes,
+    alertedTodoIdsRef,
+  } = useDeadlineAlertSettings();
 
   // Computed
   const editDialogTodo = useMemo(() =>
     editDialogTodoId ? sharedTodos.find((t) => t.id === editDialogTodoId) || null : null,
     [editDialogTodoId, sharedTodos]
   );
-
-  const filteredTodos = useMemo(() => {
-    return sharedTodos.filter((todo) => {
-      if (filterState.tags.length > 0) {
-        const todoTags = todo.tagIds || [];
-        if (!filterState.tags.some((tagId) => todoTags.includes(tagId))) return false;
-      }
-      if (filterState.priority !== "all" && (todo.priority || "none") !== filterState.priority) return false;
-      if (filterState.importance !== "all" && (todo.importance || "none") !== filterState.importance) return false;
-      if (filterState.kanbanStatus !== "all" && (todo.kanbanStatus || "backlog") !== filterState.kanbanStatus) return false;
-      return true;
-    });
-  }, [sharedTodos, filterState]);
 
   // マウント完了フラグ
   useEffect(() => { setMounted(true); }, []);
@@ -247,18 +172,6 @@ export function useTodoManager(options: TodoManagerOptions): TodoManagerState {
   }, [useDatabase, user, sharedSupabaseTodos.todos, sharedSupabaseTodos.loading]);
 
   // --- CRUD ---
-
-  const addTodoVersion = useCallback(
-    (todoId: string, text: string, changeType: "create" | "update" | "delete") => {
-      const newVersion: TodoVersion = {
-        id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        todoId, text,
-        timestamp: new Date().toISOString(),
-        changeType,
-      };
-      setTodoVersions((prev) => [...prev, newVersion]);
-    }, []
-  );
 
   const addTodo = useCallback(
     async (text: string, options?: { dueDate?: string; dueTime?: string }): Promise<string | null> => {
@@ -371,12 +284,6 @@ export function useTodoManager(options: TodoManagerOptions): TodoManagerState {
     },
     [useDatabase, user, sharedSupabaseTodos]
   );
-
-  const permanentlyDeleteTodo = useCallback((id: string) => {
-    setTrashedTodos((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
-  const emptyTrash = useCallback(() => setTrashedTodos([]), []);
 
   // --- Kanban & Details ---
 
