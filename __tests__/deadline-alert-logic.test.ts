@@ -52,8 +52,11 @@ function runDeadlineAlertCheck(params: {
   return results;
 }
 
-// Fixed reference time: 2026-01-15 10:00:00 JST
-const BASE_TIME = new Date("2026-01-15T01:00:00.000Z"); // UTC = 10:00 JST
+// Fixed reference time: 2026-01-15 10:00 (local). Parsed WITHOUT a "Z" so it is
+// interpreted as local time, matching the deadline parsing on line 36
+// (`${dueDate}T${dueTime}` is also local). This keeps timeUntilDeadline
+// timezone-independent — CI runs in UTC, developers often in JST.
+const BASE_TIME = new Date("2026-01-15T10:00:00");
 
 function makeTodo(overrides: Partial<TodoItem> & { id: string }): TodoItem {
   return { text: "テストTODO", isCompleted: false, ...overrides };
