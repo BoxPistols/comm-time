@@ -18,14 +18,6 @@ jest.mock('../hooks/useSupabaseTodos', () => ({
   })
 }));
 
-jest.mock('../hooks/useSupabaseMemos', () => ({
-  useSupabaseMemos: () => ({
-    memo: '',
-    updateMemo: jest.fn(),
-    loading: false
-  })
-}));
-
 // window.confirmのモック
 global.confirm = jest.fn(() => true);
 

@@ -36,14 +36,6 @@ jest.mock('../hooks/useSupabaseTodos', () => ({
   })
 }));
 
-jest.mock('../hooks/useSupabaseMemos', () => ({
-  useSupabaseMemos: () => ({
-    memo: '',
-    updateMemo: jest.fn(),
-    loading: false
-  })
-}));
-
 // LocalStorageのモック
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
