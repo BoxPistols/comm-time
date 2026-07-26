@@ -3,7 +3,7 @@
 import React from "react";
 import { Flag, Star } from "lucide-react";
 import type { TodoItem, Tag, KanbanStatusColumn } from "@/types";
-import { PRIORITY_CONFIG, IMPORTANCE_CONFIG, TAG_COLORS } from "@/types";
+import { PRIORITY_CONFIG, IMPORTANCE_CONFIG, TAG_COLORS } from "@/lib/constants";
 
 interface TodoMetaBadgesProps {
   todo: TodoItem;

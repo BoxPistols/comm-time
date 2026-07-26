@@ -14,17 +14,19 @@ import {
   Clock,
 } from "lucide-react";
 import { RichTextWithLinks } from "@/components/rich-text-with-links";
+import type {
+  Tag,
+  KanbanStatus,
+  KanbanStatusColumn,
+  PriorityLevel,
+  ImportanceLevel,
+} from "@/types";
 import {
-  type Tag,
-  type KanbanStatus,
-  type KanbanStatusColumn,
-  type PriorityLevel,
-  type ImportanceLevel,
   DEFAULT_KANBAN_COLUMNS,
   PRIORITY_CONFIG,
   IMPORTANCE_CONFIG,
   TAG_COLORS,
-} from "@/types";
+} from "@/lib/constants";
 
 // TODO型の最小定義（comm-time.tsxから渡される）
 interface TodoItem {

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import type { TodoItem, FilterState } from "@/types";
-import { initialFilterState } from "@/types";
+import { initialFilterState } from "@/lib/constants";
 
 type TodoFiltersOptions = {
   sharedTodos: TodoItem[];

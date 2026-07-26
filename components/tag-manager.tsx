@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { Plus, X, Edit, Trash2, Save, Tag as TagIcon } from "lucide-react";
-import { type Tag, TAG_COLORS } from "@/types";
+import type { Tag } from "@/types";
+import { TAG_COLORS } from "@/lib/constants";
 
 interface TagManagerProps {
   tags: Tag[];

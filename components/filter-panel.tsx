@@ -2,18 +2,20 @@
 
 import React from "react";
 import { X, Filter, Tag as TagIcon, Flag, Star, Columns } from "lucide-react";
+import type {
+  Tag,
+  FilterState,
+  PriorityLevel,
+  ImportanceLevel,
+  KanbanStatus,
+  KanbanStatusColumn,
+} from "@/types";
 import {
-  type Tag,
-  type FilterState,
-  type PriorityLevel,
-  type ImportanceLevel,
-  type KanbanStatus,
-  type KanbanStatusColumn,
   PRIORITY_CONFIG,
   IMPORTANCE_CONFIG,
   DEFAULT_KANBAN_COLUMNS,
   TAG_COLORS,
-} from "@/types";
+} from "@/lib/constants";
 
 interface FilterPanelProps {
   tags: Tag[];

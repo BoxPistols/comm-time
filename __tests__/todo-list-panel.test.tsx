@@ -8,7 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { TodoListPanel } from "../components/todo-list/TodoListPanel";
 import type { TodoListPanelProps } from "../components/todo-list/TodoListPanel";
 import type { TodoItem, TrashedTodoItem, FilterState } from "../types";
-import { initialFilterState } from "../types";
+import { initialFilterState } from "../lib/constants";
 
 // Heavy deps that need jsdom-safe mocks
 jest.mock("../components/strict-mode-droppable", () => ({

@@ -3,16 +3,18 @@
 import React, { useState, useEffect } from "react";
 import { X, Save, Tag as TagIcon, Flag, Star, Columns } from "lucide-react";
 import { RichTextWithLinks } from "@/components/rich-text-with-links";
+import type {
+  Tag,
+  PriorityLevel,
+  ImportanceLevel,
+  KanbanStatus,
+} from "@/types";
 import {
-  type Tag,
-  type PriorityLevel,
-  type ImportanceLevel,
-  type KanbanStatus,
   PRIORITY_CONFIG,
   IMPORTANCE_CONFIG,
   KANBAN_COLUMNS,
   TAG_COLORS,
-} from "@/types";
+} from "@/lib/constants";
 
 interface TodoItem {
   id: string;
