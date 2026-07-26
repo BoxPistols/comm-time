@@ -145,8 +145,23 @@ export async function DELETE(request: NextRequest) {
         // 復号・失効に失敗してもレコード削除は続行する
       }
     }
-    await db.from("calendar_event_cache").delete().eq("user_id", auth.userId);
-    await db.from("calendar_connections").delete().eq("user_id", auth.userId);
+    // 削除失敗を握り潰すと、Google 側のトークンは失効済みなのに
+    // 暗号化リフレッシュトークンを持つ行が残り、UI は「解除済み」を表示して再試行もできなくなる
+    const { error: cacheError } = await db
+      .from("calendar_event_cache")
+      .delete()
+      .eq("user_id", auth.userId);
+    if (cacheError) {
+      return apiError(cacheError.message, 500);
+    }
+
+    const { error: connectionError } = await db
+      .from("calendar_connections")
+      .delete()
+      .eq("user_id", auth.userId);
+    if (connectionError) {
+      return apiError(connectionError.message, 500);
+    }
   }
 
   return apiResponse({ connected: false });

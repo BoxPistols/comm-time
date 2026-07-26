@@ -162,8 +162,6 @@ export function useSupabaseTags(user: User | null) {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log("Tag change received:", payload)
-
           switch (payload.eventType) {
             case 'INSERT':
               if (payload.new) {

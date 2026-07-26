@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { Play, Clock, ArrowRight, Target } from "lucide-react";
-import type { LocalTodoItem } from "@/hooks/useSupabaseTodos";
+import type { LocalTodoItem } from "@/types";
 
 type DeadlineTimelineProps = {
   todos: LocalTodoItem[];

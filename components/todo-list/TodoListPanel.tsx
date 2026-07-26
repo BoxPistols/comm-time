@@ -9,14 +9,11 @@ import {
   Save,
   Timer,
   Calendar,
-  ChevronDown,
   Trash2,
   RotateCcw,
   Tag as TagIcon,
   Filter,
   Columns,
-  Flag,
-  Star,
 } from "lucide-react";
 import {
   DragDropContext,
@@ -38,9 +35,10 @@ import type {
   ImportanceLevel,
   KanbanStatusColumn,
 } from "@/types";
-import { PRIORITY_CONFIG, IMPORTANCE_CONFIG, TAG_COLORS } from "@/types";
+import { TodoDeadlinePanel } from "@/components/todo-list/TodoDeadlinePanel";
+import { TodoMetaBadges } from "@/components/todo-list/TodoMetaBadges";
 
-type DeadlineStatus = {
+export type DeadlineStatus = {
   isOverdue: boolean;
   isSoon: boolean;
   diffDays: number;
@@ -588,197 +586,20 @@ export function TodoListPanel({
                               )}
                             </div>
 
-                            {/* 期限表示 - コンパクト版（クリックで詳細展開） */}
-                            {(() => {
-                              const status = getDeadlineStatus(todo);
-                              if (!status) return null;
+                            <TodoDeadlinePanel
+                              todo={todo}
+                              getDeadlineStatus={getDeadlineStatus}
+                              expandedDeadlineTodoId={expandedDeadlineTodoId}
+                              setExpandedDeadlineTodoId={setExpandedDeadlineTodoId}
+                              updateTodoDeadline={updateTodoDeadline}
+                              extendDeadline={extendDeadline}
+                            />
 
-                              // ステータスに応じたスタイルクラス
-                              const statusClasses = status.isOverdue
-                                ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 font-medium"
-                                : status.isSoon
-                                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300 font-medium"
-                                : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300";
-
-                              // 残り時間テキスト（短縮版）
-                              const remainingText = status.isOverdue
-                                ? "期限切れ"
-                                : status.isSoon
-                                ? `${status.diffHours}h`
-                                : `${status.diffDays}d`;
-
-                              const isExpanded =
-                                expandedDeadlineTodoId === todo.id;
-
-                              return (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setExpandedDeadlineTodoId(
-                                      isExpanded ? null : todo.id
-                                    )
-                                  }
-                                  className={`text-[10px] px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 cursor-pointer hover:opacity-80 transition-opacity ${statusClasses}`}
-                                  title={`${todo.dueDate}${todo.dueTime ? ` ${todo.dueTime}` : ""} - クリックで編集`}
-                                >
-                                  <Calendar className="w-2.5 h-2.5 flex-shrink-0" />
-                                  <span>{remainingText}</span>
-                                  <ChevronDown
-                                    className={`w-2.5 h-2.5 flex-shrink-0 transition-transform ${
-                                      isExpanded ? "rotate-180" : ""
-                                    }`}
-                                  />
-                                </button>
-                              );
-                            })()}
-
-                            {/* 期限設定フォーム - 折りたたみ式 */}
-                            {expandedDeadlineTodoId === todo.id && (
-                              <div className="flex flex-col gap-2 bg-gray-50 dark:bg-gray-700 p-2 rounded-lg mt-1">
-                                {/* 日付・時刻入力行 */}
-                                <div className="flex gap-1 items-center flex-wrap">
-                                  <input
-                                    type="date"
-                                    value={todo.dueDate || ""}
-                                    onChange={(e) =>
-                                      updateTodoDeadline(
-                                        todo.id,
-                                        e.target.value || undefined,
-                                        todo.dueTime,
-                                      )
-                                    }
-                                    className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:[color-scheme:dark]"
-                                    placeholder="期限日"
-                                  />
-                                  <input
-                                    type="time"
-                                    value={todo.dueTime || ""}
-                                    onChange={(e) =>
-                                      updateTodoDeadline(
-                                        todo.id,
-                                        todo.dueDate,
-                                        e.target.value || undefined,
-                                      )
-                                    }
-                                    className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:[color-scheme:dark]"
-                                    placeholder="時刻"
-                                  />
-                                  {(todo.dueDate || todo.dueTime) && (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        updateTodoDeadline(
-                                          todo.id,
-                                          undefined,
-                                          undefined
-                                        )
-                                      }
-                                      className="text-xs px-2 py-1 bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 rounded transition-colors"
-                                      title="期限をクリア"
-                                    >
-                                      解除
-                                    </button>
-                                  )}
-                                </div>
-                                {/* 延長ボタン行 - 期限が設定されている場合のみ */}
-                                {todo.dueDate && (
-                                  <div className="flex gap-1 items-center">
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                                      延長:
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        extendDeadline(todo.id, 1)
-                                      }
-                                      className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 rounded transition-colors"
-                                      title="1日延長"
-                                    >
-                                      +1日
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        extendDeadline(todo.id, 3)
-                                      }
-                                      className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 rounded transition-colors"
-                                      title="3日延長"
-                                    >
-                                      +3日
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        extendDeadline(todo.id, 7)
-                                      }
-                                      className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500 rounded transition-colors"
-                                      title="1週間延長"
-                                    >
-                                      +7日
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* タグ・優先度・重要度表示 - コンパクト */}
-                            <div className="flex flex-wrap items-center gap-0.5">
-                              {/* タグ表示 - コンパクト */}
-                              {todo.tagIds && todo.tagIds.length > 0 && (
-                                <>
-                                  {todo.tagIds.slice(0, 2).map((tagId) => {
-                                    const tag = tagsMap.get(tagId);
-                                    if (!tag) return null;
-                                    const textColor = TAG_COLORS.find((c) => c.value === tag.color)?.textColor || "text-white";
-                                    return (
-                                      <span
-                                        key={tagId}
-                                        className={`text-[10px] px-1 py-0.5 rounded ${tag.color} ${textColor}`}
-                                      >
-                                        {tag.name}
-                                      </span>
-                                    );
-                                  })}
-                                  {todo.tagIds.length > 2 && (
-                                    <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                                      +{todo.tagIds.length - 2}
-                                    </span>
-                                  )}
-                                </>
-                              )}
-                              {/* 優先度バッジ - コンパクト */}
-                              {todo.priority && todo.priority !== "none" && (
-                                <span
-                                  className={`text-[10px] px-1 py-0.5 rounded flex items-center ${PRIORITY_CONFIG[todo.priority].badgeClass}`}
-                                  title={`優先度: ${PRIORITY_CONFIG[todo.priority].label}`}
-                                >
-                                  <Flag className="w-2.5 h-2.5" />
-                                </span>
-                              )}
-                              {/* 重要度バッジ - コンパクト */}
-                              {todo.importance && todo.importance !== "none" && (
-                                <span
-                                  className={`text-[10px] px-1 py-0.5 rounded flex items-center ${IMPORTANCE_CONFIG[todo.importance].badgeClass}`}
-                                  title={`重要度: ${IMPORTANCE_CONFIG[todo.importance].label}`}
-                                >
-                                  <Star className="w-2.5 h-2.5" />
-                                </span>
-                              )}
-                              {/* カンバンステータスバッジ - コンパクト */}
-                              {todo.kanbanStatus && todo.kanbanStatus !== "backlog" && (
-                                <span
-                                  className={`text-[10px] px-1 py-0.5 rounded ${
-                                    todo.kanbanStatus === "done"
-                                      ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
-                                      : todo.kanbanStatus === "doing"
-                                      ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300"
-                                      : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
-                                  }`}
-                                >
-                                  {kanbanStatuses.find((c) => c.name === todo.kanbanStatus)?.label}
-                                </span>
-                              )}
-                            </div>
+                            <TodoMetaBadges
+                              todo={todo}
+                              tagsMap={tagsMap}
+                              kanbanStatuses={kanbanStatuses}
+                            />
                           </div>
                           {/* アクションボタン - コンパクト配置 */}
                           <div className="flex gap-0.5 items-center self-start">

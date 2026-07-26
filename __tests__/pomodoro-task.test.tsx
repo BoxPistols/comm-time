@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CommTimeComponent } from '@/components/comm-time';
 import '@testing-library/jest-dom';
@@ -103,11 +103,14 @@ describe('Pomodoro Task Integration', () => {
         await user.click(startPomodoroButton);
     }
     
-    // ポモドーロタイマーセクションに移動していることを確認（UI上の確認は難しいので、タスクが設定されたかで代用）
     // 現在のタスクが更新されたことを確認
+    // 同じ文言がTODOリスト側にも残るため、ポモドーロタイマーセクション内に限定して検索する
     await waitFor(() => {
-        const taskDisplay = screen.getByText('テスト用のTODOタスク');
-        expect(taskDisplay).toBeInTheDocument();
+        const timerSection = document.getElementById('pomodoro-timer-section');
+        expect(timerSection).not.toBeNull();
+        expect(
+            within(timerSection as HTMLElement).getByText('テスト用のTODOタスク')
+        ).toBeInTheDocument();
     });
 
     // タイマーが開始されているか確認（UIのテキストで判断）
@@ -124,8 +127,9 @@ describe('Pomodoro Task Integration', () => {
     render(<CommTimeComponent />);
 
     // ポモドーロタブに切り替えられていること
+    // アクティブ判定のクラスはラベルのspanではなくタブのbutton要素に付与される
     const pomodoroTab = screen.getByText('ポモドーロ');
-    expect(pomodoroTab).toHaveClass('bg-gradient-to-r'); // active class
+    expect(pomodoroTab.closest('button')).toHaveClass('bg-gradient-to-r'); // active class
 
     // localStorageから読み込んだタスクが表示されていることを確認
     const taskDisplay = screen.getByText('ローカルストレージからのタスク');

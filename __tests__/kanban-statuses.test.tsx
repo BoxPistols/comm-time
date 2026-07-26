@@ -5,7 +5,8 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { User } from '@supabase/supabase-js';
-import { type KanbanStatusColumn, DEFAULT_KANBAN_COLUMNS } from '@/types';
+import type { KanbanStatusColumn } from '@/types';
+import { DEFAULT_KANBAN_COLUMNS } from '@/lib/constants';
 
 // isSupabaseConfiguredのモック用フラグ
 let mockIsConfigured = true;

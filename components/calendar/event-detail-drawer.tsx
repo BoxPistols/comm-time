@@ -12,12 +12,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CALENDAR_TEXT } from "@/lib/constants";
-import { formatDateHeading, formatTimeRange } from "@/lib/calendar-date";
+import { eventDisplayDate, formatDateHeading, formatTimeRange } from "@/lib/calendar-date";
 import { useEventAnnotations } from "@/hooks/useEventAnnotations";
 import { useTodoEventLinks } from "@/hooks/useTodoEventLinks";
 import type { CalendarEvent, AnnotationScope } from "@/types/calendar";
 import type { PriorityLevel, ImportanceLevel } from "@/types";
-import type { LocalTodoItem } from "@/hooks/useSupabaseTodos";
+import type { LocalTodoItem } from "@/types";
 
 type EventDetailDrawerProps = {
   event: CalendarEvent | null;
@@ -84,8 +84,9 @@ export function EventDetailDrawer({ event, todos, onAddTodo, onClose, onAnnotati
 
   const handleCreateTodoFromEvent = async () => {
     if (!onAddTodo || !event.summary) return;
-    const startDate = new Date(event.startAt);
-    const dueDate = startDate.toISOString().split("T")[0];
+    // 終日予定は UTC 保存のためローカル日付として解釈し直す（toISOString だと前日にずれる）
+    const startDate = eventDisplayDate(event.startAt, event.isAllDay);
+    const dueDate = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(startDate.getDate()).padStart(2, "0")}`;
     const dueTime = event.isAllDay ? undefined : startDate.toTimeString().slice(0, 5);
     const todoId = await onAddTodo(event.summary, { dueDate, dueTime });
     if (todoId) {

@@ -16,10 +16,8 @@ import {
   type DropResult,
 } from "react-beautiful-dnd";
 import { StrictModeDroppable } from "@/components/strict-mode-droppable";
-import {
-  type KanbanStatusColumn,
-  KANBAN_STATUS_COLORS,
-} from "@/types";
+import type { KanbanStatusColumn } from "@/types";
+import { KANBAN_STATUS_COLORS } from "@/lib/constants";
 
 interface KanbanStatusManagerProps {
   statuses: KanbanStatusColumn[];

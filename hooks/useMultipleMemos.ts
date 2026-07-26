@@ -22,13 +22,11 @@ function createNewMemo(): MemoData {
 // ローカルストレージからメモを取得
 function getLocalMemos(): MemoData[] {
   if (typeof window === "undefined") {
-    console.log("[useMultipleMemos] getLocalMemos: window is undefined (SSR)")
     return []
   }
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY)
     const memos = saved ? JSON.parse(saved) : []
-    console.log("[useMultipleMemos] getLocalMemos: retrieved", memos.length, "memos")
     return memos
   } catch (error) {
     console.error("[useMultipleMemos] getLocalMemos error:", error)
@@ -39,13 +37,11 @@ function getLocalMemos(): MemoData[] {
 // ローカルストレージにメモを保存
 function saveLocalMemos(memos: MemoData[]) {
   if (typeof window === "undefined") {
-    console.log("[useMultipleMemos] saveLocalMemos: window is undefined (SSR)")
     return
   }
   try {
     const data = JSON.stringify(memos)
     localStorage.setItem(LOCAL_STORAGE_KEY, data)
-    console.log("[useMultipleMemos] saveLocalMemos: saved", memos.length, "memos, size:", data.length, "bytes")
   } catch (error) {
     console.error("[useMultipleMemos] saveLocalMemos error:", error)
   }
@@ -86,8 +82,9 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
                 const localMemos = getLocalMemos()
                 setMemos(localMemos)
             }
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err) {
+            // any 禁止規約対応: catch は unknown で受け、Error へ narrowing してメッセージを取り出す（以降の catch も同様）
+            setError(err instanceof Error ? err.message : String(err))
             console.error('Error fetching memos:', err)
             // フォールバック: ローカルストレージ
             const localMemos = getLocalMemos()
@@ -139,8 +136,8 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
                 })
                 return newMemo
             }
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err))
             console.error('Error creating memo:', err)
             return null
         }
@@ -182,8 +179,8 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
 
                     return updatedMemos
                 })
-            } catch (err: any) {
-                setError(err.message)
+            } catch (err) {
+                setError(err instanceof Error ? err.message : String(err))
                 console.error('Error updating memo:', err)
             }
         },
@@ -222,8 +219,8 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
 
                     return updatedMemos
                 })
-            } catch (err: any) {
-                setError(err.message)
+            } catch (err) {
+                setError(err instanceof Error ? err.message : String(err))
                 console.error('Error deleting memo:', err)
             }
         },
@@ -261,8 +258,8 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
 
                     return updatedMemos
                 })
-            } catch (err: any) {
-                setError(err.message)
+            } catch (err) {
+                setError(err instanceof Error ? err.message : String(err))
                 console.error('Error restoring memo:', err)
             }
         },
@@ -289,8 +286,6 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
                     filter: `user_id=eq.${user.id}`,
                 },
                 (payload) => {
-                    console.log('Memo change received:', payload)
-
                     switch (payload.eventType) {
                         case 'INSERT':
                             if (payload.new) {
@@ -374,7 +369,7 @@ export function useMultipleMemos(user: User | null, useDatabase: boolean) {
                     if (reorderError) {
                         throw reorderError
                     }
-                } catch (err: any) {
+                } catch (err) {
                     console.error('Error reordering memos:', err)
                     setError('メモの順序の保存に失敗しました。')
                     setMemos(originalMemos)

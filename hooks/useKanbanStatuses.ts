@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react"
 import { supabase, isSupabaseConfigured } from "@/lib/supabase"
 import type { User } from "@supabase/supabase-js"
-import { type KanbanStatusColumn, DEFAULT_KANBAN_COLUMNS } from "@/types"
+import type { KanbanStatusColumn } from "@/types"
+import { DEFAULT_KANBAN_COLUMNS } from "@/lib/constants"
 
 // DBの型からローカル型に変換
 const convertToLocal = (dbStatus: Record<string, unknown>): KanbanStatusColumn => ({
@@ -309,8 +310,7 @@ export function useKanbanStatuses(user: User | null) {
           table: "kanban_statuses",
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log("Kanban status change received, refetching:", payload)
+        () => {
           fetchStatuses()
         }
       )

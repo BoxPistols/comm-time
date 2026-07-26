@@ -11,15 +11,17 @@ const customJestConfig = {
   testEnvironment: 'jest-environment-jsdom',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
+    // moduleNameMapper は解決後のパスではなく import 指定子に対して効くため、
+    // 拡張子を持たない `swiper/css` 系のサブパスは既定の CSS パターンに掛からない
+    '^swiper/css(/.*)?$': '<rootDir>/__mocks__/styleMock.js',
     // Mock CSS and markdown packages
     '\\.(css|less|scss|sass)$': '<rootDir>/__mocks__/styleMock.js',
     'react-markdown': '<rootDir>/__mocks__/react-markdown.js',
     'remark-gfm': '<rootDir>/__mocks__/remark-gfm.js',
   },
-  // Add ESM packages to the transform ignore pattern
-  transformIgnorePatterns: [
-    'node_modules/(?!(swiper|ssr-window|react-beautiful-dnd|@react-dnd|dnd-core)/)',
-  ],
+  // ESM パッケージの変換除外は next.config.mjs の transpilePackages で指定する。
+  // next/jest は自前の '/node_modules/' を先頭に置き、ここへの追記では上書きできないため
+  // （transformIgnorePatterns は 1 つでも一致すれば変換されない）
   testPathIgnorePatterns: ['/node_modules/', '/.next/', '/e2e/'],
   collectCoverageFrom: [
     'components/**/*.{js,jsx,ts,tsx}',

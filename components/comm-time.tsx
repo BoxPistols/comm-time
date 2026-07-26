@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { X, Settings, Columns, Filter, MessageSquare } from "lucide-react";
+import { X, Columns, Filter, MessageSquare } from "lucide-react";
 import { RichTextWithLinks } from "@/components/rich-text-with-links";
 import { AuthDialog } from "@/components/auth-dialog";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,8 +10,6 @@ import { useMultipleMemos } from "@/hooks/useMultipleMemos";
 import { MemoSwiper } from "@/components/memo-swiper";
 import { type MemoData } from "@/components/markdown-memo";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { KanbanBoard } from "@/components/kanban-board";
-import { KanbanStatusManager } from "@/components/kanban-status-manager";
 import { TodoEditDialog } from "@/components/todo-edit-dialog";
 import { AIChat } from "@/components/ai-chat";
 import { SearchModal, type SearchResult } from "@/components/search-modal";
@@ -24,6 +22,8 @@ import { MeetingTimerPanel } from "@/components/meeting-timer/MeetingTimerPanel"
 import { PomodoroTimerPanel } from "@/components/pomodoro-timer/PomodoroTimerPanel";
 import { TodoListPanel } from "@/components/todo-list/TodoListPanel";
 import { DeadlineTimeline } from "@/components/deadline-timeline";
+import { LoadingScreen } from "@/components/loading-screen";
+import { KanbanModal } from "@/components/kanban-modal";
 import { useKanbanStatuses } from "@/hooks/useKanbanStatuses";
 import { useAlarmSystem } from "@/hooks/useAlarmSystem";
 import { useMeetingTimer } from "@/hooks/useMeetingTimer";
@@ -31,6 +31,7 @@ import { usePomodoroTimer } from "@/hooks/usePomodoroTimer";
 import { useDefaultSettings } from "@/hooks/useDefaultSettings";
 import { useTagManager } from "@/hooks/useTagManager";
 import { useTodoManager } from "@/hooks/useTodoManager";
+import { useDeadlineAlert } from "@/hooks/useDeadlineAlert";
 import { type TabType } from "@/types";
 export function CommTimeComponent() {
   // クライアントサイドマウント状態（Hydration error回避）
@@ -193,9 +194,6 @@ export function CommTimeComponent() {
 
   // カンバンモーダルの表示状態
   const [showKanbanModal, setShowKanbanModal] = useState(false);
-
-  // ステータス管理モーダルの表示状態
-  const [showStatusManager, setShowStatusManager] = useState(false);
 
   // AIチャットの表示状態
   const [showAIChat, setShowAIChat] = useState(false);
@@ -389,36 +387,16 @@ export function CommTimeComponent() {
     localStorage.setItem("deadlineAlertMinutes", String(deadlineAlertMinutes));
   }, [deadlineAlertEnabled, deadlineAlertMinutes, mounted]);
 
-  // 締切アラートのチェック（currentTimeの分が変わった時のみ実行）
-  const lastCheckedMinuteRef = useRef<number>(-1);
-  useEffect(() => {
-    if (!deadlineAlertEnabled || !currentTime) return;
-
-    const currentMinute = currentTime.getMinutes();
-    // 分が変わっていなければスキップ
-    if (lastCheckedMinuteRef.current === currentMinute) return;
-    lastCheckedMinuteRef.current = currentMinute;
-
-    const alertThreshold = deadlineAlertMinutes * 60 * 1000;
-
-    sharedTodos.forEach((todo) => {
-      if (todo.isCompleted || !todo.dueDate || alertedTodoIdsRef.current.has(todo.id)) {
-        return;
-      }
-
-      const deadline = new Date(`${todo.dueDate}T${todo.dueTime || "23:59"}`);
-      const timeUntilDeadline = deadline.getTime() - currentTime.getTime();
-
-      if (timeUntilDeadline < 0) return;
-
-      if (timeUntilDeadline <= alertThreshold) {
-        const minutesLeft = Math.ceil(timeUntilDeadline / (60 * 1000));
-        const message = `「${todo.text.slice(0, 20)}${todo.text.length > 20 ? "..." : ""}」の締切まであと${minutesLeft}分です`;
-        playAlarm(meetingAlarmSettings, message);
-        alertedTodoIdsRef.current.add(todo.id);
-      }
-    });
-  }, [deadlineAlertEnabled, deadlineAlertMinutes, sharedTodos, currentTime, playAlarm, meetingAlarmSettings]);
+  // 締切アラートのチェック
+  useDeadlineAlert({
+    todos: sharedTodos,
+    currentTime,
+    deadlineAlertEnabled,
+    deadlineAlertMinutes,
+    alertedTodoIdsRef,
+    playAlarm,
+    meetingAlarmSettings,
+  });
 
   // (タイマーロジック: useMeetingTimer / usePomodoroTimer hookに移動済み)
 
@@ -442,112 +420,7 @@ export function CommTimeComponent() {
   // SSR時はローディング表示（Hydration error回避）
   // CSSが読み込まれる前でも正しく表示されるようinline styleを使用
   if (!mounted) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'linear-gradient(to bottom right, #eef2ff, #faf5ff, #fdf2f8)',
-        }}
-      >
-        <div style={{ textAlign: 'center' }}>
-          {/* タイマー風ローディングアニメーション */}
-          <div style={{ position: 'relative', width: 96, height: 96, margin: '0 auto 24px' }}>
-            <svg
-              width="96"
-              height="96"
-              viewBox="0 0 100 100"
-              style={{ transform: 'rotate(-90deg)' }}
-            >
-              <circle
-                cx="50"
-                cy="50"
-                r="45"
-                fill="none"
-                stroke="#e5e7eb"
-                strokeWidth="4"
-              />
-              <circle
-                cx="50"
-                cy="50"
-                r="45"
-                fill="none"
-                stroke="url(#loadingGradient)"
-                strokeWidth="4"
-                strokeLinecap="round"
-                strokeDasharray="283"
-                strokeDashoffset="70"
-                style={{
-                  animation: 'spin 2s linear infinite',
-                  transformOrigin: 'center',
-                }}
-              />
-              <defs>
-                <linearGradient id="loadingGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#6366f1" />
-                  <stop offset="50%" stopColor="#a855f7" />
-                  <stop offset="100%" stopColor="#ec4899" />
-                </linearGradient>
-              </defs>
-            </svg>
-            {/* 中央のタイマーアイコン（インラインSVG） */}
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <svg
-                width="40"
-                height="40"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#6366f1"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ animation: 'pulse 2s ease-in-out infinite' }}
-              >
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-            </div>
-          </div>
-          {/* アプリ名 */}
-          <h1
-            style={{
-              fontSize: 24,
-              fontWeight: 'bold',
-              background: 'linear-gradient(to right, #6366f1, #a855f7, #ec4899)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              marginBottom: 8,
-            }}
-          >
-            Comm Time
-          </h1>
-          {/* ローディングテキスト */}
-          <p style={{ color: '#6b7280', fontSize: 14 }}>Loading...</p>
-        </div>
-        {/* アニメーション用のstyleタグ */}
-        <style>{`
-          @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-          }
-          @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-          }
-        `}</style>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (
@@ -914,96 +787,23 @@ export function CommTimeComponent() {
         )}
 
         {/* カンバンモーダル */}
-        {showKanbanModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            {/* オーバーレイ */}
-            <div
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-              onClick={() => setShowKanbanModal(false)}
-            />
-            {/* モーダルコンテンツ */}
-            <div
-              className={`relative w-[95vw] h-[90vh] rounded-2xl shadow-2xl overflow-hidden ${
-                darkMode ? "bg-gray-900" : "bg-white"
-              }`}
-            >
-              {/* ヘッダー */}
-              <div
-                className={`flex items-center justify-between px-6 py-4 border-b ${
-                  darkMode ? "border-gray-700" : "border-gray-200"
-                }`}
-              >
-                <h2
-                  className={`text-xl font-bold flex items-center gap-2 ${
-                    darkMode ? "text-white" : "text-gray-800"
-                  }`}
-                >
-                  <Columns className="w-5 h-5" />
-                  <span className="hidden sm:inline">カンバンボード</span>
-                  <span className="sm:hidden">看板</span>
-                </h2>
-                <div className="flex items-center gap-4">
-                  {/* ステータス管理ボタン */}
-                  <button
-                    onClick={() => setShowStatusManager(true)}
-                    disabled={!isAuthenticated || !isSupabaseConfigured}
-                    title={!isAuthenticated || !isSupabaseConfigured ? "ログインするとカスタムステータスを作成できます" : "ステータスを追加・編集・削除できます"}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
-                      !isAuthenticated || !isSupabaseConfigured
-                        ? darkMode
-                          ? "bg-gray-800 text-gray-500 cursor-not-allowed"
-                          : "bg-gray-50 text-gray-400 cursor-not-allowed"
-                        : darkMode
-                          ? "bg-gray-700 hover:bg-gray-600 text-gray-300"
-                          : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                    }`}
-                  >
-                    <Settings className="w-4 h-4" />
-                    ステータス管理
-                  </button>
-                  <button
-                    onClick={() => setShowKanbanModal(false)}
-                    className={`p-2 rounded-full transition-colors ${
-                      darkMode
-                        ? "hover:bg-gray-700 text-gray-400"
-                        : "hover:bg-gray-100 text-gray-600"
-                    }`}
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-              {/* カンバンボード */}
-              <div className="p-6 h-[calc(90vh-80px)] overflow-auto">
-                <KanbanBoard
-                  todos={filteredTodos}
-                  tags={tags}
-                  columns={kanbanStatusesHook.statuses}
-                  darkMode={darkMode}
-                  onStatusChange={updateTodoKanbanStatus}
-                  onToggleTodo={(id) => toggleTodo(id)}
-                  onEditTodo={(id) => {
-                    setEditingTodoId(id);
-                    setShowKanbanModal(false);
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ステータス管理モーダル（ログイン時のみ表示） */}
-        {showStatusManager && isAuthenticated && isSupabaseConfigured && (
-          <KanbanStatusManager
-            statuses={kanbanStatusesHook.statuses}
-            darkMode={darkMode}
-            onClose={() => setShowStatusManager(false)}
-            onAddStatus={kanbanStatusesHook.addStatus}
-            onUpdateStatus={kanbanStatusesHook.updateStatus}
-            onDeleteStatus={kanbanStatusesHook.deleteStatus}
-            onReorderStatuses={kanbanStatusesHook.reorderStatuses}
-          />
-        )}
+        <KanbanModal
+          isOpen={showKanbanModal}
+          onClose={() => setShowKanbanModal(false)}
+          darkMode={darkMode}
+          todos={filteredTodos}
+          tags={tags}
+          kanbanStatuses={kanbanStatusesHook.statuses}
+          isAuthenticated={isAuthenticated}
+          isSupabaseConfigured={isSupabaseConfigured}
+          onStatusChange={updateTodoKanbanStatus}
+          onToggleTodo={toggleTodo}
+          onEditTodo={(id) => setEditingTodoId(id)}
+          onAddStatus={kanbanStatusesHook.addStatus}
+          onUpdateStatus={kanbanStatusesHook.updateStatus}
+          onDeleteStatus={kanbanStatusesHook.deleteStatus}
+          onReorderStatuses={kanbanStatusesHook.reorderStatuses}
+        />
 
         {/* TODO編集ダイアログ */}
         {editDialogTodo && (

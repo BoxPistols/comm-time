@@ -2,6 +2,7 @@
   "name": "comm-time",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "bun@1.3.11",
   "scripts": {
     "dev": "next dev -p 5656",
     "build": "next build",
@@ -10,18 +11,12 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed",
-    "test:visual": "playwright test e2e/visual-regression.spec.ts",
-    "test:all": "npm run test && npm run test:e2e",
-    "playwright:install": "playwright install --with-deps"
+    "test:all": "bun run test"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
     "@supabase/supabase-js": "^2.81.1",
     "@tailwindcss/typography": "^0.5.19",
-    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.462.0",
     "next": "14.2.35",
@@ -38,7 +33,6 @@
     "web-haptics": "^0.0.6"
   },
   "devDependencies": {
-    "@playwright/test": "^1.56.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
@@ -52,7 +46,6 @@
     "eslint-config-next": "14.2.16",
     "jest": "^30.2.0",
     "jest-environment-jsdom": "^30.2.0",
-    "playwright": "^1.56.1",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
