@@ -9,6 +9,9 @@ import {
 } from "@/lib/calendar-server";
 import type { CalendarSyncResult } from "@/types/calendar";
 
+// 初回フルシンク（425日分）は 10 秒では終わらないため延長
+export const maxDuration = 60;
+
 export async function OPTIONS() {
   return handleCors();
 }
