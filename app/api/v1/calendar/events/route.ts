@@ -80,28 +80,37 @@ export async function GET(request: NextRequest) {
   let annotations: AnnotationRow[] = [];
   let todoLinks: TodoLinkRow[] = [];
   if (allKeys.length > 0) {
-    const [annotationResult, linkResult] = await Promise.all([
-      auth.supabase
-        .from("event_annotations")
-        .select("event_key, scope, memo, priority, importance, tag_ids")
-        .eq("user_id", auth.userId)
-        .in("event_key", allKeys),
-      auth.supabase
-        .from("todo_event_links")
-        .select("todo_id, event_key")
-        .eq("user_id", auth.userId)
-        .in("event_key", allKeys),
-    ]);
-    // data だけ見て error を捨てると、取得失敗と「注釈もリンクも無い」が区別できず、
-    // 予定のメモ・優先度・タグが 200 のまま黙って消える
-    if (annotationResult.error) {
-      return apiError(annotationResult.error.message, 500);
+    // PostgREST の URL 長制限を回避するため、バッチ処理
+    const BATCH_SIZE = 100;
+    const batches: string[][] = [];
+    for (let i = 0; i < allKeys.length; i += BATCH_SIZE) {
+      batches.push(allKeys.slice(i, i + BATCH_SIZE));
     }
-    if (linkResult.error) {
-      return apiError(linkResult.error.message, 500);
+
+    for (const batch of batches) {
+      const [annotationResult, linkResult] = await Promise.all([
+        auth.supabase
+          .from("event_annotations")
+          .select("event_key, scope, memo, priority, importance, tag_ids")
+          .eq("user_id", auth.userId)
+          .in("event_key", batch),
+        auth.supabase
+          .from("todo_event_links")
+          .select("todo_id, event_key")
+          .eq("user_id", auth.userId)
+          .in("event_key", batch),
+      ]);
+      // data だけ見て error を捨てると、取得失敗と「注釈もリンクも無い」が区別できず、
+      // 予定のメモ・優先度・タグが 200 のまま黙って消える
+      if (annotationResult.error) {
+        return apiError(annotationResult.error.message, 500);
+      }
+      if (linkResult.error) {
+        return apiError(linkResult.error.message, 500);
+      }
+      annotations.push(...((annotationResult.data ?? []) as AnnotationRow[]));
+      todoLinks.push(...((linkResult.data ?? []) as TodoLinkRow[]));
     }
-    annotations = (annotationResult.data ?? []) as AnnotationRow[];
-    todoLinks = (linkResult.data ?? []) as TodoLinkRow[];
   }
 
   const annotationByKey = new Map(annotations.map((a) => [`${a.event_key}:${a.scope}`, a]));
