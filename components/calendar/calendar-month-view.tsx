@@ -75,7 +75,7 @@ export function CalendarMonthView({ events, currentDate, onEventClick }: Calenda
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 max-w-xl mx-auto">
       <div className="text-center text-sm font-semibold text-gray-700 dark:text-gray-200">
         {formatMonthHeading(currentDate)}
       </div>
@@ -88,7 +88,7 @@ export function CalendarMonthView({ events, currentDate, onEventClick }: Calenda
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-px">
+      <div className="grid grid-cols-7 gap-1">
         {days.map((day, idx) => {
           if (!day) {
             return <div key={`empty-${idx}`} className="aspect-square" />;

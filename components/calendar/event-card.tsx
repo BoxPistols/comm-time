@@ -30,30 +30,43 @@ export function EventCard({ event, compact = false, onClick }: EventCardProps) {
         compact ? "px-2 py-1.5" : "px-3 py-2.5"
       } ${event.status === "tentative" ? "opacity-70 border-dashed" : ""}`}
     >
-      <div className="flex items-center gap-2">
-        <span
-          className={`font-mono text-gray-500 dark:text-gray-400 shrink-0 ${
-            compact ? "text-[10px]" : "text-xs"
-          }`}
-        >
-          {formatTimeRange(event.startAt, event.endAt, event.isAllDay)}
-        </span>
-        {priority !== "none" && (
-          <span
-            className={`shrink-0 rounded px-1 text-[10px] font-semibold ${PRIORITY_BADGE_CLASSES[priority]}`}
-          >
-            {CALENDAR_TEXT.priorityNames[priority]}
-          </span>
-        )}
-        {hasMemo && <StickyNote className="w-3 h-3 shrink-0 text-amber-500" />}
-      </div>
-      <div
-        className={`font-medium text-gray-800 dark:text-gray-100 truncate ${
-          compact ? "text-xs" : "text-sm"
-        }`}
-      >
-        {event.summary}
-      </div>
+      {compact ? (
+        <>
+          <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400">
+            <span className="font-mono truncate">
+              {formatTimeRange(event.startAt, event.endAt, event.isAllDay)}
+            </span>
+            {priority !== "none" && (
+              <span className={`shrink-0 rounded px-1 font-semibold ${PRIORITY_BADGE_CLASSES[priority]}`}>
+                {CALENDAR_TEXT.priorityNames[priority]}
+              </span>
+            )}
+            {hasMemo && <StickyNote className="w-3 h-3 shrink-0 text-amber-500" />}
+          </div>
+          <div className="text-xs font-medium text-gray-800 dark:text-gray-100 truncate">
+            {event.summary}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs text-gray-500 dark:text-gray-400 shrink-0">
+              {formatTimeRange(event.startAt, event.endAt, event.isAllDay)}
+            </span>
+            {priority !== "none" && (
+              <span
+                className={`shrink-0 rounded px-1 text-[10px] font-semibold ${PRIORITY_BADGE_CLASSES[priority]}`}
+              >
+                {CALENDAR_TEXT.priorityNames[priority]}
+              </span>
+            )}
+            {hasMemo && <StickyNote className="w-3 h-3 shrink-0 text-amber-500" />}
+          </div>
+          <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+            {event.summary}
+          </div>
+        </>
+      )}
       {!compact && (event.location || event.hangoutLink || event.attendeesCount) && (
         <div className="mt-1 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
           {event.hangoutLink && (

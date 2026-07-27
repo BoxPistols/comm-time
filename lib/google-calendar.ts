@@ -27,13 +27,28 @@ export type GoogleOAuthConfig = {
   encryptionKey: Buffer;
 };
 
+// リダイレクト URI を環境から自動決定
+function getRedirectUri(): string {
+  // Vercel 本番環境
+  if (process.env.VERCEL_ENV === "production") {
+    const host = process.env.VERCEL_PROJECT_PRODUCTION_URL || "comm-time.vercel.app";
+    return `https://${host}/api/v1/calendar/callback`;
+  }
+  // Vercel プレビュー環境
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}/api/v1/calendar/callback`;
+  }
+  // ローカル開発
+  return "http://localhost:5656/api/v1/calendar/callback";
+}
+
 // 必須環境変数が揃っている場合のみ設定を返す（未設定なら null → API は 503 を返す）
 export function getGoogleOAuthConfig(): GoogleOAuthConfig | null {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI;
+  const redirectUri = getRedirectUri();
   const keyBase64 = process.env.CALENDAR_TOKEN_ENCRYPTION_KEY;
-  if (!clientId || !clientSecret || !redirectUri || !keyBase64) {
+  if (!clientId || !clientSecret || !keyBase64) {
     return null;
   }
   const encryptionKey = Buffer.from(keyBase64, "base64");

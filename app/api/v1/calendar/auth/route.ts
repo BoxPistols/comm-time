@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   const config = getGoogleOAuthConfig();
   if (!config) {
     return apiError(
-      "Google Calendar integration is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_OAUTH_REDIRECT_URI, and CALENDAR_TOKEN_ENCRYPTION_KEY.",
+      "Google Calendar integration is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and CALENDAR_TOKEN_ENCRYPTION_KEY.",
       503
     );
   }
