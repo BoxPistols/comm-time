@@ -20,6 +20,7 @@ type CalendarWeekViewProps = {
 // 月曜始まりの1週間を日別に表示（PC: 7カラム / モバイル: 縦積み）
 export function CalendarWeekView({ events, currentDate, onEventClick }: CalendarWeekViewProps) {
   const today = new Date();
+  const now = Date.now();
   const weekStart = startOfWeekMonday(currentDate ?? today);
 
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -48,7 +49,7 @@ export function CalendarWeekView({ events, currentDate, onEventClick }: Calendar
             key={day.date.getTime()}
             className={`rounded-lg p-2 ${
               isToday
-                ? "bg-indigo-50/80 dark:bg-indigo-950/40 ring-1 ring-indigo-300 dark:ring-indigo-700"
+                ? "bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-300 dark:border-indigo-700"
                 : "bg-gray-50/60 dark:bg-gray-900/40"
             }`}
           >
@@ -62,14 +63,14 @@ export function CalendarWeekView({ events, currentDate, onEventClick }: Calendar
               {formatDateHeading(day.date)}
             </div>
             <div className="space-y-1">
-              {day.events.map((event) => (
-                <EventCard
-                  key={`${event.calendarId}:${event.eventId}`}
-                  event={event}
-                  compact
-                  onClick={onEventClick}
-                />
-              ))}
+              {day.events.map((event) => {
+                const isPast = new Date(event.endAt).getTime() < now && !event.isAllDay;
+                return (
+                  <div key={`${event.calendarId}:${event.eventId}`} className={isPast ? "opacity-50" : ""}>
+                    <EventCard event={event} compact onClick={onEventClick} />
+                  </div>
+                );
+              })}
             </div>
           </div>
         );
