@@ -20,6 +20,7 @@ import {
 import { DragDropContext, Draggable, DropResult } from "react-beautiful-dnd";
 import { StrictModeDroppable } from "./strict-mode-droppable";
 import { MarkdownMemo, type MemoData } from "./markdown-memo";
+import { MemoContextMenu } from "@/components/context-menu/MemoContextMenu";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { ShortcutsModal } from "./ShortcutsModal";
 import { ShortcutsDropdown } from "./ShortcutsDropdown";
@@ -377,19 +378,27 @@ export function MemoSwiper({
                       index={index}
                     >
                       {(provided, snapshot) => (
-                        <li
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          className={`grid grid-cols-[auto_1fr_auto] gap-2 p-2 rounded-lg border transition-all ${
-                            snapshot.isDragging
-                              ? darkMode
-                                ? "bg-gray-700 border-blue-500 shadow-lg"
-                                : "bg-white border-blue-500 shadow-lg"
-                              : darkMode
-                              ? "bg-gray-800 border-gray-700 hover:border-gray-600"
-                              : "bg-white border-gray-200 hover:border-gray-300"
-                          }`}
+                        <MemoContextMenu
+                          onEdit={() => handleMemoClick(index)}
+                          onDelete={() => {
+                            if (window.confirm(`「${memo.title || "無題のメモ"}」を削除しますか？`)) {
+                              onDeleteMemo(memo.id);
+                            }
+                          }}
                         >
+                          <li
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            className={`grid grid-cols-[auto_1fr_auto] gap-2 p-2 rounded-lg border transition-all ${
+                              snapshot.isDragging
+                                ? darkMode
+                                  ? "bg-gray-700 border-blue-500 shadow-lg"
+                                  : "bg-white border-blue-500 shadow-lg"
+                                : darkMode
+                                ? "bg-gray-800 border-gray-700 hover:border-gray-600"
+                                : "bg-white border-gray-200 hover:border-gray-300"
+                            }`}
+                          >
                           {/* ドラッグハンドル */}
                           <div
                             {...provided.dragHandleProps}
@@ -469,7 +478,8 @@ export function MemoSwiper({
                               <Trash2 size={14} />
                             </button>
                           </div>
-                        </li>
+                          </li>
+                        </MemoContextMenu>
                       )}
                     </Draggable>
                   ))}

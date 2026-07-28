@@ -14,6 +14,7 @@ import {
   Clock,
 } from "lucide-react";
 import { RichTextWithLinks } from "@/components/rich-text-with-links";
+import { KanbanContextMenu } from "@/components/context-menu/KanbanContextMenu";
 import type {
   Tag,
   KanbanStatus,
@@ -200,23 +201,29 @@ export function KanbanBoard({
                           index={index}
                         >
                           {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              onClick={() => onEditTodo?.(todo.id)}
-                              className={`p-3 rounded-lg border cursor-pointer transition-all overflow-hidden ${
-                                snapshot.isDragging
-                                  ? "shadow-lg scale-105"
-                                  : "hover:shadow-md"
-                              } ${
-                                darkMode
-                                  ? "bg-gray-800 border-gray-700"
-                                  : "bg-white border-gray-200"
-                              } ${
-                                todo.isCompleted ? "opacity-60" : ""
-                              }`}
+                            <KanbanContextMenu
+                              currentStatus={todo.kanbanStatus || "backlog"}
+                              kanbanStatuses={columns}
+                              onOpenDetails={() => onEditTodo?.(todo.id)}
+                              onChangeStatus={(status) => onStatusChange(todo.id, status)}
                             >
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                onClick={() => onEditTodo?.(todo.id)}
+                                className={`p-3 rounded-lg border cursor-pointer transition-all overflow-hidden ${
+                                  snapshot.isDragging
+                                    ? "shadow-lg scale-105"
+                                    : "hover:shadow-md"
+                                } ${
+                                  darkMode
+                                    ? "bg-gray-800 border-gray-700"
+                                    : "bg-white border-gray-200"
+                                } ${
+                                  todo.isCompleted ? "opacity-60" : ""
+                                }`}
+                              >
                               {/* タスク内容 */}
                               <div className="flex items-start gap-2">
                                 <button
@@ -333,7 +340,8 @@ export function KanbanBoard({
                                   )}
                                 </div>
                               )}
-                            </div>
+                              </div>
+                            </KanbanContextMenu>
                           )}
                         </Draggable>
                       );

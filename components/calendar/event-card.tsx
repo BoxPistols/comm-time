@@ -3,12 +3,14 @@
 import { MapPin, Video, StickyNote, Users } from "lucide-react";
 import { CALENDAR_TEXT } from "@/lib/constants";
 import { formatTimeRange } from "@/lib/calendar-date";
+import { EventContextMenu } from "@/components/context-menu/EventContextMenu";
 import type { CalendarEvent } from "@/types/calendar";
 
 type EventCardProps = {
   event: CalendarEvent;
   compact?: boolean;
   onClick: (event: CalendarEvent) => void;
+  onAddAsTodo?: (event: CalendarEvent) => void;
 };
 
 // 優先度バッジの配色（注釈がある場合のみ表示）
@@ -18,12 +20,17 @@ const PRIORITY_BADGE_CLASSES: Record<string, string> = {
   low: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
 };
 
-export function EventCard({ event, compact = false, onClick }: EventCardProps) {
+export function EventCard({ event, compact = false, onClick, onAddAsTodo }: EventCardProps) {
   const priority = event.annotation?.priority ?? "none";
   const hasMemo = Boolean(event.annotation?.memo);
 
   return (
-    <button
+    <EventContextMenu
+      event={event}
+      onOpenDetails={() => onClick(event)}
+      onAddAsTodo={onAddAsTodo ? () => onAddAsTodo(event) : undefined}
+    >
+      <button
       type="button"
       onClick={() => onClick(event)}
       className={`w-full text-left rounded-xl border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 hover:bg-white dark:hover:bg-gray-800 shadow-sm hover:shadow-md transition-all ${
@@ -90,6 +97,7 @@ export function EventCard({ event, compact = false, onClick }: EventCardProps) {
           )}
         </div>
       )}
-    </button>
+      </button>
+    </EventContextMenu>
   );
 }
