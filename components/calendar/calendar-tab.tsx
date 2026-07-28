@@ -24,6 +24,7 @@ import { useCalendarEvents } from "@/hooks/useCalendarEvents";
 import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
 import { CalendarConnectPanel, SyncStatusBar } from "./calendar-connect-panel";
 import { CalendarDayView } from "./calendar-day-view";
+import { CalendarDaysView } from "./calendar-days-view";
 import { CalendarWeekView } from "./calendar-week-view";
 import { CalendarMonthView } from "./calendar-month-view";
 import { CalendarAgendaView } from "./calendar-agenda-view";
@@ -38,11 +39,12 @@ type CalendarTabProps = {
   onAddTodo?: (text: string, options?: { dueDate?: string; dueTime?: string }) => Promise<string | null>;
 };
 
-const VIEW_OPTIONS: { value: CalendarViewType; label: string }[] = [
-  { value: "today", label: CALENDAR_TEXT.viewToday },
-  { value: "week", label: CALENDAR_TEXT.viewWeek },
-  { value: "month", label: CALENDAR_TEXT.viewMonth },
-  { value: "agenda", label: CALENDAR_TEXT.viewAgenda },
+const VIEW_OPTIONS: { value: CalendarViewType; label: string; shortcut: string }[] = [
+  { value: "today", label: CALENDAR_TEXT.viewToday, shortcut: "T/1" },
+  { value: "days", label: CALENDAR_TEXT.viewDays, shortcut: "X/5" },
+  { value: "week", label: CALENDAR_TEXT.viewWeek, shortcut: "W/2" },
+  { value: "month", label: CALENDAR_TEXT.viewMonth, shortcut: "M/3" },
+  { value: "agenda", label: CALENDAR_TEXT.viewAgenda, shortcut: "A/4" },
 ];
 
 // 予定リストは今日から14日先まで表示する
@@ -63,6 +65,8 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
   const navigatePrev = useCallback(() => {
     if (view === "today") {
       setCurrentDate((d) => addDays(d, -1));
+    } else if (view === "days") {
+      setCurrentDate((d) => addDays(d, -4));
     } else if (view === "week") {
       setCurrentDate((d) => addWeeks(d, -1));
     } else if (view === "month") {
@@ -73,6 +77,8 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
   const navigateNext = useCallback(() => {
     if (view === "today") {
       setCurrentDate((d) => addDays(d, 1));
+    } else if (view === "days") {
+      setCurrentDate((d) => addDays(d, 4));
     } else if (view === "week") {
       setCurrentDate((d) => addWeeks(d, 1));
     } else if (view === "month") {
@@ -84,12 +90,47 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
     setCurrentDate(startOfDay(new Date()));
   }, []);
 
-  // 今日/週/月ビューで横スワイプで前後移動できる
+  // 今日/4日/週/月ビューで横スワイプで前後移動できる
   const swipeHandlers = useSwipeNavigation({
     onSwipeLeft: navigateNext,
     onSwipeRight: navigatePrev,
-    enabled: view === "today" || view === "week" || view === "month",
+    enabled: view === "today" || view === "days" || view === "week" || view === "month",
   });
+
+  // キーボードショートカット（Google Calendar 互換）
+  useEffect(() => {
+    if (!connected) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (key === "t" || key === "1") {
+        e.preventDefault();
+        setView("today");
+        setCurrentDate(startOfDay(new Date()));
+      } else if (key === "x" || key === "5") {
+        e.preventDefault();
+        setView("days");
+      } else if (key === "w" || key === "2") {
+        e.preventDefault();
+        setView("week");
+      } else if (key === "m" || key === "3") {
+        e.preventDefault();
+        setView("month");
+      } else if (key === "a" || key === "4") {
+        e.preventDefault();
+        setView("agenda");
+      } else if (key === "arrowleft" || key === "p" || key === "k") {
+        e.preventDefault();
+        navigatePrev();
+      } else if (key === "arrowright" || key === "n" || key === "j") {
+        e.preventDefault();
+        navigateNext();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [connected, navigatePrev, navigateNext]);
 
   // 取得期間: 現在の表示月の前後1ヶ月 + アジェンダ分をカバー
   const range = useMemo(() => {
@@ -190,7 +231,7 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
             />
           </div>
 
-          {(view === "today" || view === "week" || view === "month") && (
+          {(view === "today" || view === "days" || view === "week" || view === "month") && (
             <div className="mb-3 flex items-center justify-between">
               <button
                 type="button"
@@ -204,6 +245,8 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
                   {view === "today"
                     ? `${currentDate.getMonth() + 1}/${currentDate.getDate()}（${["日", "月", "火", "水", "木", "金", "土"][currentDate.getDay()]}）`
+                    : view === "days"
+                    ? `${currentDate.getMonth() + 1}/${currentDate.getDate()}〜${addDays(currentDate, 3).getMonth() + 1}/${addDays(currentDate, 3).getDate()}`
                     : view === "week"
                     ? formatWeekHeading(startOfWeekMonday(currentDate))
                     : formatMonthHeading(currentDate)}
@@ -251,6 +294,14 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
           <div className={`${VIEW_MAX_HEIGHT} overflow-y-auto`} {...swipeHandlers}>
             {view === "today" && (
               <CalendarDayView events={eventsState.events} currentDate={currentDate} onEventClick={handleEventClick} />
+            )}
+            {view === "days" && (
+              <CalendarDaysView
+                events={eventsState.events}
+                currentDate={currentDate}
+                daysCount={4}
+                onEventClick={handleEventClick}
+              />
             )}
             {view === "week" && (
               <CalendarWeekView

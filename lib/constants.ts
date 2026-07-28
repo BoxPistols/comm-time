@@ -48,6 +48,7 @@ export const CALENDAR_TEXT = {
   tabLabel: "カレンダー",
   tabLabelShort: "カレンダー",
   viewToday: "今日",
+  viewDays: "4日",
   viewWeek: "週",
   viewMonth: "月",
   viewAgenda: "予定リスト",

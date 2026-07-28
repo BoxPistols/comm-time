@@ -3,7 +3,7 @@
 import type { PriorityLevel, ImportanceLevel } from "./index";
 
 // カレンダービューの種類
-export type CalendarViewType = "today" | "week" | "month" | "agenda";
+export type CalendarViewType = "today" | "days" | "week" | "month" | "agenda";
 
 // 注釈のスコープ（単発の回のみ / 繰り返しシリーズ全体）
 export type AnnotationScope = "instance" | "series";
