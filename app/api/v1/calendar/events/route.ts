@@ -77,8 +77,8 @@ export async function GET(request: NextRequest) {
     .filter((id): id is string => id !== null);
   const allKeys = Array.from(new Set([...instanceKeys, ...seriesKeys]));
 
-  let annotations: AnnotationRow[] = [];
-  let todoLinks: TodoLinkRow[] = [];
+  const annotations: AnnotationRow[] = [];
+  const todoLinks: TodoLinkRow[] = [];
   if (allKeys.length > 0) {
     // PostgREST の URL 長制限を回避するため、バッチ処理
     const BATCH_SIZE = 100;
