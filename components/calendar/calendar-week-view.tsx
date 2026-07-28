@@ -46,7 +46,7 @@ export function CalendarWeekView({ events, currentDate, onEventClick }: Calendar
         return (
           <div
             key={day.date.getTime()}
-            className={`rounded-xl p-2 ${
+            className={`rounded-lg p-2 ${
               isToday
                 ? "bg-indigo-50/80 dark:bg-indigo-950/40 ring-1 ring-indigo-300 dark:ring-indigo-700"
                 : "bg-gray-50/60 dark:bg-gray-900/40"

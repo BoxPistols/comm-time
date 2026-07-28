@@ -55,7 +55,7 @@ export function CalendarDayView({ events, currentDate, onEventClick }: CalendarD
           <div
             key={`${event.calendarId}:${event.eventId}`}
             className={`${isPast ? "opacity-50" : ""} ${
-              isOngoing ? "ring-2 ring-indigo-400 rounded-xl" : ""
+              isOngoing ? "ring-2 ring-indigo-400 rounded-lg" : ""
             }`}
           >
             <EventCard event={event} onClick={onEventClick} />

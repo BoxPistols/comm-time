@@ -38,9 +38,7 @@ const CALENDAR_COLORS: Record<string, string> = {
 export function EventCard({ event, compact = false, onClick, onAddAsTodo }: EventCardProps) {
   const priority = event.annotation?.priority ?? "none";
   const hasMemo = Boolean(event.annotation?.memo);
-  const colorStyle = event.colorId && CALENDAR_COLORS[event.colorId]
-    ? { borderLeftColor: CALENDAR_COLORS[event.colorId], borderLeftWidth: "3px" }
-    : undefined;
+  const eventColor = event.colorId ? CALENDAR_COLORS[event.colorId] : undefined;
 
   return (
     <EventContextMenu
@@ -52,8 +50,7 @@ export function EventCard({ event, compact = false, onClick, onAddAsTodo }: Even
       type="button"
       onClick={() => onClick(event)}
       title={event.summary}
-      style={colorStyle}
-      className={`w-full text-left rounded-xl border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 hover:bg-white dark:hover:bg-gray-800 shadow-sm hover:shadow-md transition-all ${
+      className={`w-full text-left rounded-lg border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 hover:bg-white dark:hover:bg-gray-800 shadow-sm hover:shadow-md transition-all ${
         compact ? "px-2 py-1.5" : "px-3 py-2.5"
       } ${event.status === "tentative" ? "opacity-70 border-dashed" : ""}`}
     >
@@ -70,8 +67,15 @@ export function EventCard({ event, compact = false, onClick, onAddAsTodo }: Even
             )}
             {hasMemo && <StickyNote className="w-3 h-3 shrink-0 text-amber-500" />}
           </div>
-          <div className="text-xs font-medium text-gray-800 dark:text-gray-100 truncate">
-            {event.summary}
+          <div className="flex items-center gap-1.5 text-xs font-medium text-gray-800 dark:text-gray-100">
+            {eventColor && (
+              <span
+                className="shrink-0 w-2 h-2 rounded-full"
+                style={{ backgroundColor: eventColor }}
+                aria-hidden="true"
+              />
+            )}
+            <span className="truncate">{event.summary}</span>
           </div>
         </>
       ) : (
@@ -89,8 +93,15 @@ export function EventCard({ event, compact = false, onClick, onAddAsTodo }: Even
             )}
             {hasMemo && <StickyNote className="w-3 h-3 shrink-0 text-amber-500" />}
           </div>
-          <div className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-            {event.summary}
+          <div className="flex items-center gap-1.5 text-sm font-medium text-gray-800 dark:text-gray-100">
+            {eventColor && (
+              <span
+                className="shrink-0 w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: eventColor }}
+                aria-hidden="true"
+              />
+            )}
+            <span className="truncate">{event.summary}</span>
           </div>
         </>
       )}
