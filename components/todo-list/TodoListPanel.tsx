@@ -24,6 +24,7 @@ import { StrictModeDroppable } from "@/components/strict-mode-droppable";
 import { TagManager } from "@/components/tag-manager";
 import { FilterPanel } from "@/components/filter-panel";
 import { RichTextWithLinks } from "@/components/rich-text-with-links";
+import { TodoContextMenu } from "@/components/context-menu/TodoContextMenu";
 import type {
   TodoItem,
   TrashedTodoItem,
@@ -449,25 +450,38 @@ export function TodoListPanel({
                   isDragDisabled={sortByDeadline}
                 >
                   {(provided, snapshot) => (
-                    <li
-                      id={`todo-${todo.id}`}
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      {...provided.dragHandleProps}
-                      className={`grid grid-cols-[1fr_auto] gap-1 p-2 sm:p-3 rounded-xl transition-all duration-200 ${
-                        todo.isCompleted
-                          ? "bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border border-green-200 dark:border-green-800"
-                          : "bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600"
-                      } ${
-                        snapshot.isDragging
-                          ? "shadow-2xl scale-105"
-                          : "shadow-sm hover:shadow-md"
-                      } ${
-                        highlightedTodoId === todo.id
-                          ? "ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-gray-800 bg-indigo-50 dark:bg-indigo-900/30 transition-all duration-500"
-                          : ""
-                      }`}
+                    <TodoContextMenu
+                      todo={todo}
+                      onToggle={() => toggleTodo(todo.id)}
+                      onEdit={() => startEditingTodo(todo.id)}
+                      onDelete={() => removeTodo(todo.id)}
+                      onOpenDetails={() => setEditDialogTodoId(todo.id)}
+                      onStartPomodoro={() => startWithTodo(todo.text, todo.id)}
+                      onExpandDeadline={() =>
+                        setExpandedDeadlineTodoId(
+                          expandedDeadlineTodoId === todo.id ? null : todo.id
+                        )
+                      }
                     >
+                      <li
+                        id={`todo-${todo.id}`}
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        {...provided.dragHandleProps}
+                        className={`grid grid-cols-[1fr_auto] gap-1 p-2 sm:p-3 rounded-xl transition-all duration-200 ${
+                          todo.isCompleted
+                            ? "bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border border-green-200 dark:border-green-800"
+                            : "bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600"
+                        } ${
+                          snapshot.isDragging
+                            ? "shadow-2xl scale-105"
+                            : "shadow-sm hover:shadow-md"
+                        } ${
+                          highlightedTodoId === todo.id
+                            ? "ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-gray-800 bg-indigo-50 dark:bg-indigo-900/30 transition-all duration-500"
+                            : ""
+                        }`}
+                      >
                       {editingTodoId === todo.id ? (
                         <>
                           <input
@@ -687,7 +701,8 @@ export function TodoListPanel({
                           </div>
                         </>
                       )}
-                    </li>
+                      </li>
+                    </TodoContextMenu>
                   )}
                 </Draggable>
               ))}

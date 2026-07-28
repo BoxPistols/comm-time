@@ -14,6 +14,7 @@
     "test:all": "bun run test"
   },
   "dependencies": {
+    "@radix-ui/react-context-menu": "^2.3.7",
     "@radix-ui/react-dialog": "^1.1.15",
     "@supabase/supabase-js": "^2.81.1",
     "@tailwindcss/typography": "^0.5.19",
