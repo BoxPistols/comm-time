@@ -61,7 +61,9 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
 
   // ナビゲーション: 前/次/今日
   const navigatePrev = useCallback(() => {
-    if (view === "week") {
+    if (view === "today") {
+      setCurrentDate((d) => addDays(d, -1));
+    } else if (view === "week") {
       setCurrentDate((d) => addWeeks(d, -1));
     } else if (view === "month") {
       setCurrentDate((d) => addMonths(d, -1));
@@ -69,7 +71,9 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
   }, [view]);
 
   const navigateNext = useCallback(() => {
-    if (view === "week") {
+    if (view === "today") {
+      setCurrentDate((d) => addDays(d, 1));
+    } else if (view === "week") {
       setCurrentDate((d) => addWeeks(d, 1));
     } else if (view === "month") {
       setCurrentDate((d) => addMonths(d, 1));
@@ -80,11 +84,11 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
     setCurrentDate(startOfDay(new Date()));
   }, []);
 
-  // 週/月ビューのみ横スワイプで前後移動できる
+  // 今日/週/月ビューで横スワイプで前後移動できる
   const swipeHandlers = useSwipeNavigation({
     onSwipeLeft: navigateNext,
     onSwipeRight: navigatePrev,
-    enabled: view === "week" || view === "month",
+    enabled: view === "today" || view === "week" || view === "month",
   });
 
   // 取得期間: 現在の表示月の前後1ヶ月 + アジェンダ分をカバー
@@ -186,7 +190,7 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
             />
           </div>
 
-          {(view === "week" || view === "month") && (
+          {(view === "today" || view === "week" || view === "month") && (
             <div className="mb-3 flex items-center justify-between">
               <button
                 type="button"
@@ -198,7 +202,9 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
               </button>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                  {view === "week"
+                  {view === "today"
+                    ? `${currentDate.getMonth() + 1}/${currentDate.getDate()}（${["日", "月", "火", "水", "木", "金", "土"][currentDate.getDay()]}）`
+                    : view === "week"
                     ? formatWeekHeading(startOfWeekMonday(currentDate))
                     : formatMonthHeading(currentDate)}
                 </span>
@@ -244,7 +250,7 @@ export function CalendarTab({ user, todos = [], onAddTodo }: CalendarTabProps) {
 
           <div className={`${VIEW_MAX_HEIGHT} overflow-y-auto`} {...swipeHandlers}>
             {view === "today" && (
-              <CalendarDayView events={eventsState.events} onEventClick={handleEventClick} />
+              <CalendarDayView events={eventsState.events} currentDate={currentDate} onEventClick={handleEventClick} />
             )}
             {view === "week" && (
               <CalendarWeekView

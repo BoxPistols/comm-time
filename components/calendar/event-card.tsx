@@ -20,9 +20,27 @@ const PRIORITY_BADGE_CLASSES: Record<string, string> = {
   low: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
 };
 
+// Google Calendar の colorId → CSS カラー
+const CALENDAR_COLORS: Record<string, string> = {
+  "1": "#7986cb", // ラベンダー
+  "2": "#33b679", // セージ
+  "3": "#8e24aa", // ブドウ
+  "4": "#e67c73", // フラミンゴ
+  "5": "#f6bf26", // バナナ
+  "6": "#f4511e", // みかん
+  "7": "#039be5", // ピーコック
+  "8": "#616161", // グラファイト
+  "9": "#3f51b5", // ブルーベリー
+  "10": "#0b8043", // バジル
+  "11": "#d50000", // トマト
+};
+
 export function EventCard({ event, compact = false, onClick, onAddAsTodo }: EventCardProps) {
   const priority = event.annotation?.priority ?? "none";
   const hasMemo = Boolean(event.annotation?.memo);
+  const colorStyle = event.colorId && CALENDAR_COLORS[event.colorId]
+    ? { borderLeftColor: CALENDAR_COLORS[event.colorId], borderLeftWidth: "3px" }
+    : undefined;
 
   return (
     <EventContextMenu
@@ -33,6 +51,8 @@ export function EventCard({ event, compact = false, onClick, onAddAsTodo }: Even
       <button
       type="button"
       onClick={() => onClick(event)}
+      title={event.summary}
+      style={colorStyle}
       className={`w-full text-left rounded-xl border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 hover:bg-white dark:hover:bg-gray-800 shadow-sm hover:shadow-md transition-all ${
         compact ? "px-2 py-1.5" : "px-3 py-2.5"
       } ${event.status === "tentative" ? "opacity-70 border-dashed" : ""}`}

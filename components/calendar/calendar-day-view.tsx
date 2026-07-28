@@ -7,32 +7,36 @@ import type { CalendarEvent } from "@/types/calendar";
 
 type CalendarDayViewProps = {
   events: CalendarEvent[];
+  currentDate?: Date;
   onEventClick: (event: CalendarEvent) => void;
 };
 
-// 今日の予定を時系列で表示（終日予定を先頭に）
-export function CalendarDayView({ events, onEventClick }: CalendarDayViewProps) {
+// 指定日の予定を時系列で表示（終日予定を先頭に）
+export function CalendarDayView({ events, currentDate, onEventClick }: CalendarDayViewProps) {
+  const targetDate = currentDate ?? new Date();
   const today = new Date();
 
-  const todayEvents = events
+  const dayEvents = events
     .filter((e) => {
       const start = eventDisplayDate(e.startAt, e.isAllDay);
       if (e.isAllDay) {
         // Google の終日予定の end は排他的（翌日 00:00）
         const end = eventDisplayDate(e.endAt, true);
-        return isSameDay(start, today) || (start <= today && end > today);
+        return isSameDay(start, targetDate) || (start <= targetDate && end > targetDate);
       }
-      return isSameDay(start, today);
+      return isSameDay(start, targetDate);
     })
     .sort((a, b) => {
       if (a.isAllDay !== b.isAllDay) return a.isAllDay ? -1 : 1;
       return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
     });
 
-  if (todayEvents.length === 0) {
+  const isToday = isSameDay(targetDate, today);
+
+  if (dayEvents.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-        {CALENDAR_TEXT.noEventsToday}
+        {isToday ? CALENDAR_TEXT.noEventsToday : "この日の予定はありません"}
       </p>
     );
   }
@@ -41,7 +45,7 @@ export function CalendarDayView({ events, onEventClick }: CalendarDayViewProps) 
 
   return (
     <div className="space-y-1.5">
-      {todayEvents.map((event) => {
+      {dayEvents.map((event) => {
         const isPast = new Date(event.endAt).getTime() < now && !event.isAllDay;
         const isOngoing =
           !event.isAllDay &&
