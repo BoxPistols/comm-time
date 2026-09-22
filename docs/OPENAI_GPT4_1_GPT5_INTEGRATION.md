@@ -12,15 +12,15 @@
 # OpenAI API設定
 OPENAI_API_KEY=your-openai-api-key
 
-# オプション: デフォルトモデル（省略時: gpt-5.6-luna）
-OPENAI_MODEL=gpt-5.6-luna
+# オプション: デフォルトモデル（省略時: gpt-6-luna）
+OPENAI_MODEL=gpt-6-luna
 ```
 
 ### 2. 対応モデル
 
 | モデル | パラメータ | 備考 |
 |--------|-----------|------|
-| gpt-5.6-luna | `max_completion_tokens` | 高速・軽量（デフォルト） |
+| gpt-6-luna | `max_completion_tokens` | 高速・軽量（デフォルト） |
 | o1 / o1-mini | `max_completion_tokens` | 推論特化モデル |
 | o3 | `max_completion_tokens` | 高度な推論モデル |
 
@@ -48,6 +48,7 @@ components/
 // GPT-5系、o1系、o3系は max_completion_tokens を使用
 function requiresMaxCompletionTokens(modelId: string): boolean {
   if (modelId.startsWith('gpt-5')) return true;
+  if (modelId.startsWith('gpt-6')) return true;
   if (modelId.startsWith('gpt-4.1')) return true;
   if (modelId.startsWith('o1')) return true;
   if (modelId.startsWith('o3')) return true;
@@ -97,13 +98,13 @@ Body:
   "message": "今日やるべきタスクを教えて",
   "history": [],          // 会話履歴（オプション）
   "stream": false,        // ストリーミング（オプション）
-  "model": "gpt-5.6-luna"  // モデル指定（オプション）
+  "model": "gpt-6-luna"  // モデル指定（オプション）
 }
 
 Response:
 {
   "message": "AIからの応答",
-  "model": "gpt-5.6-luna",
+  "model": "gpt-6-luna",
   "usage": {
     "promptTokens": 100,
     "completionTokens": 50,

@@ -34,7 +34,7 @@ export function getOpenAIClient(): OpenAI {
  * デフォルトモデルを取得
  */
 export function getDefaultModel(): string {
-  return process.env.OPENAI_MODEL || 'gpt-5.6-luna';
+  return process.env.OPENAI_MODEL || 'gpt-6-luna';
 }
 
 // ============================================
@@ -49,6 +49,8 @@ export function getDefaultModel(): string {
 export function requiresMaxCompletionTokens(modelId: string): boolean {
   // GPT-5系
   if (modelId.startsWith('gpt-5')) return true;
+  // GPT-6系（gpt-6-lunaもmax_tokensを拒否する前提で扱う）
+  if (modelId.startsWith('gpt-6')) return true;
   // GPT-4.1系
   if (modelId.startsWith('gpt-4.1')) return true;
   // o1系モデル（reasoning models）
@@ -66,6 +68,8 @@ export function requiresMaxCompletionTokens(modelId: string): boolean {
 export function doesNotSupportTemperature(modelId: string): boolean {
   // GPT-5系 - temperatureはデフォルト(1)のみサポート
   if (modelId.startsWith('gpt-5')) return true;
+  // GPT-6系もtemperatureはデフォルト(1)のみの前提で扱う
+  if (modelId.startsWith('gpt-6')) return true;
   // o1系モデル（reasoning models）- temperatureサポートなし
   if (modelId.startsWith('o1')) return true;
   // o3系モデル（reasoning models）- temperatureサポートなし
@@ -242,9 +246,9 @@ export function isOpenAIConfigured(): boolean {
 
 /**
  * 利用可能なモデルのリスト（UIで選択用）
- * GPT-5.6 Luna の1択
+ * GPT-6 Lunaの1択
  * ログイン済みユーザーが使用可能（50回/日のレート制限）
  */
 export const AVAILABLE_MODELS = [
-  { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', description: '高速・軽量（デフォルト）' },
+  { id: 'gpt-6-luna', name: 'GPT-6 Luna', description: '高速・軽量（デフォルト）' },
 ] as const;

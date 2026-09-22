@@ -51,7 +51,7 @@ type ModelOption = {
 };
 
 const MODEL_OPTIONS: ModelOption[] = [
-  { id: "gpt-5.6-luna", name: "GPT-5.6 Luna", description: "高速・軽量（デフォルト）" },
+  { id: "gpt-6-luna", name: "GPT-6 Luna", description: "高速・軽量（デフォルト）" },
   { id: "custom", name: "ローカルLLM（無料）", description: "LM Studio等", isCustom: true },
 ];
 
@@ -85,9 +85,9 @@ export function AIChat({ darkMode, isOpen, onClose }: AIChatProps) {
       const saved = localStorage.getItem("aiChatSelectedModel");
       // 保存されたモデルが選択肢にあるかチェック（旧モデル廃止対応）
       const isValidModel = saved && MODEL_OPTIONS.some(m => m.id === saved);
-      return isValidModel ? saved : "gpt-5.6-luna";
+      return isValidModel ? saved : "gpt-6-luna";
     }
-    return "gpt-5.6-luna";
+    return "gpt-6-luna";
   });
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [customEndpoint, setCustomEndpoint] = useState("http://localhost:1234/v1");
