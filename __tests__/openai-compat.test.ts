@@ -24,7 +24,7 @@ import {
 
 describe("モデル判定", () => {
   it.each(["gpt-6-luna", "gpt-5.6-luna", "o1-mini", "o3"])(
-    "%s はmax_completion_tokensを使い、temperatureを送らない",
+    "%sはmax_completion_tokensを使い、temperatureを送らない",
     (model) => {
       expect(requiresMaxCompletionTokens(model)).toBe(true);
       expect(doesNotSupportTemperature(model)).toBe(true);
