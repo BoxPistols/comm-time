@@ -217,7 +217,7 @@ async function getUserMemosContext(client: SupabaseClient, userId: string): Prom
  * - message: string (required) - ユーザーのメッセージ
  * - history?: Array<{role: 'user' | 'assistant', content: string}> - 会話履歴
  * - stream?: boolean - ストリーミングレスポンスを使用するか (default: false)
- * - model?: string - 使用するモデル (default: 環境変数 or gpt-5.6-luna)
+ * - model?: string - 使用するモデル (default: 環境変数 or gpt-6-luna)
  */
 export async function POST(request: NextRequest) {
   // 認証チェック
